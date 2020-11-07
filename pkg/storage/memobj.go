@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/common"
@@ -16,8 +17,62 @@ type MemObjectStore struct {
 	config *ObjectStoreConfig
 }
 
+type MemObjectStoreBackendParams struct {
+	backendType BackendType
+}
+
+func NewMemObjectStoreBackendParams(backendType BackendType) (*MemObjectStoreBackendParams, error) {
+	if backendType != MemObjectStoreBackend {
+		return nil, common.NewInvalidError(fmt.Sprintf("NewMemObjectStoreBackendParams - Invalid backendType: %v",
+			backendType))
+	}
+	return &MemObjectStoreBackendParams {
+		backendType: backendType,
+	}, nil
+}
+
+func NewMemObjectStoreBackendParamsFromBytes(payload []byte) (*MemObjectStoreBackendParams, error) {
+	params := &MemObjectStoreBackendParams {
+	}
+	err := params.Deserialize(payload)
+	if err != nil {
+		return nil, err
+	}
+	return params, nil
+}
+
+func (memObjectStoreParams *MemObjectStoreBackendParams) Get() map[string]string {
+	return nil
+}
+
+func (memObjectStoreParams *MemObjectStoreBackendParams) GetBackendType() BackendType {
+	return memObjectStoreParams.backendType
+}
+
+func (memObjectStoreParams *MemObjectStoreBackendParams) Serialize() ([]byte, error) {
+	byteBuffer := bytes.NewBuffer(make([]byte, 0))
+	gEncoder := gob.NewEncoder(byteBuffer)
+	err := gEncoder.Encode(memObjectStoreParams.backendType)
+	if err != nil {
+		return nil, err
+	}
+	return byteBuffer.Bytes(), nil
+}
+
+func (memObjectStoreParams *MemObjectStoreBackendParams) Deserialize(payload []byte) error {
+	var backendType BackendType
+	byteBuffer := bytes.NewBuffer(payload)
+	gDecoder := gob.NewDecoder(byteBuffer)
+	err := gDecoder.Decode(&backendType)
+	if err != nil {
+		return err
+	}
+	memObjectStoreParams.backendType = backendType
+	return nil
+}
+
 // NewMemObjectStore returns a MemObjectStore object
-func NewMemObjectStore() (*MemObjectStore, error) {
+func NewMemObjectStore(params ObjectStoreBackendParams) (*MemObjectStore, error) {
 	configBase, err := config.NewConfigBase()
 	if err != nil {
 		return nil, err

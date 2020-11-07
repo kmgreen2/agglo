@@ -61,7 +61,7 @@ func (reader *BadReader) Read(b []byte) (int ,error) {
 
 func TestHappyPath(t *testing.T) {
 	fileSize := 1024
-	objStore, err := storage.NewMemObjectStore()
+	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -103,7 +103,7 @@ func TestHappyPath(t *testing.T) {
 }
 
 func TestPutConflictError(t *testing.T) {
-	objStore, err := storage.NewMemObjectStore()
+	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -119,7 +119,7 @@ func TestPutConflictError(t *testing.T) {
 }
 
 func TestPutReadError(t *testing.T) {
-	objStore, err := storage.NewMemObjectStore()
+	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -130,7 +130,7 @@ func TestPutReadError(t *testing.T) {
 }
 
 func TestGetNotFound(t *testing.T) {
-	objStore, err := storage.NewMemObjectStore()
+	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -139,7 +139,7 @@ func TestGetNotFound(t *testing.T) {
 }
 
 func TestHeadNotFound(t *testing.T) {
-	objStore, err := storage.NewMemObjectStore()
+	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -166,7 +166,7 @@ func putObjects(objStore storage.ObjectStore, prefix string, numWithPrefix int, 
 }
 
 func TestListNone(t *testing.T) {
-	objStore, err := storage.NewMemObjectStore()
+	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -180,7 +180,7 @@ func TestListNone(t *testing.T) {
 }
 
 func TestListAll(t *testing.T) {
-	objStore, err := storage.NewMemObjectStore()
+	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -194,7 +194,7 @@ func TestListAll(t *testing.T) {
 }
 
 func TestListSome(t *testing.T) {
-	objStore, err := storage.NewMemObjectStore()
+	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}

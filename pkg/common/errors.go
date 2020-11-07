@@ -101,3 +101,20 @@ func NewEndOfStreamError(msg string) *EndOfStreamError {
 		msg: msg,
 	}
 }
+
+// SignatureError represents a end-of-stream error in a data, kv or object store
+type SignatureError struct {
+	msg string
+}
+
+// Error returns the error message
+func (err *SignatureError) Error() string {
+	return err.msg
+}
+
+// NewSignatureError will return a SignatureError object
+func NewSignatureError(msg string) *SignatureError {
+	return &SignatureError{
+		msg: msg,
+	}
+}

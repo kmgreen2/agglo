@@ -64,7 +64,7 @@ func (memTopic *MemTopic) Publish(payload []byte) error {
 // Next will return the message at a given element
 func (memTopic *MemTopic) Get(index int64) ([]byte, error) {
 	numMessages := len(memTopic.messageQueue)
-	if numMessages >= int(index) {
+	if numMessages <= int(index) {
 		return nil, common.NewOutOfBoundsError(fmt.Sprintf("MemPubSub - index out of bounds: %d >= %d", index,
 			numMessages))
 	}
