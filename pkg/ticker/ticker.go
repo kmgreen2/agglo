@@ -8,6 +8,7 @@ import (
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"strings"
 	"sync"
+	"time"
 )
 
 /*
@@ -18,23 +19,39 @@ import (
 	Proof: h(<substream_id>)[:4]-<substream-id>-pf-<idx> -> <serialized proof>
  */
 
+// TickerStore is the interface for managing a ticker stream
 type TickerStore interface {
 	GetMessageByUUID(uuid gUuid.UUID) (ImmutableMessage, error)
 	GetHistory(start gUuid.UUID, end gUuid.UUID) ([]ImmutableMessage, error)
-	GetAnchor(proof []ImmutableMessage, subStreamID SubStreamID,
+	Anchor(proof []ImmutableMessage, subStreamID SubStreamID,
 		authenticator crypto.Authenticator) (ImmutableMessage, error)
 	HappenedBefore(lhs *TickerImmutableMessage, rhs *TickerImmutableMessage) (bool, error)
-	Append(message *UncommittedMessage) error
+	Append(signer crypto.Signer) error
 }
 
+// KVStreamStore is an implementation of TickerStore that is backed by an in-memory map
 type KVTickerStore struct {
 	kvStore kvs.KVStore
 	head *TickerImmutableMessage
 	tickerLock *sync.Mutex
 	proofIndexes map[string]int
 	proofLocks map[string]*sync.Mutex
+	digestType common.DigestType
 }
 
+// NewKVTickerStore returns a new KVStreamStore backed by the provided KVStore
+// ToDo(KMG): Need to init heads, write locks from state in the backing KVStore
+func NewKVTickerStore(kvStore kvs.KVStore, digestType common.DigestType) *KVTickerStore {
+	return &KVTickerStore{
+		kvStore: kvStore,
+		digestType: digestType,
+		proofIndexes: make(map[string]int),
+		proofLocks: make(map[string]*sync.Mutex),
+		tickerLock: &sync.Mutex{},
+	}
+}
+
+// GetMessageByUUID will return the message with a given UUID; otherwise, return an error
 func (tickerStore *KVTickerStore) GetMessageByUUID(uuid gUuid.UUID) (ImmutableMessage, error) {
 	messageBytes, err := tickerStore.kvStore.Get(uuid.String())
 	if err != nil {
@@ -43,6 +60,7 @@ func (tickerStore *KVTickerStore) GetMessageByUUID(uuid gUuid.UUID) (ImmutableMe
 	return NewTickerImmutableMessageFromBuffer(messageBytes)
 }
 
+// GetMessages will return the messages for the given UUIDs; otherwise, return an error
 func (tickerStore *KVTickerStore) GetMessages(uuids []gUuid.UUID) ([]ImmutableMessage, error) {
 	var chainedMessages []ImmutableMessage
 	for _, myUuid := range uuids {
@@ -59,6 +77,7 @@ func (tickerStore *KVTickerStore) GetMessages(uuids []gUuid.UUID) ([]ImmutableMe
 	return chainedMessages, nil
 }
 
+// GetHistory will return the ordered, immutable history between two UUIDs; otherwise return an error
 func (tickerStore *KVTickerStore) GetHistory(start gUuid.UUID, end gUuid.UUID) ([]ImmutableMessage, error) {
 	var chainedUuids []gUuid.UUID
 
@@ -82,6 +101,7 @@ func (tickerStore *KVTickerStore) GetHistory(start gUuid.UUID, end gUuid.UUID) (
 	return tickerStore.GetMessages(chainedUuids)
 }
 
+// CreateGenesisProof will create a genesis proof for a substream; otherwise, return an error
 func (tickerStore *KVTickerStore) CreateGenesisProof(subStreamID SubStreamID) error {
 	if _, ok := tickerStore.proofLocks[string(subStreamID)]; !ok {
 		tickerStore.proofLocks[string(subStreamID)] = &sync.Mutex{}
@@ -90,7 +110,10 @@ func (tickerStore *KVTickerStore) CreateGenesisProof(subStreamID SubStreamID) er
 	defer tickerStore.proofLocks[string(subStreamID)].Unlock()
 
 	tickerMessage := tickerStore.head
-	proof := NewGenesisProof(subStreamID, tickerMessage)
+	proof, err := NewGenesisProof(subStreamID, tickerMessage)
+	if err != nil {
+		return err
+	}
 
 	// Serialize and store the new proof
 	proofBytes, err := proof.Serialize()
@@ -114,6 +137,7 @@ func (tickerStore *KVTickerStore) CreateGenesisProof(subStreamID SubStreamID) er
 	return nil
 }
 
+// GetLatestProofKey will return the latest known proof for a substream; otherwise, return an error
 func (tickerStore *KVTickerStore) GetLatestProofKey(subStreamID SubStreamID) (string, error) {
 	proofPrefix, err := ProofIdentifierPrefix(subStreamID)
 	if err != nil {
@@ -151,6 +175,8 @@ func (tickerStore *KVTickerStore) GetLatestProofKey(subStreamID SubStreamID) (st
 	return fmt.Sprintf("%s-%d", proofPrefix, maxIdx), nil
 }
 
+// GetProofStartUuid will return the UUID of the last message in the latest known proof for a substream; otherwise,
+// return an error
 func (tickerStore *KVTickerStore) GetProofStartUuid(subStreamID SubStreamID) (gUuid.UUID, error) {
 	proofKey, err := tickerStore.GetLatestProofKey(subStreamID)
 	if err != nil {
@@ -169,7 +195,8 @@ func (tickerStore *KVTickerStore) GetProofStartUuid(subStreamID SubStreamID) (gU
 	return proof.endUuid, nil
 }
 
-
+// Anchor will return a ticker anchor, given a sequence of messages (used as a proof) for a substream; otherwise, return
+// an error
 func (tickerStore *KVTickerStore) Anchor(messages []ImmutableMessage, subStreamID SubStreamID,
 	authenticator crypto.Authenticator) (ImmutableMessage, error) {
 
@@ -212,7 +239,11 @@ func (tickerStore *KVTickerStore) Anchor(messages []ImmutableMessage, subStreamI
 	}
 
 	// Validate the previous proof is consistent with the proposed proof
-	if !proof.IsConsistent(prevProof) {
+	ok, err := proof.IsConsistent(prevProof)
+	if err != nil {
+		return nil, NewInvalidError(fmt.Sprintf("Anchor - error with proposed proof: %s", err.Error()))
+	}
+	if !ok {
 		return nil, NewInvalidError("Anchor - proposed proof is not consistent with previous chain of proof")
 	}
 
@@ -237,11 +268,48 @@ func (tickerStore *KVTickerStore) Anchor(messages []ImmutableMessage, subStreamI
 	return tickerMessage, nil
 }
 
+// HappenedBefore returns true if lhs happened before rhs; otherwise return an error and/or false
 func (tickerStore *KVTickerStore) HappenedBefore(lhs *TickerImmutableMessage, rhs *TickerImmutableMessage) (bool,
 	error) {
 	return lhs.Index() < rhs.Index(), nil
 }
 
-func (tickerStore *KVTickerStore) Append(message *UncommittedMessage) error {
-	panic("implement me")
+// Append will append an uncommitted message to a substream; otherwise, return
+// an error.
+func (tickerStore *KVTickerStore) Append(signer crypto.Signer) error {
+	ts := time.Now().Unix()
+	tickerStore.tickerLock.Lock()
+	defer tickerStore.tickerLock.Unlock()
+
+	head := tickerStore.head
+
+	immutableMessage, err := NewTickerImmutableMessage(tickerStore.digestType, signer,
+		ts, head)
+	if err != nil {
+		return err
+	}
+
+	newUuid := immutableMessage.uuid
+
+	// Store previous node reference
+	prevUuidBytes, err := UuidToBytes(head.uuid)
+	if err != nil {
+		return err
+	}
+	err = tickerStore.kvStore.Put(PreviousNodeKey(newUuid), prevUuidBytes)
+	if err != nil {
+		return err
+	}
+
+	// Store main record
+	messageBytes, err := immutableMessage.Serialize()
+	err = tickerStore.kvStore.Put(newUuid.String(), messageBytes)
+	if err != nil {
+		return err
+	}
+
+	// Set new head
+	tickerStore.head = immutableMessage
+
+	return nil
 }

@@ -17,10 +17,12 @@ type MemObjectStore struct {
 	config *ObjectStoreConfig
 }
 
+// MemObjectStoreBackendParams are parameters used to access a MemObjectStore
 type MemObjectStoreBackendParams struct {
 	backendType BackendType
 }
 
+// NewMemObjectStoreBackendParams will create and return a MemObjectStoreBackendParams object
 func NewMemObjectStoreBackendParams(backendType BackendType) (*MemObjectStoreBackendParams, error) {
 	if backendType != MemObjectStoreBackend {
 		return nil, common.NewInvalidError(fmt.Sprintf("NewMemObjectStoreBackendParams - Invalid backendType: %v",
@@ -31,6 +33,8 @@ func NewMemObjectStoreBackendParams(backendType BackendType) (*MemObjectStoreBac
 	}, nil
 }
 
+// NewMemObjectStoreBackendParamsFromBytes will deserialize backend params and return an error if the params cannot
+// be deserialized
 func NewMemObjectStoreBackendParamsFromBytes(payload []byte) (*MemObjectStoreBackendParams, error) {
 	params := &MemObjectStoreBackendParams {
 	}
@@ -41,14 +45,17 @@ func NewMemObjectStoreBackendParamsFromBytes(payload []byte) (*MemObjectStoreBac
 	return params, nil
 }
 
+// Get will get a map of backend params
 func (memObjectStoreParams *MemObjectStoreBackendParams) Get() map[string]string {
 	return nil
 }
 
+// GetBackendType will return the object store backend type
 func (memObjectStoreParams *MemObjectStoreBackendParams) GetBackendType() BackendType {
 	return memObjectStoreParams.backendType
 }
 
+// Serialize will serialize the backend params and return an error if the params cannot be serialized
 func (memObjectStoreParams *MemObjectStoreBackendParams) Serialize() ([]byte, error) {
 	byteBuffer := bytes.NewBuffer(make([]byte, 0))
 	gEncoder := gob.NewEncoder(byteBuffer)
@@ -59,6 +66,7 @@ func (memObjectStoreParams *MemObjectStoreBackendParams) Serialize() ([]byte, er
 	return byteBuffer.Bytes(), nil
 }
 
+// Deserialize will deserialize the backend params and return an error if the params cannot be deserialized
 func (memObjectStoreParams *MemObjectStoreBackendParams) Deserialize(payload []byte) error {
 	var backendType BackendType
 	byteBuffer := bytes.NewBuffer(payload)

@@ -21,6 +21,7 @@ import (
  	Tags: md5(tag)[:4]-<tag>-<UUID>
  */
 
+// StreamStore is the interface for a converged stream of substreams
 type StreamStore interface {
 	GetMessagesByName(name string) ([]ImmutableMessage, error)
 	GetMessagesByTags(tags []string) ([]ImmutableMessage, error)
@@ -35,6 +36,7 @@ type StreamStore interface {
 	//HappenedBefore(lhs *StreamImmutableMessage, rhs *StreamImmutableMessage) (bool, error)
 }
 
+// KVStreamStore is an implementation of StreamStore that is backed by an in-memory map
 type KVStreamStore struct {
 	kvStore kvs.KVStore
 	heads map[string]*StreamImmutableMessage
@@ -43,6 +45,19 @@ type KVStreamStore struct {
 	streamLock *sync.Mutex
 }
 
+// NewKVStreamStore returns a new KVStreamStore backed by the provided KVStore
+// ToDo(KMG): Need to init heads, write locks from state in the backing KVStore
+func NewKVStreamStore(kvStore kvs.KVStore, digestType common.DigestType) *KVStreamStore {
+	return &KVStreamStore{
+		kvStore: kvStore,
+		digestType: digestType,
+		heads: make(map[string]*StreamImmutableMessage),
+		writeLocks: make(map[string]*sync.Mutex),
+		streamLock: &sync.Mutex{},
+	}
+}
+
+// GetMessagesByName will return all messages that have a given name; otherwise, return an error
 func (streamStore *KVStreamStore) GetMessagesByName(name string) ([]ImmutableMessage, error) {
 	namePrefix, err := NameKeyPrefix(name)
 	if err != nil {
@@ -66,6 +81,7 @@ func (streamStore *KVStreamStore) GetMessagesByName(name string) ([]ImmutableMes
 	return messages, nil
 }
 
+// GetMessagesByTags will return all messages that have a given set of tags; otherwise, return an error
 func (streamStore *KVStreamStore) GetMessagesByTags(tags []string) ([]ImmutableMessage, error) {
 	var allKeys []string
 
@@ -96,6 +112,7 @@ func (streamStore *KVStreamStore) GetMessagesByTags(tags []string) ([]ImmutableM
 	return messages, nil
 }
 
+// GetMessageByUUID will return the message with a given UUID; otherwise, return an error
 func (streamStore *KVStreamStore) GetMessageByUUID(uuid gUuid.UUID) (ImmutableMessage, error) {
 	messageBytes, err := streamStore.kvStore.Get(uuid.String())
 	if err != nil {
@@ -104,6 +121,7 @@ func (streamStore *KVStreamStore) GetMessageByUUID(uuid gUuid.UUID) (ImmutableMe
 	return NewStreamImmutableMessageFromBuffer(messageBytes)
 }
 
+// GetMessages will return the messages for the given UUIDs; otherwise, return an error
 func (streamStore *KVStreamStore) GetMessages(uuids []gUuid.UUID) ([]ImmutableMessage, error) {
 	var chainedMessages []ImmutableMessage
 	for _, myUuid := range uuids {
@@ -120,6 +138,7 @@ func (streamStore *KVStreamStore) GetMessages(uuids []gUuid.UUID) ([]ImmutableMe
 	return chainedMessages, nil
 }
 
+// GetHistory will return the ordered, immutable history between two UUIDs; otherwise return an error
 func (streamStore *KVStreamStore) GetHistory(start gUuid.UUID, end gUuid.UUID) ([]ImmutableMessage, error) {
 	var chainedUuids []gUuid.UUID
 
@@ -143,6 +162,7 @@ func (streamStore *KVStreamStore) GetHistory(start gUuid.UUID, end gUuid.UUID) (
 	return streamStore.GetMessages(chainedUuids)
 }
 
+// getAnchorUUID will return the anchor UUID for a give message; otherwise, return an error
 func (streamStore *KVStreamStore) getAnchorUUID(uuid gUuid.UUID) (gUuid.UUID, error) {
 	anchorBytes, err := streamStore.kvStore.Get(AnchorNodeKey(uuid))
 	if err != nil {
@@ -155,6 +175,8 @@ func (streamStore *KVStreamStore) getAnchorUUID(uuid gUuid.UUID) (gUuid.UUID, er
 	return anchorUuid, nil
 }
 
+// GetHistoryToLastAnchor will return the immutable history from the provided UUID back to the last message with
+// a different anchor; otherwise, return an error
 func (streamStore *KVStreamStore) GetHistoryToLastAnchor(uuid gUuid.UUID) ([]ImmutableMessage, error) {
 	var chainedUuids []gUuid.UUID
 
@@ -187,6 +209,7 @@ func (streamStore *KVStreamStore) GetHistoryToLastAnchor(uuid gUuid.UUID) ([]Imm
 	return streamStore.GetMessages(chainedUuids)
 }
 
+// getHead will return the head of a specific substream; otherwise, return an error
 func (streamStore *KVStreamStore) getHead(subStreamID SubStreamID) (*StreamImmutableMessage, error) {
 	if head, ok := streamStore.heads[string(subStreamID)]; ok {
 		return head , nil
@@ -194,11 +217,14 @@ func (streamStore *KVStreamStore) getHead(subStreamID SubStreamID) (*StreamImmut
 	return nil, common.NewNotFoundError(fmt.Sprintf("GetHead - cannot find substream: %s", subStreamID))
 }
 
+// setHead will set the head of a specific substream; otherwise, return an error
 func (streamStore *KVStreamStore) setHead(subStreamID SubStreamID, message *StreamImmutableMessage) error {
 	streamStore.heads[string(subStreamID)] = message
 	return nil
 }
 
+// Append will append an uncommitted message to a substream, anchored at the provided anchor UUID; otherwise return
+// an error.
 // ToDo(KMG): Need to rollback any incomplete append
 func (streamStore *KVStreamStore) Append(message UncommittedMessage, subStreamID SubStreamID,
 	anchorTickerUuid gUuid.UUID) (gUuid.UUID, error) {
@@ -276,6 +302,7 @@ func (streamStore *KVStreamStore) Append(message UncommittedMessage, subStreamID
 		return gUuid.Nil, err
 	}
 
+	// Set new head
 	err = streamStore.setHead(subStreamID, immutableMessage)
 	if err != nil {
 		return gUuid.Nil, err
