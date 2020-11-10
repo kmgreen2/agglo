@@ -1,17 +1,247 @@
 package ticker
 
 import (
-	"github.com/google/uuid"
+	"fmt"
+	gUuid "github.com/google/uuid"
+	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/kvs"
+	"strings"
+	"sync"
 )
 
+/*
+	Internal key format :
+
+	Primary record: <UUID>-n -> <data or data descriptor>, <substream id>, <object metadata>
+	Previous node:  <UUID>-p -> <previous UUID>
+	Proof: h(<substream_id>)[:4]-<substream-id>-pf-<idx> -> <serialized proof>
+ */
+
 type TickerStore interface {
-	GetMessageByUUID(uuid uuid.UUID) ImmutableMessage
-	GetHistory(from uuid.UUID, to uuid.UUID) []ImmutableMessage
-	GetAnchor(proof []ImmutableMessage, subStreamID SubStreamID) ImmutableMessage
-	HappenedBefore(lhs ImmutableMessage, rhs ImmutableMessage) (bool, error)
+	GetMessageByUUID(uuid gUuid.UUID) (ImmutableMessage, error)
+	GetHistory(start gUuid.UUID, end gUuid.UUID) ([]ImmutableMessage, error)
+	GetAnchor(proof []ImmutableMessage, subStreamID SubStreamID,
+		authenticator crypto.Authenticator) (ImmutableMessage, error)
+	HappenedBefore(lhs *TickerImmutableMessage, rhs *TickerImmutableMessage) (bool, error)
+	Append(message *UncommittedMessage) error
 }
 
 type KVTickerStore struct {
 	kvStore kvs.KVStore
+	head *TickerImmutableMessage
+	tickerLock *sync.Mutex
+	proofIndexes map[string]int
+	proofLocks map[string]*sync.Mutex
+}
+
+func (tickerStore *KVTickerStore) GetMessageByUUID(uuid gUuid.UUID) (ImmutableMessage, error) {
+	messageBytes, err := tickerStore.kvStore.Get(uuid.String())
+	if err != nil {
+		return nil, err
+	}
+	return NewTickerImmutableMessageFromBuffer(messageBytes)
+}
+
+func (tickerStore *KVTickerStore) GetMessages(uuids []gUuid.UUID) ([]ImmutableMessage, error) {
+	var chainedMessages []ImmutableMessage
+	for _, myUuid := range uuids {
+		messageBytes, err := tickerStore.kvStore.Get(myUuid.String())
+		if err != nil {
+			return nil, err
+		}
+		message, err := NewStreamImmutableMessageFromBuffer(messageBytes)
+		if err != nil {
+			return nil, err
+		}
+		chainedMessages = append(chainedMessages, message)
+	}
+	return chainedMessages, nil
+}
+
+func (tickerStore *KVTickerStore) GetHistory(start gUuid.UUID, end gUuid.UUID) ([]ImmutableMessage, error) {
+	var chainedUuids []gUuid.UUID
+
+	curr := end
+
+	for {
+		chainedUuids = append(chainedUuids, curr)
+		if strings.Compare(curr.String(), start.String()) == 0 {
+			break
+		}
+		prevBytes, err := tickerStore.kvStore.Get(PreviousNodeKey(curr))
+		if err != nil {
+			return nil, err
+		}
+		prev, err := BytesToUUID(prevBytes)
+		if err != nil {
+			return nil, err
+		}
+		curr = prev
+	}
+	return tickerStore.GetMessages(chainedUuids)
+}
+
+func (tickerStore *KVTickerStore) CreateGenesisProof(subStreamID SubStreamID) error {
+	if _, ok := tickerStore.proofLocks[string(subStreamID)]; !ok {
+		tickerStore.proofLocks[string(subStreamID)] = &sync.Mutex{}
+	}
+	tickerStore.proofLocks[string(subStreamID)].Lock()
+	defer tickerStore.proofLocks[string(subStreamID)].Unlock()
+
+	tickerMessage := tickerStore.head
+	proof := NewGenesisProof(subStreamID, tickerMessage)
+
+	// Serialize and store the new proof
+	proofBytes, err := proof.Serialize()
+	if err != nil {
+		return err
+	}
+
+	// ID == 0 because this is the genesis proof
+	proofKey, err := ProofIdentifier(subStreamID, 0)
+	if err != nil {
+		return err
+	}
+
+	err = tickerStore.kvStore.Put(proofKey, proofBytes)
+	if err != nil {
+		return err
+	}
+
+	tickerStore.proofIndexes[string(subStreamID)] = 0
+
+	return nil
+}
+
+func (tickerStore *KVTickerStore) GetLatestProofKey(subStreamID SubStreamID) (string, error) {
+	proofPrefix, err := ProofIdentifierPrefix(subStreamID)
+	if err != nil {
+		return "", err
+	}
+	if idx, ok := tickerStore.proofIndexes[string(subStreamID)]; ok {
+		return fmt.Sprintf("%s-%d", proofPrefix, idx), nil
+	}
+
+
+	keys, err := tickerStore.kvStore.List(proofPrefix)
+	if err != nil {
+		return "", err
+	}
+
+	// No proofs have been stored yet, return not found.  Caller should create a genesis proof
+	if len(keys) == 0 {
+		return "", common.NewNotFoundError(fmt.Sprintf(
+			"GetProofStartUuid - cannot find previous proof for substream: %s", subStreamID))
+	}
+
+	maxIdx := -1
+
+	for _, key := range keys {
+		var idx int
+		_, err = fmt.Sscanf(key, proofPrefix + "-%d", &idx)
+		if err != nil {
+			return "", err
+		}
+		if idx > maxIdx {
+			maxIdx = idx
+		}
+	}
+	tickerStore.proofIndexes[string(subStreamID)] = maxIdx
+	return fmt.Sprintf("%s-%d", proofPrefix, maxIdx), nil
+}
+
+func (tickerStore *KVTickerStore) GetProofStartUuid(subStreamID SubStreamID) (gUuid.UUID, error) {
+	proofKey, err := tickerStore.GetLatestProofKey(subStreamID)
+	if err != nil {
+		return gUuid.Nil, err
+	}
+	proofBytes, err := tickerStore.kvStore.Get(proofKey)
+	if err != nil {
+		return gUuid.Nil, err
+	}
+
+	proof, err := NewProofFromBytes(proofBytes)
+	if err != nil {
+		return gUuid.Nil, err
+	}
+
+	return proof.endUuid, nil
+}
+
+
+func (tickerStore *KVTickerStore) Anchor(messages []ImmutableMessage, subStreamID SubStreamID,
+	authenticator crypto.Authenticator) (ImmutableMessage, error) {
+
+	tickerMessage := tickerStore.head
+	// Create proof and validate
+	proof := NewProof(messages, subStreamID, tickerMessage)
+	if !proof.Validate() {
+		return nil, NewInvalidError(fmt.Sprintf("Anchor - proof validation failed for substream: %s",
+			subStreamID))
+	}
+
+	// Validate signatures
+	for _, message := range messages {
+		verified, err := message.VerifySignature(authenticator)
+		if err != nil {
+			return nil, err
+		}
+		if !verified {
+			return nil, NewInvalidError(fmt.Sprintf("Anchor - invalid signature for uuid: %s", message.Uuid()))
+		}
+	}
+
+	tickerStore.proofLocks[string(subStreamID)].Lock()
+	defer tickerStore.proofLocks[string(subStreamID)].Unlock()
+
+	// Get previous proof
+	prevProofKey, err := tickerStore.GetLatestProofKey(subStreamID)
+	if err != nil {
+		return nil, err
+	}
+
+	prevBytes, err := tickerStore.kvStore.Get(prevProofKey)
+	// There is no record of any previous proof, or something went wrong
+	if err != nil {
+		return nil, err
+	}
+	prevProof, err := NewProofFromBytes(prevBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate the previous proof is consistent with the proposed proof
+	if !proof.IsConsistent(prevProof) {
+		return nil, NewInvalidError("Anchor - proposed proof is not consistent with previous chain of proof")
+	}
+
+	// Serialize and store the new proof
+	proofBytes, err := proof.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	proofKey, err := ProofIdentifier(subStreamID, tickerStore.proofIndexes[string(subStreamID)] + 1)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tickerStore.kvStore.Put(proofKey, proofBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	tickerStore.proofIndexes[string(subStreamID)]++
+
+	return tickerMessage, nil
+}
+
+func (tickerStore *KVTickerStore) HappenedBefore(lhs *TickerImmutableMessage, rhs *TickerImmutableMessage) (bool,
+	error) {
+	return lhs.Index() < rhs.Index(), nil
+}
+
+func (tickerStore *KVTickerStore) Append(message *UncommittedMessage) error {
+	panic("implement me")
 }
