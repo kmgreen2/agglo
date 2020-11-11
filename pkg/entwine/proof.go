@@ -1,4 +1,4 @@
-package ticker
+package entwine
 
 import (
 	"bytes"
@@ -8,31 +8,85 @@ import (
 	"strings"
 )
 
-// MessageFingerprint is the fingerprint used to prove historical timelines of substreams.  A fingerprint is
+// messageFingerprint is the fingerprint used to prove historical timelines of substreams.  A fingerprint is
 // derived from a StreamImmutableMessage
-type MessageFingerprint struct {
-	signature []byte
-	digest []byte
-	digestType common.DigestType
-	uuid gUuid.UUID
+type messageFingerprint struct {
+	Signature []byte
+	Digest []byte
+	DigestType common.DigestType
+	Uuid gUuid.UUID
 }
 
 // Proof is used to encapsulate a sequence of immutable fingerprints for verification
 type Proof struct {
-	messageFingerprints []*MessageFingerprint
+	messageFingerprints []*messageFingerprint
 	startUuid gUuid.UUID
 	endUuid gUuid.UUID
 	subStreamID SubStreamID
 	tickerUuid gUuid.UUID
 }
 
-// NewMessageFingerprint will create a MessageFingerprint from an ImmutableMessage
-func NewMessageFingerprint(message ImmutableMessage) *MessageFingerprint {
-	return &MessageFingerprint{
-		signature: message.Signature(),
-		digest: message.Digest(),
-		digestType: message.DigestType(),
-		uuid: message.Uuid(),
+// SerializeProof serializes a Proof
+func SerializeProof(proof *Proof) ([]byte, error) {
+	byteBuffer := bytes.NewBuffer(make([]byte, 0))
+	gEncoder := gob.NewEncoder(byteBuffer)
+	err := gEncoder.Encode(proof.messageFingerprints)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(proof.startUuid)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(proof.endUuid)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(proof.subStreamID)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(proof.tickerUuid)
+	if err != nil {
+		return nil, err
+	}
+	return byteBuffer.Bytes(), nil
+}
+
+// DeserializeProof deserializes a Proof
+func DeserializeProof(proofBytes []byte, proof *Proof) error {
+	byteBuffer := bytes.NewBuffer(proofBytes)
+	gDecoder := gob.NewDecoder(byteBuffer)
+	err := gDecoder.Decode(&proof.messageFingerprints)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&proof.startUuid)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&proof.endUuid)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&proof.subStreamID)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&proof.tickerUuid)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// NewMessageFingerprint will create a messageFingerprint from an ImmutableMessage
+func NewMessageFingerprint(message ImmutableMessage) *messageFingerprint {
+	return &messageFingerprint{
+		Signature: message.Signature(),
+		Digest: message.Digest(),
+		DigestType: message.DigestType(),
+		Uuid: message.Uuid(),
 	}
 }
 
@@ -72,7 +126,7 @@ func (proof *Proof) IsGenesis() (bool, error) {
 // at the provided ticker message
 func NewProof(messages []ImmutableMessage, subStreamID SubStreamID, tickerMessage *TickerImmutableMessage) *Proof {
 	proof := &Proof {
-		messageFingerprints: make([]*MessageFingerprint, len(messages)),
+		messageFingerprints: make([]*messageFingerprint, len(messages)),
 		subStreamID: subStreamID,
 		startUuid: messages[0].Uuid(),
 		endUuid: messages[len(messages)-1].Uuid(),
@@ -102,12 +156,12 @@ func (proof *Proof) Validate() bool {
 	var prevDigest []byte
 	for i, fingerprint := range proof.messageFingerprints {
 		if i == 0 {
-			prevDigest = fingerprint.digest
+			prevDigest = fingerprint.Digest
 		} else {
-			digest := common.InitHash(fingerprint.digestType)
+			digest := common.InitHash(fingerprint.DigestType)
 			digest.Write(prevDigest)
-			digest.Write(fingerprint.signature)
-			if bytes.Compare(digest.Sum(nil), fingerprint.digest) != 0 {
+			digest.Write(fingerprint.Signature)
+			if bytes.Compare(digest.Sum(nil), fingerprint.Digest) != 0 {
 				return false
 			}
 		}

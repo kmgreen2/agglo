@@ -1,4 +1,4 @@
-package ticker
+package entwine
 
 import (
 	"fmt"
@@ -296,7 +296,7 @@ func (streamStore *KVStreamStore) Append(message UncommittedMessage, subStreamID
 	}
 
 	// Store main record
-	messageBytes, err := immutableMessage.Serialize()
+	messageBytes, err := SerializeStreamImmutableMessage(immutableMessage)
 	err = streamStore.kvStore.Put(newUuid.String(), messageBytes)
 	if err != nil {
 		return gUuid.Nil, err

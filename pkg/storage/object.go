@@ -23,6 +23,8 @@ type BackendType int
 const (
 	// UnknownBackend is an undefined object store backend
 	UnknownBackend = iota
+	// NilBackend
+	NilBackend
 	// MemObjectStoreBackend
 	MemObjectStoreBackend
 )
@@ -31,8 +33,20 @@ const (
 type ObjectStoreBackendParams interface {
 	GetBackendType() BackendType
 	Get() map[string]string
-	Serialize() ([]byte, error)
-	Deserialize([]byte) error
+}
+
+// NilObjectStoreBackendParams is a hack to get serialization to work for genesis messages
+type NilObjectStoreBackendParams struct {
+}
+
+// GetBackendType returns NilBackend
+func (backendParams *NilObjectStoreBackendParams) GetBackendType() BackendType {
+	return NilBackend
+}
+
+// Get returns nil
+func (backendParams *NilObjectStoreBackendParams) Get() map[string]string {
+	return nil
 }
 
 // ObjectDescriptor contains all of the information needed to access an object from an object store
@@ -56,7 +70,7 @@ func NewObjectDescriptor(backendParams ObjectStoreBackendParams, backendKey stri
 func NewObjectDescriptorFromBytes(payload []byte) (*ObjectDescriptor, error) {
 	desc := &ObjectDescriptor{
 	}
-	err := desc.deserialize(payload)
+	 err := DeserializeObjectDescriptor(payload, desc)
 	if err != nil {
 		return nil, err
 	}
@@ -73,8 +87,8 @@ func (desc *ObjectDescriptor) GetKey() string {
 	return desc.backendKey
 }
 
-// Serialize will serialize the object descriptor and return an error, if it cannot serialize
-func (desc *ObjectDescriptor) Serialize() ([]byte, error) {
+// SerializeObjectDescriptor will serialize the object descriptor and return an error, if it cannot serialize
+func SerializeObjectDescriptor(desc *ObjectDescriptor) ([]byte, error) {
 	byteBuffer := bytes.NewBuffer(make([]byte, 0))
 	gEncoder := gob.NewEncoder(byteBuffer)
 	err := gEncoder.Encode(desc.backendKey)
@@ -85,19 +99,29 @@ func (desc *ObjectDescriptor) Serialize() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	paramsBytes, err := desc.backendParams.Serialize()
-	if err != nil {
-		return nil, err
+
+	if _, ok := desc.backendParams.(*NilObjectStoreBackendParams); ok {
+		return byteBuffer.Bytes(), nil
 	}
-	err = gEncoder.Encode(paramsBytes)
-	if err != nil {
-		return nil, err
+
+	if params, ok := desc.backendParams.(*MemObjectStoreBackendParams); ok {
+		paramsBytes, err := SerializeMemObjectStoreParams(params)
+		if err != nil {
+			return nil, err
+		}
+		err = gEncoder.Encode(paramsBytes)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, common.NewInvalidError(fmt.Sprintf("Deserialize - invalid backend params type: %T",
+			desc.backendParams))
 	}
 	return byteBuffer.Bytes(), nil
 }
 
-// deserialize will serialize the object descriptor and return an error, if it cannot deserialize
-func (desc *ObjectDescriptor) deserialize(descBytes []byte) error {
+// DeserializeObjectDescriptor will serialize the object descriptor and return an error, if it cannot deserialize
+func DeserializeObjectDescriptor(descBytes []byte, desc *ObjectDescriptor) error {
 	var backendKey string
 	var backendType BackendType
 	var paramsBytes []byte
@@ -114,6 +138,10 @@ func (desc *ObjectDescriptor) deserialize(descBytes []byte) error {
 		return err
 	}
 	desc.backendType = backendType
+
+	if backendType == NilBackend {
+		return nil
+	}
 
 	err = gDecoder.Decode(&paramsBytes)
 	if err != nil {

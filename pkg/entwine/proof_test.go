@@ -1,4 +1,4 @@
-package ticker_test
+package entwine_test
 
 import "testing"
 

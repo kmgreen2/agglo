@@ -1,12 +1,10 @@
 package storage_test
 
 import (
-	"fmt"
-	"github.com/golang/mock/gomock"
+	"github.com/kmgreen2/agglo/pkg/serialization"
 	"github.com/kmgreen2/agglo/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"github.com/kmgreen2/agglo/test/mocks"
 )
 
 func TestNewObjectDescriptorFromBytes(t *testing.T) {
@@ -16,7 +14,7 @@ func TestNewObjectDescriptorFromBytes(t *testing.T) {
 	}
 	objectDesc := storage.NewObjectDescriptor(objectDescParams, "foobar")
 
-	objectDescBytes, err := objectDesc.Serialize()
+	objectDescBytes, err := serialization.Serialize(objectDesc)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -33,27 +31,6 @@ func TestNewObjectDescriptorFromBytes(t *testing.T) {
 func TestNewObjectDescriptorFromBytesInvalid(t *testing.T) {
 	_, err := storage.NewObjectDescriptorFromBytes([]byte{})
 	assert.Error(t, err)
-}
-
-func TestObjectDescriptorSerializeInvalid(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mockObjectStoreParams := test.NewMockObjectStoreBackendParams(ctrl)
-
-	mockObjectStoreParams.
-		EXPECT().
-		Serialize().
-		Return(nil, fmt.Errorf("error"))
-
-	mockObjectStoreParams.
-		EXPECT().
-		GetBackendType().
-		Return(storage.BackendType(storage.MemObjectStoreBackend))
-
-	objectDesc := storage.NewObjectDescriptor(mockObjectStoreParams, "foobar")
-
-	_, err := objectDesc.Serialize()
-	assert.Errorf(t, err, "error")
 }
 
 func TestNewObjectStore(t *testing.T) {

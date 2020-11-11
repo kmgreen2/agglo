@@ -1,4 +1,4 @@
-package ticker
+package entwine
 
 // InvalidError represents a conflict in a data, kv or object store
 type InvalidError struct {

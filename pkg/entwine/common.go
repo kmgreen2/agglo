@@ -1,4 +1,4 @@
-package ticker
+package entwine
 
 import (
 	"encoding/hex"

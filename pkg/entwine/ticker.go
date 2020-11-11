@@ -1,4 +1,4 @@
-package ticker
+package entwine
 
 import (
 	"fmt"
@@ -116,7 +116,7 @@ func (tickerStore *KVTickerStore) CreateGenesisProof(subStreamID SubStreamID) er
 	}
 
 	// Serialize and store the new proof
-	proofBytes, err := proof.Serialize()
+	proofBytes, err := SerializeProof(proof)
 	if err != nil {
 		return err
 	}
@@ -248,7 +248,7 @@ func (tickerStore *KVTickerStore) Anchor(messages []ImmutableMessage, subStreamI
 	}
 
 	// Serialize and store the new proof
-	proofBytes, err := proof.Serialize()
+	proofBytes, err := SerializeProof(proof)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +302,7 @@ func (tickerStore *KVTickerStore) Append(signer crypto.Signer) error {
 	}
 
 	// Store main record
-	messageBytes, err := immutableMessage.Serialize()
+	messageBytes, err := SerializeTickerImmutableMessage(immutableMessage)
 	err = tickerStore.kvStore.Put(newUuid.String(), messageBytes)
 	if err != nil {
 		return err

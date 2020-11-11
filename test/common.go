@@ -10,7 +10,7 @@ import (
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/storage"
-	"github.com/kmgreen2/agglo/pkg/ticker"
+	"github.com/kmgreen2/agglo/pkg/entwine"
 	"time"
 )
 
@@ -67,10 +67,10 @@ func GetTestObjects(objectStore storage.ObjectStore, numObjects int) (map[string
 	return objectMap, nil
 }
 
-func GetSubStream(subStreamID ticker.SubStreamID, numMessages int,
-	prevMessage *ticker.StreamImmutableMessage) ([]*ticker.StreamImmutableMessage, crypto.Authenticator,
+func GetSubStream(subStreamID entwine.SubStreamID, numMessages int, defaultObjectStore bool,
+	prevMessage *entwine.StreamImmutableMessage) ([]*entwine.StreamImmutableMessage, crypto.Authenticator,
 	storage.ObjectStore, error) {
-	messages := make([]*ticker.StreamImmutableMessage, numMessages)
+	messages := make([]*entwine.StreamImmutableMessage, numMessages)
 	signer, authenticator, _, err := GetSignerAuthenticator(gocrypto.SHA1)
 	if err != nil {
 		return nil, nil, nil, err
@@ -79,7 +79,7 @@ func GetSubStream(subStreamID ticker.SubStreamID, numMessages int,
 	anchorUuid := gUuid.New()
 	i := 0
 	if prevMessage == nil {
-		messages[0], err = ticker.NewGenesisMessage(subStreamID, common.SHA1, signer, anchorUuid)
+		messages[0], err = entwine.NewGenesisMessage(subStreamID, common.SHA1, signer, anchorUuid)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -87,7 +87,12 @@ func GetSubStream(subStreamID ticker.SubStreamID, numMessages int,
 		i++
 	}
 
-	objectStoreParams, err := storage.NewMemObjectStoreBackendParams(storage.MemObjectStoreBackend, "default")
+	objectStoreInstance := "default"
+	if !defaultObjectStore {
+		objectStoreInstance = gUuid.New().String()
+	}
+
+	objectStoreParams, err := storage.NewMemObjectStoreBackendParams(storage.MemObjectStoreBackend, objectStoreInstance)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -104,7 +109,7 @@ func GetSubStream(subStreamID ticker.SubStreamID, numMessages int,
 
 	for key, _ := range objectMap {
 		objectDescriptor := storage.NewObjectDescriptor(objectStoreParams, key)
-		messages[i], err = ticker.NewStreamImmutableMessage(subStreamID, objectDescriptor, key, []string{},
+		messages[i], err = entwine.NewStreamImmutableMessage(subStreamID, objectDescriptor, key, []string{},
 			common.SHA1, signer, time.Now().Unix(), prevMessage, anchorUuid)
 		prevMessage = messages[i]
 		i++

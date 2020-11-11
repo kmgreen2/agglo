@@ -1,4 +1,4 @@
-package ticker
+package entwine
 
 import (
 	"bytes"
@@ -33,7 +33,6 @@ type ImmutableMessage interface {
 	Tags() []string
 	Index() int64
 	VerifySignature(authenticator crypto.Authenticator) (bool, error)
-
 }
 
 // BaseImmutableMessage is the base message for all streams
@@ -58,6 +57,136 @@ type StreamImmutableMessage struct {
 	subStreamID SubStreamID
 }
 
+// SerializeStreamImmutableMessage serializes a StreamImmutableMessage
+func SerializeStreamImmutableMessage(message *StreamImmutableMessage) ([]byte, error) {
+	byteBuffer := bytes.NewBuffer(make([]byte, 0))
+	gEncoder := gob.NewEncoder(byteBuffer)
+	err := gEncoder.Encode(message.signature)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.digest)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.digestType)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.uuid)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.prevUuid)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.idx)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.ts)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.name)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.tags)
+	if err != nil {
+		return nil, err
+	}
+	descBytes, err := storage.SerializeObjectDescriptor(message.objectDescriptor)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(descBytes)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.objectDigest)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.anchorTickerUuid)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.subStreamID)
+	if err != nil {
+		return nil, err
+	}
+
+	return byteBuffer.Bytes(), nil
+}
+
+// DeserializeStreamImmutableMessage deserializes a StreamImmutableMessage
+func DeserializeStreamImmutableMessage(messageBytes []byte, message *StreamImmutableMessage) error {
+	byteBuffer := bytes.NewBuffer(messageBytes)
+	gDecoder := gob.NewDecoder(byteBuffer)
+	err := gDecoder.Decode(&message.signature)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.digest)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.digestType)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.uuid)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.prevUuid)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.idx)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.ts)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.name)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.tags)
+	if err != nil {
+		return err
+	}
+	var descBytes []byte
+	err = gDecoder.Decode(&descBytes)
+	if err != nil {
+		return err
+	}
+	message.objectDescriptor = &storage.ObjectDescriptor{}
+	err = storage.DeserializeObjectDescriptor(descBytes, message.objectDescriptor)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.objectDigest)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.anchorTickerUuid)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.subStreamID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func NewGenesisMessage(subStreamID SubStreamID, digestType common.DigestType,
 	signer crypto.Signer, anchorTickerUuid gUuid.UUID) (*StreamImmutableMessage, error) {
 	var err error
@@ -69,6 +198,7 @@ func NewGenesisMessage(subStreamID SubStreamID, digestType common.DigestType,
 	message.anchorTickerUuid = anchorTickerUuid
 	message.idx = 0
 	message.ts = 0
+	message.objectDescriptor = storage.NewObjectDescriptor(&storage.NilObjectStoreBackendParams{}, "")
 
 	message.signature, err = message.ComputeSignature(signer)
 	if err != nil {
@@ -133,24 +263,11 @@ func NewStreamImmutableMessage(subStreamID SubStreamID, objectDescriptor *storag
 // decode the byte slice, an error will be returned
 func NewStreamImmutableMessageFromBuffer(messageBytes []byte) (*StreamImmutableMessage, error) {
 	message := &StreamImmutableMessage{}
-	byteBuffer := bytes.NewBuffer(messageBytes)
-	gDecoder := gob.NewDecoder(byteBuffer)
-	err := gDecoder.Decode(message)
+	err := DeserializeStreamImmutableMessage(messageBytes, message)
 	if err != nil {
 		return nil, err
 	}
 	return message, nil
-}
-
-// Serialize will serialize this message, or return an error if it cannot serialize
-func (message *StreamImmutableMessage) Serialize() ([]byte, error) {
-	byteBuffer := bytes.NewBuffer(make([]byte, 0))
-	gEncoder := gob.NewEncoder(byteBuffer)
-	err := gEncoder.Encode(message)
-	if err != nil {
-		return nil, err
-	}
-	return byteBuffer.Bytes(), nil
 }
 
 // Signature will return the signature computed when the message was created
@@ -328,6 +445,76 @@ type TickerImmutableMessage struct {
 	BaseImmutableMessage
 }
 
+// SerializeTickerImmutableMessage serializes a TickerImmutableMessage
+func SerializeTickerImmutableMessage(message *TickerImmutableMessage) ([]byte, error) {
+	byteBuffer := bytes.NewBuffer(make([]byte, 0))
+	gEncoder := gob.NewEncoder(byteBuffer)
+	err := gEncoder.Encode(message.signature)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.digest)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.digestType)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.uuid)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.prevUuid)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.idx)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(message.ts)
+	if err != nil {
+		return nil, err
+	}
+	return byteBuffer.Bytes(), nil
+}
+
+// DeserializeTickerImmutableMessage deserializes a TickerImmutableMessage
+func DeserializeTickerImmutableMessage(messageBytes []byte, message *TickerImmutableMessage) error {
+	byteBuffer := bytes.NewBuffer(messageBytes)
+	gDecoder := gob.NewDecoder(byteBuffer)
+	err := gDecoder.Decode(&message.signature)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.digest)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.digestType)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.uuid)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.prevUuid)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.idx)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&message.ts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // NewTickerImmutableMessage will create a new immutable message, which includes signing and hashing with the previous
 // message in the chain
 func NewTickerImmutableMessage(digestType common.DigestType, signer crypto.Signer,
@@ -356,24 +543,11 @@ func NewTickerImmutableMessage(digestType common.DigestType, signer crypto.Signe
 // decode the byte slice, an error will be returned
 func NewTickerImmutableMessageFromBuffer(messageBytes []byte) (*TickerImmutableMessage, error) {
 	message := &TickerImmutableMessage{}
-	byteBuffer := bytes.NewBuffer(messageBytes)
-	gDecoder := gob.NewDecoder(byteBuffer)
-	err := gDecoder.Decode(message)
+	err := DeserializeTickerImmutableMessage(messageBytes, message)
 	if err != nil {
 		return nil, err
 	}
 	return message, nil
-}
-
-// Serialize this message into a byte slice.  If the message cannot be serialized, return an error.
-func (message *TickerImmutableMessage) Serialize() ([]byte, error) {
-	byteBuffer := bytes.NewBuffer(make([]byte, 0))
-	gEncoder := gob.NewEncoder(byteBuffer)
-	err := gEncoder.Encode(message)
-	if err != nil {
-		return nil, err
-	}
-	return byteBuffer.Bytes(), nil
 }
 
 // Signature will return the signature computed when the message was created

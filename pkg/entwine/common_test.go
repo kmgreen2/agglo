@@ -1,10 +1,10 @@
-package ticker_test
+package entwine_test
 
 import (
 	"encoding/hex"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/common"
-	"github.com/kmgreen2/agglo/pkg/ticker"
+	"github.com/kmgreen2/agglo/pkg/entwine"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"fmt"
@@ -12,19 +12,19 @@ import (
 
 func TestPrimaryRecordKey(t *testing.T) {
 	uuid := gUuid.New()
-	key := ticker.PrimaryRecordKey(uuid)
+	key := entwine.PrimaryRecordKey(uuid)
 	assert.Equal(t, fmt.Sprintf("%s-n", uuid.String()), key)
 }
 
 func TestPreviousNodeKey(t *testing.T) {
 	uuid := gUuid.New()
-	key := ticker.PreviousNodeKey(uuid)
+	key := entwine.PreviousNodeKey(uuid)
 	assert.Equal(t, fmt.Sprintf("%s-p", uuid.String()), key)
 }
 
 func TestAnchorNodeKey(t *testing.T) {
 	uuid := gUuid.New()
-	key := ticker.AnchorNodeKey(uuid)
+	key := entwine.AnchorNodeKey(uuid)
 	assert.Equal(t, fmt.Sprintf("%s-a", uuid.String()), key)
 }
 
@@ -36,7 +36,7 @@ func TestNameKeyPrefix(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	namePrefix, err := ticker.NameKeyPrefix(testName)
+	namePrefix, err := entwine.NameKeyPrefix(testName)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -47,23 +47,23 @@ func TestNameKeyPrefix(t *testing.T) {
 func TestNameEntry(t *testing.T) {
 	uuid := gUuid.New()
 	testName := "foobarbaz"
-	namePrefix, err := ticker.NameKeyPrefix(testName)
+	namePrefix, err := entwine.NameKeyPrefix(testName)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
 
-	assert.Equal(t, fmt.Sprintf("%s-%s", namePrefix, uuid.String()), ticker.NameEntry(namePrefix, uuid))
+	assert.Equal(t, fmt.Sprintf("%s-%s", namePrefix, uuid.String()), entwine.NameEntry(namePrefix, uuid))
 }
 
 func TestTagEntry(t *testing.T) {
 	uuid := gUuid.New()
 	testTag := "tagfoobarbaz"
-	tagPrefix, err := ticker.TagKeyPrefix(testTag)
+	tagPrefix, err := entwine.TagKeyPrefix(testTag)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
 
-	assert.Equal(t, fmt.Sprintf("%s-%s", tagPrefix, uuid.String()), ticker.TagEntry(tagPrefix, uuid))
+	assert.Equal(t, fmt.Sprintf("%s-%s", tagPrefix, uuid.String()), entwine.TagEntry(tagPrefix, uuid))
 }
 
 func TestTagKeyPrefix(t *testing.T) {
@@ -74,7 +74,7 @@ func TestTagKeyPrefix(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	tagPrefix, err := ticker.TagKeyPrefix(testTag)
+	tagPrefix, err := entwine.TagKeyPrefix(testTag)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -85,12 +85,12 @@ func TestTagKeyPrefix(t *testing.T) {
 func TestBytesToUUID(t *testing.T) {
 	uuid := gUuid.New()
 
-	uuidBytes, err := ticker.UuidToBytes(uuid)
+	uuidBytes, err := entwine.UuidToBytes(uuid)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
 
-	newUuid, err := ticker.BytesToUUID(uuidBytes)
+	newUuid, err := entwine.BytesToUUID(uuidBytes)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -99,19 +99,19 @@ func TestBytesToUUID(t *testing.T) {
 }
 
 func TestBytesToUUIDError(t *testing.T) {
-	_, err := ticker.BytesToUUID([]byte{})
+	_, err := entwine.BytesToUUID([]byte{})
 	assert.Error(t, err)
 }
 
 func TestProofIdentifierPrefix(t *testing.T) {
-	subStreamID := ticker.SubStreamID("myssid")
+	subStreamID := entwine.SubStreamID("myssid")
 	hasher := common.InitHash(common.MD5)
 	_, err := hasher.Write([]byte(subStreamID))
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
 
-	proofPrefix, err := ticker.ProofIdentifierPrefix(subStreamID)
+	proofPrefix, err := entwine.ProofIdentifierPrefix(subStreamID)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -120,13 +120,13 @@ func TestProofIdentifierPrefix(t *testing.T) {
 }
 
 func TestProofIdentifier(t *testing.T) {
-	subStreamID := ticker.SubStreamID("myssid")
-	proofPrefix, err := ticker.ProofIdentifierPrefix(subStreamID)
+	subStreamID := entwine.SubStreamID("myssid")
+	proofPrefix, err := entwine.ProofIdentifierPrefix(subStreamID)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
 
-	proofID, err := ticker.ProofIdentifier(subStreamID, 1)
+	proofID, err := entwine.ProofIdentifier(subStreamID, 1)
 
 	assert.Equal(t, fmt.Sprintf("%s-%d", proofPrefix, 1), proofID)
 }

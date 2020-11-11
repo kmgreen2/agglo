@@ -1,14 +1,16 @@
-package ticker_test
+package entwine_test
 
 import (
-	"github.com/kmgreen2/agglo/pkg/ticker"
+	"github.com/kmgreen2/agglo/pkg/entwine"
+	"github.com/kmgreen2/agglo/pkg/serialization"
 	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestNewStreamGenesisMessage(t *testing.T) {
-	messages, authenticator, _, err := test.GetSubStream(ticker.SubStreamID("foobar"), 1, nil)
+	messages, authenticator, _, err := test.GetSubStream(entwine.SubStreamID("foobar"), 1,
+		false, nil)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -22,7 +24,8 @@ func TestNewStreamGenesisMessage(t *testing.T) {
 }
 
 func TestNewStreamImmutableMessage(t *testing.T) {
-	messages, authenticator, _, err := test.GetSubStream(ticker.SubStreamID("foobar"), 2, nil)
+	messages, authenticator, _, err := test.GetSubStream(entwine.SubStreamID("foobar"), 2,
+		false, nil)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -44,7 +47,8 @@ func TestNewStreamImmutableMessage(t *testing.T) {
 }
 
 func TestNewStreamImmutableMessageBadData(t *testing.T) {
-	messages, _, objectStore, err := test.GetSubStream(ticker.SubStreamID("foobar"), 2, nil)
+	messages, _, objectStore, err := test.GetSubStream(entwine.SubStreamID("foobar"), 2,
+		false, nil)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -59,18 +63,19 @@ func TestNewStreamImmutableMessageBadData(t *testing.T) {
 }
 
 func TestNewStreamImmutableMessageFromBuffer(t *testing.T) {
-	newMessages := make([]*ticker.StreamImmutableMessage, 4)
-	messages, authenticator, _, err := test.GetSubStream(ticker.SubStreamID("foobar"), 4, nil)
+	newMessages := make([]*entwine.StreamImmutableMessage, 4)
+	messages, authenticator, _, err := test.GetSubStream(entwine.SubStreamID("foobar"), 4,
+		false, nil)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
 
 	for i, message := range messages {
-		messageBytes, err := message.Serialize()
+		messageBytes, err := serialization.Serialize(message)
 		if err != nil {
 			assert.FailNow(t, err.Error())
 		}
-		newMessages[i], err = ticker.NewStreamImmutableMessageFromBuffer(messageBytes)
+		newMessages[i], err = entwine.NewStreamImmutableMessageFromBuffer(messageBytes)
 		if err != nil {
 			assert.FailNow(t, err.Error())
 		}

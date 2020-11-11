@@ -40,9 +40,8 @@ func NewMemObjectStoreBackendParams(backendType BackendType, instanceName string
 // NewMemObjectStoreBackendParamsFromBytes will deserialize backend params and return an error if the params cannot
 // be deserialized
 func NewMemObjectStoreBackendParamsFromBytes(payload []byte) (*MemObjectStoreBackendParams, error) {
-	params := &MemObjectStoreBackendParams {
-	}
-	err := params.Deserialize(payload)
+	params := &MemObjectStoreBackendParams{}
+	err := DeserializeMemObjectStoreParams(payload, params)
 	if err != nil {
 		return nil, err
 	}
@@ -61,8 +60,8 @@ func (memObjectStoreParams *MemObjectStoreBackendParams) GetBackendType() Backen
 	return memObjectStoreParams.backendType
 }
 
-// Serialize will serialize the backend params and return an error if the params cannot be serialized
-func (memObjectStoreParams *MemObjectStoreBackendParams) Serialize() ([]byte, error) {
+// SerializeMemObjectStoreParams will serialize the backend params and return an error if the params cannot be serialized
+func SerializeMemObjectStoreParams(memObjectStoreParams *MemObjectStoreBackendParams) ([]byte, error) {
 	byteBuffer := bytes.NewBuffer(make([]byte, 0))
 	gEncoder := gob.NewEncoder(byteBuffer)
 	err := gEncoder.Encode(memObjectStoreParams.backendType)
@@ -76,8 +75,9 @@ func (memObjectStoreParams *MemObjectStoreBackendParams) Serialize() ([]byte, er
 	return byteBuffer.Bytes(), nil
 }
 
-// Deserialize will deserialize the backend params and return an error if the params cannot be deserialized
-func (memObjectStoreParams *MemObjectStoreBackendParams) Deserialize(payload []byte) error {
+// DeserializeMemObjectStoreParams will deserialize the backend params and return an error if the params cannot be
+//deserialized
+func DeserializeMemObjectStoreParams(payload []byte, memObjectStoreParams *MemObjectStoreBackendParams) error {
 	var backendType BackendType
 	var instanceName string
 	byteBuffer := bytes.NewBuffer(payload)
