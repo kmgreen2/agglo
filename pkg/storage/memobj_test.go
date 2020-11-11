@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"errors"
 	"fmt"
+	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/storage"
 	"github.com/stretchr/testify/assert"
@@ -59,9 +60,18 @@ func (reader *BadReader) Read(b []byte) (int ,error) {
 	return -1, &common.InternalError{}
 }
 
+func RandomMemObjectStoreInstanceParams() (*storage.MemObjectStoreBackendParams, error) {
+	uuid := gUuid.New()
+	return storage.NewMemObjectStoreBackendParams(storage.MemObjectStoreBackend, uuid.String())
+}
+
 func TestHappyPath(t *testing.T) {
 	fileSize := 1024
-	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
+	params, err := RandomMemObjectStoreInstanceParams()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	objStore, err := storage.NewMemObjectStore(params)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -103,7 +113,11 @@ func TestHappyPath(t *testing.T) {
 }
 
 func TestPutConflictError(t *testing.T) {
-	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
+	params, err := RandomMemObjectStoreInstanceParams()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	objStore, err := storage.NewMemObjectStore(params)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -119,7 +133,11 @@ func TestPutConflictError(t *testing.T) {
 }
 
 func TestPutReadError(t *testing.T) {
-	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
+	params, err := RandomMemObjectStoreInstanceParams()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	objStore, err := storage.NewMemObjectStore(params)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -130,20 +148,28 @@ func TestPutReadError(t *testing.T) {
 }
 
 func TestGetNotFound(t *testing.T) {
-	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
+	params, err := RandomMemObjectStoreInstanceParams()
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
-	_, err = objStore.Get("foo")
+	objStore, err := storage.NewMemObjectStore(params)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	_, err = objStore.Get("baz")
 	assert.Error(t, err)
 }
 
 func TestHeadNotFound(t *testing.T) {
-	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
+	params, err := RandomMemObjectStoreInstanceParams()
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
-	err = objStore.Head("foo")
+	objStore, err := storage.NewMemObjectStore(params)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	err = objStore.Head("baz")
 	assert.Error(t, err)
 }
 
@@ -166,7 +192,11 @@ func putObjects(objStore storage.ObjectStore, prefix string, numWithPrefix int, 
 }
 
 func TestListNone(t *testing.T) {
-	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
+	params, err := RandomMemObjectStoreInstanceParams()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	objStore, err := storage.NewMemObjectStore(params)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -180,7 +210,11 @@ func TestListNone(t *testing.T) {
 }
 
 func TestListAll(t *testing.T) {
-	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
+	params, err := RandomMemObjectStoreInstanceParams()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	objStore, err := storage.NewMemObjectStore(params)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -194,7 +228,11 @@ func TestListAll(t *testing.T) {
 }
 
 func TestListSome(t *testing.T) {
-	objStore, err := storage.NewMemObjectStore(&storage.MemObjectStoreBackendParams{})
+	params, err := RandomMemObjectStoreInstanceParams()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	objStore, err := storage.NewMemObjectStore(params)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}

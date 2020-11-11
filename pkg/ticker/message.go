@@ -58,6 +58,30 @@ type StreamImmutableMessage struct {
 	subStreamID SubStreamID
 }
 
+func NewGenesisMessage(subStreamID SubStreamID, digestType common.DigestType,
+	signer crypto.Signer, anchorTickerUuid gUuid.UUID) (*StreamImmutableMessage, error) {
+	var err error
+	message := &StreamImmutableMessage{}
+	message.uuid = gUuid.New()
+	message.subStreamID = subStreamID
+	message.name = "genesis"
+	message.digestType = digestType
+	message.anchorTickerUuid = anchorTickerUuid
+	message.idx = 0
+	message.ts = 0
+
+	message.signature, err = message.ComputeSignature(signer)
+	if err != nil {
+		return nil, err
+	}
+
+	message.digest, err = message.ComputeChainHash(nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	return message, nil
+}
+
 // NewStreamImmutableMessage will create a new immutable message, which includes signing and hashing with the previous
 // message in the chain
 func NewStreamImmutableMessage(subStreamID SubStreamID, objectDescriptor *storage.ObjectDescriptor, name string,
@@ -204,6 +228,9 @@ func (message *StreamImmutableMessage) VerifySignature(authenticator crypto.Auth
 		return false, err
 	}
 	signature, err := crypto.DeserializeSignature(message.signature)
+	if err != nil {
+		return false, err
+	}
 	return authenticator.Verify(signatureBytes, signature), nil
 }
 
@@ -252,7 +279,7 @@ func (message *StreamImmutableMessage) ComputeSignature(signer crypto.Signer) ([
 	if err != nil {
 		return nil, err
 	}
-	return signature.Bytes(), nil
+	return crypto.SerializeSignature(signature)
 }
 
 // ComputeChainHash is a helper function that will compute this messages hash based on a provided previous node
@@ -260,9 +287,15 @@ func (message *StreamImmutableMessage) ComputeSignature(signer crypto.Signer) ([
 // if the authenticator is nil.
 func (message *StreamImmutableMessage) ComputeChainHash(prev *StreamImmutableMessage,
 	authenticator crypto.Authenticator) ([]byte, error) {
-	if prev.digestType != message.digestType {
-		return nil, NewInvalidError(fmt.Sprintf("ComputeChainHash - UUIDs (%s %s) mismatched digest types (%d %d)",
-			prev.uuid.String(), message.uuid.String(), prev.digestType, message.digestType))
+	var prevDigest []byte
+	var err error
+
+	if prev != nil {
+		if prev.digestType != message.digestType {
+			return nil, NewInvalidError(fmt.Sprintf("ComputeChainHash - UUIDs (%s %s) mismatched digest types (%d %d)",
+				prev.uuid.String(), message.uuid.String(), prev.digestType, message.digestType))
+		}
+		prevDigest = prev.digest
 	}
 	if message.signature == nil {
 		return nil, NewInvalidError(fmt.Sprintf("ComputeChainHash - Cannot hash unsigned message UUID=%s",
@@ -279,12 +312,11 @@ func (message *StreamImmutableMessage) ComputeChainHash(prev *StreamImmutableMes
 		}
 	}
 	digest := common.InitHash(message.digestType)
-	byteBuffer := bytes.NewBuffer(make([]byte, 0))
-	_, err := byteBuffer.Write(message.signature)
-	if err != nil {
-		return nil, err
+	if prevDigest != nil {
+		_, err = digest.Write(append(prevDigest, message.signature...))
+	} else {
+		_, err = digest.Write(message.signature)
 	}
-	_, err = digest.Write(append(prev.digest, byteBuffer.Bytes()...))
 	if err != nil {
 		return nil, err
 	}
@@ -444,6 +476,16 @@ func (message * TickerImmutableMessage) GetSignaturePayload() ([]byte, error) {
 // if the authenticator is nil.
 func (message *TickerImmutableMessage) ComputeChainHash(prev *TickerImmutableMessage,
 	authenticator crypto.Authenticator) ([]byte, error) {
+	var prevDigest []byte
+	var err error
+
+	if prev != nil {
+		if prev.digestType != message.digestType {
+			return nil, NewInvalidError(fmt.Sprintf("ComputeChainHash - UUIDs (%s %s) mismatched digest types (%d %d)",
+				prev.uuid.String(), message.uuid.String(), prev.digestType, message.digestType))
+		}
+		prevDigest = prev.digest
+	}
 	if prev.digestType != message.digestType {
 		return nil, NewInvalidError(fmt.Sprintf("ComputeChainHash - UUIDs (%s %s) mismatched digest types (%d %d)",
 			prev.uuid.String(), message.uuid.String(), prev.digestType, message.digestType))
@@ -463,7 +505,11 @@ func (message *TickerImmutableMessage) ComputeChainHash(prev *TickerImmutableMes
 		}
 	}
 	digest := common.InitHash(message.digestType)
-	_, err := digest.Write(append(prev.digest, message.signature...))
+	if prevDigest != nil {
+		_, err = digest.Write(append(prevDigest, message.signature...))
+	} else {
+		_, err = digest.Write(message.signature)
+	}
 	if err != nil {
 		return nil, err
 	}

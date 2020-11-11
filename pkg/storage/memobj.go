@@ -9,6 +9,7 @@ import (
 	"github.com/kmgreen2/agglo/pkg/config"
 	"io"
 	"strings"
+	"sync"
 )
 
 // MemObjectStore is a simple map-based implementation of an ObjectStore
@@ -20,16 +21,19 @@ type MemObjectStore struct {
 // MemObjectStoreBackendParams are parameters used to access a MemObjectStore
 type MemObjectStoreBackendParams struct {
 	backendType BackendType
+	instanceName string
 }
 
 // NewMemObjectStoreBackendParams will create and return a MemObjectStoreBackendParams object
-func NewMemObjectStoreBackendParams(backendType BackendType) (*MemObjectStoreBackendParams, error) {
+func NewMemObjectStoreBackendParams(backendType BackendType, instanceName string) (*MemObjectStoreBackendParams,
+	error) {
 	if backendType != MemObjectStoreBackend {
 		return nil, common.NewInvalidError(fmt.Sprintf("NewMemObjectStoreBackendParams - Invalid backendType: %v",
 			backendType))
 	}
 	return &MemObjectStoreBackendParams {
 		backendType: backendType,
+		instanceName: instanceName,
 	}, nil
 }
 
@@ -47,7 +51,9 @@ func NewMemObjectStoreBackendParamsFromBytes(payload []byte) (*MemObjectStoreBac
 
 // Get will get a map of backend params
 func (memObjectStoreParams *MemObjectStoreBackendParams) Get() map[string]string {
-	return nil
+	params := make(map[string]string)
+	params["instanceName"] = memObjectStoreParams.instanceName
+	return params
 }
 
 // GetBackendType will return the object store backend type
@@ -63,33 +69,70 @@ func (memObjectStoreParams *MemObjectStoreBackendParams) Serialize() ([]byte, er
 	if err != nil {
 		return nil, err
 	}
+	err = gEncoder.Encode(memObjectStoreParams.instanceName)
+	if err != nil {
+		return nil, err
+	}
 	return byteBuffer.Bytes(), nil
 }
 
 // Deserialize will deserialize the backend params and return an error if the params cannot be deserialized
 func (memObjectStoreParams *MemObjectStoreBackendParams) Deserialize(payload []byte) error {
 	var backendType BackendType
+	var instanceName string
 	byteBuffer := bytes.NewBuffer(payload)
 	gDecoder := gob.NewDecoder(byteBuffer)
 	err := gDecoder.Decode(&backendType)
 	if err != nil {
 		return err
 	}
+	err = gDecoder.Decode(&instanceName)
+	if err != nil {
+		return err
+	}
 	memObjectStoreParams.backendType = backendType
+	memObjectStoreParams.instanceName = instanceName
 	return nil
 }
 
+// We implement the reference to the object store as a singleton.  This allows for two things:
+// 1. Shared reference to the same in-memory object store in the same process (testing)
+// 2. The individual object store implementations can manage their own object store references, which
+//    allows us to instantiate object stored on-demand.  That is, each object has the object store parameters
+//    stored as metadata and will instantiate via NewObjectStore(params ObjectStoreBackendParams), which is
+//    only needed when accessing the object
+var (
+	memObjectStoreInstance map[string]*MemObjectStore
+)
+
+var instanceLock = &sync.Mutex{}
+
 // NewMemObjectStore returns a MemObjectStore object
 func NewMemObjectStore(params ObjectStoreBackendParams) (*MemObjectStore, error) {
-	configBase, err := config.NewConfigBase()
-	if err != nil {
-		return nil, err
+	instanceLock.Lock()
+	defer instanceLock.Unlock()
+
+	if memObjectStoreInstance == nil {
+		memObjectStoreInstance = make(map[string]*MemObjectStore)
 	}
-	osConfig, err := NewObjectStoreConfig(configBase)
-	return &MemObjectStore{
-		blobs: make(map[string][]byte),
-		config: osConfig,
-	}, nil
+
+	memObjectStoreParams, ok := params.(*MemObjectStoreBackendParams)
+	if !ok {
+		return nil, common.NewInvalidError(fmt.Sprintf("NewMemObjectStore - invalid params"))
+	}
+
+	if _, ok := memObjectStoreInstance[memObjectStoreParams.instanceName]; !ok  {
+		configBase, err := config.NewConfigBase()
+		if err != nil {
+			return nil, err
+		}
+		osConfig, err := NewObjectStoreConfig(configBase)
+		memObjectStoreInstance[memObjectStoreParams.instanceName] = &MemObjectStore{
+			blobs: make(map[string][]byte),
+			config: osConfig,
+		}
+	}
+	return memObjectStoreInstance[memObjectStoreParams.instanceName], nil
 }
 
 // Put will map the content read from a stream to a provided key and store the stream as a blob
@@ -151,9 +194,10 @@ func (objStore *MemObjectStore) List(prefix string) ([]string, error) {
 	var result []string
 	prefixLength := len(prefix)
 	for s, _ := range objStore.blobs {
-		if strings.Compare(prefix, s[:prefixLength]) == 0 {
+		if len(s) >= prefixLength && strings.Compare(prefix, s[:prefixLength]) == 0 {
 			result = append(result, s)
 		}
 	}
 	return result, nil
 }
+

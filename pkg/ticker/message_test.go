@@ -1,20 +1,88 @@
 package ticker_test
 
-import "testing"
+import (
+	"github.com/kmgreen2/agglo/pkg/ticker"
+	"github.com/kmgreen2/agglo/test"
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
+
+func TestNewStreamGenesisMessage(t *testing.T) {
+	messages, authenticator, _, err := test.GetSubStream(ticker.SubStreamID("foobar"), 1, nil)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	genesisMessage := messages[0]
+
+	verified, err := genesisMessage.VerifySignature(authenticator)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	assert.True(t, verified)
+}
 
 func TestNewStreamImmutableMessage(t *testing.T) {
+	messages, authenticator, _, err := test.GetSubStream(ticker.SubStreamID("foobar"), 2, nil)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	for i, message := range messages {
+		verified, err := message.VerifySignature(authenticator)
+		if err != nil {
+			assert.FailNow(t, err.Error())
+		}
+		assert.True(t, verified)
+
+		if i > 0 {
+			hashBytes, err := messages[i].ComputeChainHash(messages[i-1], authenticator)
+			if err != nil {
+				assert.FailNow(t, err.Error())
+			}
+			assert.Equal(t, messages[i].Digest(), hashBytes)
+		}
+	}
 }
 
 func TestNewStreamImmutableMessageBadData(t *testing.T) {
-}
+	messages, _, objectStore, err := test.GetSubStream(ticker.SubStreamID("foobar"), 2, nil)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
 
-func TestNewStreamImmutableMessageBadSignature(t *testing.T) {
-}
+	err = objectStore.Delete(messages[1].Name())
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
 
-func TestNewStreamImmutableMessageBadHash(t *testing.T) {
+	_, err = messages[1].Data()
+	assert.Error(t, err)
 }
 
 func TestNewStreamImmutableMessageFromBuffer(t *testing.T) {
+	newMessages := make([]*ticker.StreamImmutableMessage, 4)
+	messages, authenticator, _, err := test.GetSubStream(ticker.SubStreamID("foobar"), 4, nil)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	for i, message := range messages {
+		messageBytes, err := message.Serialize()
+		if err != nil {
+			assert.FailNow(t, err.Error())
+		}
+		newMessages[i], err = ticker.NewStreamImmutableMessageFromBuffer(messageBytes)
+		if err != nil {
+			assert.FailNow(t, err.Error())
+		}
+
+		if i > 0 {
+			hashBytes, err := newMessages[i].ComputeChainHash(newMessages[i-1], authenticator)
+			if err != nil {
+				assert.FailNow(t, err.Error())
+			}
+			assert.Equal(t, messages[i].Digest(), hashBytes)
+		}
+	}
 }
 
 func TestNewStreamImmutableMessageFromBufferInvalid(t *testing.T) {
