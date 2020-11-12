@@ -81,7 +81,7 @@ func DeserializeProof(proofBytes []byte, proof *Proof) error {
 }
 
 // NewMessageFingerprint will create a messageFingerprint from an ImmutableMessage
-func NewMessageFingerprint(message ImmutableMessage) *messageFingerprint {
+func NewMessageFingerprint(message *StreamImmutableMessage) *messageFingerprint {
 	return &messageFingerprint{
 		Signature: message.Signature(),
 		Digest: message.Digest(),
@@ -124,7 +124,8 @@ func (proof *Proof) IsGenesis() (bool, error) {
 
 // NewProof will create a proof for  a sequence of substream immutable messages, which are assumed to be anchored
 // at the provided ticker message
-func NewProof(messages []ImmutableMessage, subStreamID SubStreamID, tickerMessage *TickerImmutableMessage) *Proof {
+func NewProof(messages []*StreamImmutableMessage, subStreamID SubStreamID,
+	tickerMessage *TickerImmutableMessage) *Proof {
 	proof := &Proof {
 		messageFingerprints: make([]*messageFingerprint, len(messages)),
 		subStreamID: subStreamID,

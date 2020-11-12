@@ -44,6 +44,12 @@ func (err *NotFoundError) Error() string {
 	return err.msg
 }
 
+// Is
+func (err *NotFoundError) Is(other error) bool {
+	_, ok := other.(*NotFoundError)
+	return ok
+}
+
 // NewNotFoundError will return a NotFoundError object
 func NewNotFoundError(msg string) *NotFoundError {
 	return &NotFoundError{

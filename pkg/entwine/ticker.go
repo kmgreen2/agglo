@@ -1,6 +1,7 @@
 package entwine
 
 import (
+	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/common"
@@ -21,12 +22,13 @@ import (
 
 // TickerStore is the interface for managing a ticker stream
 type TickerStore interface {
-	GetMessageByUUID(uuid gUuid.UUID) (ImmutableMessage, error)
-	GetHistory(start gUuid.UUID, end gUuid.UUID) ([]ImmutableMessage, error)
-	Anchor(proof []ImmutableMessage, subStreamID SubStreamID,
-		authenticator crypto.Authenticator) (ImmutableMessage, error)
+	GetMessageByUUID(uuid gUuid.UUID) (*TickerImmutableMessage, error)
+	GetHistory(start gUuid.UUID, end gUuid.UUID) ([]*TickerImmutableMessage, error)
+	Anchor(proof []*StreamImmutableMessage, subStreamID SubStreamID,
+		authenticator crypto.Authenticator) (*TickerImmutableMessage, error)
 	HappenedBefore(lhs *TickerImmutableMessage, rhs *TickerImmutableMessage) (bool, error)
 	Append(signer crypto.Signer) error
+	Head() *TickerImmutableMessage
 }
 
 // KVStreamStore is an implementation of TickerStore that is backed by an in-memory map
@@ -52,7 +54,7 @@ func NewKVTickerStore(kvStore kvs.KVStore, digestType common.DigestType) *KVTick
 }
 
 // GetMessageByUUID will return the message with a given UUID; otherwise, return an error
-func (tickerStore *KVTickerStore) GetMessageByUUID(uuid gUuid.UUID) (ImmutableMessage, error) {
+func (tickerStore *KVTickerStore) GetMessageByUUID(uuid gUuid.UUID) (*TickerImmutableMessage, error) {
 	messageBytes, err := tickerStore.kvStore.Get(uuid.String())
 	if err != nil {
 		return nil, err
@@ -61,14 +63,14 @@ func (tickerStore *KVTickerStore) GetMessageByUUID(uuid gUuid.UUID) (ImmutableMe
 }
 
 // GetMessages will return the messages for the given UUIDs; otherwise, return an error
-func (tickerStore *KVTickerStore) GetMessages(uuids []gUuid.UUID) ([]ImmutableMessage, error) {
-	var chainedMessages []ImmutableMessage
+func (tickerStore *KVTickerStore) GetMessages(uuids []gUuid.UUID) ([]*TickerImmutableMessage, error) {
+	var chainedMessages []*TickerImmutableMessage
 	for _, myUuid := range uuids {
 		messageBytes, err := tickerStore.kvStore.Get(myUuid.String())
 		if err != nil {
 			return nil, err
 		}
-		message, err := NewStreamImmutableMessageFromBuffer(messageBytes)
+		message, err := NewTickerImmutableMessageFromBuffer(messageBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -77,19 +79,31 @@ func (tickerStore *KVTickerStore) GetMessages(uuids []gUuid.UUID) ([]ImmutableMe
 	return chainedMessages, nil
 }
 
+// Head will return the latest message appended to the ticker stream
+func (tickerStore *KVTickerStore) Head() *TickerImmutableMessage {
+	return tickerStore.head
+}
+
 // GetHistory will return the ordered, immutable history between two UUIDs; otherwise return an error
-func (tickerStore *KVTickerStore) GetHistory(start gUuid.UUID, end gUuid.UUID) ([]ImmutableMessage, error) {
+func (tickerStore *KVTickerStore) GetHistory(start gUuid.UUID, end gUuid.UUID) ([]*TickerImmutableMessage, error) {
 	var chainedUuids []gUuid.UUID
 
 	curr := end
 
 	for {
+		if err := tickerStore.kvStore.Head(curr.String()); err != nil {
+			return nil, err
+		}
 		chainedUuids = append(chainedUuids, curr)
 		if strings.Compare(curr.String(), start.String()) == 0 {
 			break
 		}
 		prevBytes, err := tickerStore.kvStore.Get(PreviousNodeKey(curr))
-		if err != nil {
+		// No previous message, assumes we have reached the first
+		// ToDo(KMG): Do we care?  Should we check the first message and return an error?
+		if errors.Is(err, &common.NotFoundError{}) {
+			break
+		} else if err != nil {
 			return nil, err
 		}
 		prev, err := BytesToUUID(prevBytes)
@@ -197,8 +211,8 @@ func (tickerStore *KVTickerStore) GetProofStartUuid(subStreamID SubStreamID) (gU
 
 // Anchor will return a ticker anchor, given a sequence of messages (used as a proof) for a substream; otherwise, return
 // an error
-func (tickerStore *KVTickerStore) Anchor(messages []ImmutableMessage, subStreamID SubStreamID,
-	authenticator crypto.Authenticator) (ImmutableMessage, error) {
+func (tickerStore *KVTickerStore) Anchor(messages []*StreamImmutableMessage, subStreamID SubStreamID,
+	authenticator crypto.Authenticator) (*TickerImmutableMessage, error) {
 
 	tickerMessage := tickerStore.head
 	// Create proof and validate
@@ -291,14 +305,16 @@ func (tickerStore *KVTickerStore) Append(signer crypto.Signer) error {
 
 	newUuid := immutableMessage.uuid
 
-	// Store previous node reference
-	prevUuidBytes, err := UuidToBytes(head.uuid)
-	if err != nil {
-		return err
-	}
-	err = tickerStore.kvStore.Put(PreviousNodeKey(newUuid), prevUuidBytes)
-	if err != nil {
-		return err
+	// Store previous node reference, if exists
+	if head != nil {
+		prevUuidBytes, err := UuidToBytes(head.uuid)
+		if err != nil {
+			return err
+		}
+		err = tickerStore.kvStore.Put(PreviousNodeKey(newUuid), prevUuidBytes)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Store main record

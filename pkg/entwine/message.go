@@ -20,19 +20,14 @@ type UncommittedMessage struct {
 	signer crypto.Signer
 }
 
-// ImmutableMessage is the interface for all messages in a ticker or ticker substream
-type ImmutableMessage interface {
-	Signature() []byte
-	Digest() []byte
-	DigestType() common.DigestType
-	Data() (io.Reader, error)
-	DataDigest() []byte
-	Prev() gUuid.UUID
-	Uuid() gUuid.UUID
-	Name() string
-	Tags() []string
-	Index() int64
-	VerifySignature(authenticator crypto.Authenticator) (bool, error)
+func NewUncommittedMessage(objectDescriptor *storage.ObjectDescriptor, name string, tags []string,
+	signer crypto.Signer) *UncommittedMessage {
+	return &UncommittedMessage{
+		objectDescriptor: objectDescriptor,
+		name: name,
+		tags: tags,
+		signer: signer,
+	}
 }
 
 // BaseImmutableMessage is the base message for all streams
@@ -187,7 +182,7 @@ func DeserializeStreamImmutableMessage(messageBytes []byte, message *StreamImmut
 	return nil
 }
 
-func NewGenesisMessage(subStreamID SubStreamID, digestType common.DigestType,
+func NewStreamGenesisMessage(subStreamID SubStreamID, digestType common.DigestType,
 	signer crypto.Signer, anchorTickerUuid gUuid.UUID) (*StreamImmutableMessage, error) {
 	var err error
 	message := &StreamImmutableMessage{}
@@ -199,6 +194,7 @@ func NewGenesisMessage(subStreamID SubStreamID, digestType common.DigestType,
 	message.idx = 0
 	message.ts = 0
 	message.objectDescriptor = storage.NewObjectDescriptor(&storage.NilObjectStoreBackendParams{}, "")
+	message.prevUuid = gUuid.Nil
 
 	message.signature, err = message.ComputeSignature(signer)
 	if err != nil {
@@ -523,8 +519,14 @@ func NewTickerImmutableMessage(digestType common.DigestType, signer crypto.Signe
 
 	message := &TickerImmutableMessage{}
 	message.digestType = digestType
-	message.prevUuid = prevMessage.Uuid()
-	message.idx = prevMessage.idx + 1
+	message.uuid = gUuid.New()
+	if prevMessage != nil {
+		message.prevUuid = prevMessage.Uuid()
+		message.idx = prevMessage.idx + 1
+	} else {
+		message.prevUuid = gUuid.Nil
+		message.idx = 0
+	}
 	message.ts = ts
 
 	message.signature, err = message.ComputeSignature(signer)
@@ -600,6 +602,7 @@ func (message *TickerImmutableMessage) Index() int64 {
 	return message.idx
 }
 
+// ComputeSignature will use the provided Signer to sign this message and return the resulting byte slice
 func (message *TickerImmutableMessage) ComputeSignature(signer crypto.Signer) ([]byte, error) {
 	signatureBytes, err := message.GetSignaturePayload()
 	if err != nil {
@@ -609,16 +612,19 @@ func (message *TickerImmutableMessage) ComputeSignature(signer crypto.Signer) ([
 	if err != nil {
 		return nil, err
 	}
-	return signature.Bytes(), nil
+	return crypto.SerializeSignature(signature)
 }
 
-// ComputeSignature will use the provided Signer to sign this message and return the resulting byte slice
+// VerifySignature will use the provided Authenticator to verify this message
 func (message *TickerImmutableMessage) VerifySignature(authenticator crypto.Authenticator) (bool, error) {
 	signatureBytes, err := message.GetSignaturePayload()
 	if err != nil {
 		return false, err
 	}
 	signature, err := crypto.DeserializeSignature(message.signature)
+	if err != nil {
+		return false, err
+	}
 	return authenticator.Verify(signatureBytes, signature), nil
 }
 
@@ -659,10 +665,10 @@ func (message *TickerImmutableMessage) ComputeChainHash(prev *TickerImmutableMes
 				prev.uuid.String(), message.uuid.String(), prev.digestType, message.digestType))
 		}
 		prevDigest = prev.digest
-	}
-	if prev.digestType != message.digestType {
-		return nil, NewInvalidError(fmt.Sprintf("ComputeChainHash - UUIDs (%s %s) mismatched digest types (%d %d)",
-			prev.uuid.String(), message.uuid.String(), prev.digestType, message.digestType))
+		if prev.digestType != message.digestType {
+			return nil, NewInvalidError(fmt.Sprintf("ComputeChainHash - UUIDs (%s %s) mismatched digest types (%d %d)",
+				prev.uuid.String(), message.uuid.String(), prev.digestType, message.digestType))
+		}
 	}
 	if message.signature == nil {
 		return nil, NewInvalidError(fmt.Sprintf("ComputeChainHash - Cannot hash unsigned message UUID=%s",
@@ -690,37 +696,12 @@ func (message *TickerImmutableMessage) ComputeChainHash(prev *TickerImmutableMes
 	return digest.Sum(nil), nil
 }
 
-// ComputeChainHash is a helper function that will compute the rhs hash based on the lhs
-// and authenticator.  The authenticator is used to verify the signature of this message, which will be skipped
-// if the authenticator is nil.
-func ComputeChainHash(lhs, rhs ImmutableMessage, authenticator crypto.Authenticator) ([]byte, error) {
-	if lhsMessage, lhsOk := lhs.(*TickerImmutableMessage); lhsOk {
-		if rhsMessage, rhsOk := rhs.(*TickerImmutableMessage); rhsOk {
-			return rhsMessage.ComputeChainHash(lhsMessage, authenticator)
-		} else {
-			return nil, NewInvalidError(fmt.Sprintf(
-				"ComputeChainHash - mismatched message types for hashing UUIDs (%s %s)", lhs.Uuid(), rhs.Uuid()))
-		}
-	} else if lhsMessage, lhsOk := lhs.(*StreamImmutableMessage); lhsOk {
-		if rhsMessage, rhsOk := rhs.(*StreamImmutableMessage); rhsOk {
-			return rhsMessage.ComputeChainHash(lhsMessage, authenticator)
-		} else {
-			return nil, NewInvalidError(fmt.Sprintf(
-				"ComputeChainHash - mismatched message types for hashing UUIDs (%s %s)", lhs.Uuid(), rhs.Uuid()))
-		}
-	 }
-	 return nil, NewInvalidError(fmt.Sprintf(
-			"ComputeChainHash - invalid message types for hashing UUIDs (%s %s)", lhs.Uuid(), rhs.Uuid()))
-}
-
-// ValidateMessages will validate a sequence of immutable messages
-func ValidateMessages(messages []ImmutableMessage, authenticator crypto.Authenticator) (bool, error) {
-	var prevMessage ImmutableMessage
+// ValidateStreamMessages will validate a sequence of immutable messages
+func ValidateStreamMessages(messages []*StreamImmutableMessage, authenticator crypto.Authenticator) (bool, error) {
+	var prevMessage *StreamImmutableMessage
 	for i, message := range messages {
-		if i == 0 {
-			prevMessage = message
-		} else {
-			currDigest, err := ComputeChainHash(prevMessage, message, authenticator)
+		if i > 0 {
+			currDigest, err := message.ComputeChainHash(prevMessage, authenticator)
 			if err != nil {
 				return false, err
 			}
@@ -728,6 +709,24 @@ func ValidateMessages(messages []ImmutableMessage, authenticator crypto.Authenti
 				return false, nil
 			}
 		}
+		prevMessage = message
+	}
+	return true, nil
+}
+// ValidateTickerMessages will validate a sequence of immutable messages
+func ValidateTickerMessages(messages []*TickerImmutableMessage, authenticator crypto.Authenticator) (bool, error) {
+	var prevMessage *TickerImmutableMessage
+	for i, message := range messages {
+		if i > 0 {
+			currDigest, err := message.ComputeChainHash(prevMessage, authenticator)
+			if err != nil {
+				return false, err
+			}
+			if !bytes.Equal(message.Digest(), currDigest) {
+				return false, nil
+			}
+		}
+		prevMessage = message
 	}
 	return true, nil
 }

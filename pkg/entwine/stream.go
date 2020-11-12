@@ -1,9 +1,11 @@
 package entwine
 
 import (
+	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"strings"
 	"sync"
@@ -23,12 +25,15 @@ import (
 
 // StreamStore is the interface for a converged stream of substreams
 type StreamStore interface {
-	GetMessagesByName(name string) ([]ImmutableMessage, error)
-	GetMessagesByTags(tags []string) ([]ImmutableMessage, error)
-	GetMessageByUUID(uuid gUuid.UUID) (ImmutableMessage, error)
-	GetHistory(start gUuid.UUID, end gUuid.UUID) ([]ImmutableMessage, error)
-	GetHistoryToLastAnchor(uuid gUuid.UUID) ([]ImmutableMessage, error)
-	Append(message UncommittedMessage, subStreamID SubStreamID, anchorTickerUuid gUuid.UUID) (gUuid.UUID, error)
+	GetMessagesByName(name string) ([]*StreamImmutableMessage, error)
+	GetMessagesByTags(tags []string) ([]*StreamImmutableMessage, error)
+	GetMessageByUUID(uuid gUuid.UUID) (*StreamImmutableMessage, error)
+	GetHistory(start gUuid.UUID, end gUuid.UUID) ([]*StreamImmutableMessage, error)
+	GetHistoryToLastAnchor(uuid gUuid.UUID) ([]*StreamImmutableMessage, error)
+	Append(message *UncommittedMessage, subStreamID SubStreamID, anchorTickerUuid gUuid.UUID) (gUuid.UUID, error)
+	Head(subStreamID SubStreamID) (*StreamImmutableMessage, error)
+	Create(subStreamID SubStreamID, digestType common.DigestType,
+		signer crypto.Signer, anchorTickerUuid gUuid.UUID) error
 
 	// This function needs to be at a higher level
 	// If the anchor is encoded into every message, then this is a simple fetch and compare from the Ticker: idx1 < idx2
@@ -57,8 +62,32 @@ func NewKVStreamStore(kvStore kvs.KVStore, digestType common.DigestType) *KVStre
 	}
 }
 
+// Head will return the latest message appended to the ticker stream
+func (streamStore *KVStreamStore) Head(subStreamID SubStreamID) (*StreamImmutableMessage, error) {
+	if head, ok := streamStore.heads[string(subStreamID)]; ok {
+		return head, nil
+	}
+	return nil, common.NewNotFoundError(fmt.Sprintf("Head - substream not found: %s", subStreamID))
+}
+
+// Create will create a new substream
+func (streamStore *KVStreamStore) Create(subStreamID SubStreamID, digestType common.DigestType,
+	signer crypto.Signer, anchorTickerUuid gUuid.UUID) error {
+	genesisMessage, err := NewStreamGenesisMessage(subStreamID, digestType, signer,
+		anchorTickerUuid)
+	if err != nil {
+		return err
+	}
+	err = streamStore.append(genesisMessage)
+	if err != nil {
+		return err
+	}
+	streamStore.heads[string(subStreamID)] = genesisMessage
+	return nil
+}
+
 // GetMessagesByName will return all messages that have a given name; otherwise, return an error
-func (streamStore *KVStreamStore) GetMessagesByName(name string) ([]ImmutableMessage, error) {
+func (streamStore *KVStreamStore) GetMessagesByName(name string) ([]*StreamImmutableMessage, error) {
 	namePrefix, err := NameKeyPrefix(name)
 	if err != nil {
 		return nil, err
@@ -67,9 +96,18 @@ func (streamStore *KVStreamStore) GetMessagesByName(name string) ([]ImmutableMes
 	if err != nil {
 		return nil, err
 	}
-	messages := make([]ImmutableMessage, len(keys))
+
+	if len(keys) == 0 {
+		return nil, common.NewNotFoundError(fmt.Sprintf("GetMessagesByName - not found: %s", name))
+	}
+
+	messages := make([]*StreamImmutableMessage, len(keys))
 	for i, _ := range keys {
-		messageBytes, err := streamStore.kvStore.Get(keys[i])
+		messageUuid, err := UuidFromNameKey(keys[i])
+		if err != nil {
+			return nil, err
+		}
+		messageBytes, err := streamStore.kvStore.Get(messageUuid)
 		if err != nil {
 			return nil, err
 		}
@@ -82,7 +120,7 @@ func (streamStore *KVStreamStore) GetMessagesByName(name string) ([]ImmutableMes
 }
 
 // GetMessagesByTags will return all messages that have a given set of tags; otherwise, return an error
-func (streamStore *KVStreamStore) GetMessagesByTags(tags []string) ([]ImmutableMessage, error) {
+func (streamStore *KVStreamStore) GetMessagesByTags(tags []string) ([]*StreamImmutableMessage, error) {
 	var allKeys []string
 
 	for _, tag := range tags {
@@ -97,9 +135,17 @@ func (streamStore *KVStreamStore) GetMessagesByTags(tags []string) ([]ImmutableM
 		allKeys = append(allKeys, keys...)
 	}
 
-	messages := make([]ImmutableMessage, len(allKeys))
+	if len(allKeys) == 0 {
+		return nil, common.NewNotFoundError(fmt.Sprintf("GetMessagesByTags - not found: %v", tags))
+	}
+
+	messages := make([]*StreamImmutableMessage, len(allKeys))
 	for i, _ := range allKeys {
-		messageBytes, err := streamStore.kvStore.Get(allKeys[i])
+		messageUuid, err := UuidFromTagKey(allKeys[i])
+		if err != nil {
+			return nil, err
+		}
+		messageBytes, err := streamStore.kvStore.Get(messageUuid)
 		if err != nil {
 			return nil, err
 		}
@@ -113,7 +159,7 @@ func (streamStore *KVStreamStore) GetMessagesByTags(tags []string) ([]ImmutableM
 }
 
 // GetMessageByUUID will return the message with a given UUID; otherwise, return an error
-func (streamStore *KVStreamStore) GetMessageByUUID(uuid gUuid.UUID) (ImmutableMessage, error) {
+func (streamStore *KVStreamStore) GetMessageByUUID(uuid gUuid.UUID) (*StreamImmutableMessage, error) {
 	messageBytes, err := streamStore.kvStore.Get(uuid.String())
 	if err != nil {
 		return nil, err
@@ -122,8 +168,8 @@ func (streamStore *KVStreamStore) GetMessageByUUID(uuid gUuid.UUID) (ImmutableMe
 }
 
 // GetMessages will return the messages for the given UUIDs; otherwise, return an error
-func (streamStore *KVStreamStore) GetMessages(uuids []gUuid.UUID) ([]ImmutableMessage, error) {
-	var chainedMessages []ImmutableMessage
+func (streamStore *KVStreamStore) GetMessages(uuids []gUuid.UUID) ([]*StreamImmutableMessage, error) {
+	var chainedMessages []*StreamImmutableMessage
 	for _, myUuid := range uuids {
 		messageBytes, err := streamStore.kvStore.Get(myUuid.String())
 		if err != nil {
@@ -139,18 +185,26 @@ func (streamStore *KVStreamStore) GetMessages(uuids []gUuid.UUID) ([]ImmutableMe
 }
 
 // GetHistory will return the ordered, immutable history between two UUIDs; otherwise return an error
-func (streamStore *KVStreamStore) GetHistory(start gUuid.UUID, end gUuid.UUID) ([]ImmutableMessage, error) {
+func (streamStore *KVStreamStore) GetHistory(start gUuid.UUID, end gUuid.UUID) ([]*StreamImmutableMessage, error) {
 	var chainedUuids []gUuid.UUID
-
 	curr := end
 
 	for {
+		if err := streamStore.kvStore.Head(curr.String()); err != nil {
+			return nil, err
+		}
+
 		chainedUuids = append(chainedUuids, curr)
 		if strings.Compare(curr.String(), start.String()) == 0 {
 			break
 		}
 		prevBytes, err := streamStore.kvStore.Get(PreviousNodeKey(curr))
-		if err != nil {
+
+		// No previous message, assumes we have reached the first
+		// ToDo(KMG): Do we care?  Should we check the first message and return an error?
+		if errors.Is(err, &common.NotFoundError{}) {
+			break
+		} else if err != nil {
 			return nil, err
 		}
 		prev, err := BytesToUUID(prevBytes)
@@ -159,7 +213,14 @@ func (streamStore *KVStreamStore) GetHistory(start gUuid.UUID, end gUuid.UUID) (
 		}
 		curr = prev
 	}
-	return streamStore.GetMessages(chainedUuids)
+	messages, err := streamStore.GetMessages(chainedUuids)
+	if err != nil {
+		return nil, err
+	}
+
+	ReverseStreamMessages(messages)
+
+	return messages, nil
 }
 
 // getAnchorUUID will return the anchor UUID for a give message; otherwise, return an error
@@ -177,7 +238,7 @@ func (streamStore *KVStreamStore) getAnchorUUID(uuid gUuid.UUID) (gUuid.UUID, er
 
 // GetHistoryToLastAnchor will return the immutable history from the provided UUID back to the last message with
 // a different anchor; otherwise, return an error
-func (streamStore *KVStreamStore) GetHistoryToLastAnchor(uuid gUuid.UUID) ([]ImmutableMessage, error) {
+func (streamStore *KVStreamStore) GetHistoryToLastAnchor(uuid gUuid.UUID) ([]*StreamImmutableMessage, error) {
 	var chainedUuids []gUuid.UUID
 
 	curr := uuid
@@ -187,8 +248,16 @@ func (streamStore *KVStreamStore) GetHistoryToLastAnchor(uuid gUuid.UUID) ([]Imm
 	}
 	chainedUuids = append(chainedUuids, curr)
 	for {
+		if err := streamStore.kvStore.Head(curr.String()); err != nil {
+			return nil, err
+		}
+
 		prevBytes, err := streamStore.kvStore.Get(PreviousNodeKey(curr))
-		if err != nil {
+		// No previous message, assumes we have reached the first
+		// ToDo(KMG): Do we care?  Should we check the first message and return an error?
+		if errors.Is(err, &common.NotFoundError{}) {
+			break
+		} else if err != nil {
 			return nil, err
 		}
 		prev, err := BytesToUUID(prevBytes)
@@ -225,8 +294,7 @@ func (streamStore *KVStreamStore) setHead(subStreamID SubStreamID, message *Stre
 
 // Append will append an uncommitted message to a substream, anchored at the provided anchor UUID; otherwise return
 // an error.
-// ToDo(KMG): Need to rollback any incomplete append
-func (streamStore *KVStreamStore) Append(message UncommittedMessage, subStreamID SubStreamID,
+func (streamStore *KVStreamStore) Append(message *UncommittedMessage, subStreamID SubStreamID,
 	anchorTickerUuid gUuid.UUID) (gUuid.UUID, error) {
 	ts := time.Now().Unix()
 
@@ -250,64 +318,75 @@ func (streamStore *KVStreamStore) Append(message UncommittedMessage, subStreamID
 		return gUuid.Nil, err
 	}
 
-	newUuid := immutableMessage.uuid
-	prevUuidBytes, err := UuidToBytes(head.Uuid())
+	err = streamStore.append(immutableMessage)
 	if err != nil {
 		return gUuid.Nil, err
 	}
 
-	anchorUuidBytes, err := UuidToBytes(anchorTickerUuid)
+	return immutableMessage.uuid, nil
+}
+
+// append preps and performs all of the storage operations for appending a new message
+// ToDo(KMG): Need to rollback any incomplete append
+func (streamStore *KVStreamStore) append(message *StreamImmutableMessage) error {
+	newUuid := message.uuid
+
+	prevUuidBytes, err := UuidToBytes(message.Prev())
 	if err != nil {
-		return gUuid.Nil, err
+		return err
+	}
+
+	anchorUuidBytes, err := UuidToBytes(message.anchorTickerUuid)
+	if err != nil {
+		return err
 	}
 
 	// Store tags
-	for _, tag := range immutableMessage.tags {
+	for _, tag := range message.tags {
 		tagPrefix, err := TagKeyPrefix(tag)
 		if err != nil {
-			return gUuid.Nil, err
+			return err
 		}
 		err = streamStore.kvStore.Put(TagEntry(tagPrefix, newUuid), []byte(nil))
 		if err != nil {
-			return gUuid.Nil, err
+			return err
 		}
 	}
 
 	// Store name
-	namePrefix, err := NameKeyPrefix(immutableMessage.name)
+	namePrefix, err := NameKeyPrefix(message.name)
 	if err != nil {
-		return gUuid.Nil, err
+		return err
 	}
 	err = streamStore.kvStore.Put(NameEntry(namePrefix, newUuid), []byte(nil))
 	if err != nil {
-		return gUuid.Nil, err
+		return err
 	}
 
 	// Store previous node reference
 	err = streamStore.kvStore.Put(PreviousNodeKey(newUuid), prevUuidBytes)
 	if err != nil {
-		return gUuid.Nil, err
+		return err
 	}
 
 	// Store anchor reference
 	err = streamStore.kvStore.Put(AnchorNodeKey(newUuid), anchorUuidBytes)
 	if err != nil {
-		return gUuid.Nil, err
+		return err
 	}
 
 	// Store main record
-	messageBytes, err := SerializeStreamImmutableMessage(immutableMessage)
+	messageBytes, err := SerializeStreamImmutableMessage(message)
 	err = streamStore.kvStore.Put(newUuid.String(), messageBytes)
 	if err != nil {
-		return gUuid.Nil, err
+		return err
 	}
 
 	// Set new head
-	err = streamStore.setHead(subStreamID, immutableMessage)
+	err = streamStore.setHead(message.subStreamID, message)
 	if err != nil {
-		return gUuid.Nil, err
+		return err
 	}
-
-	return newUuid, nil
+	return nil
 }
 

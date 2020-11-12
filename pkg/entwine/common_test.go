@@ -13,19 +13,19 @@ import (
 func TestPrimaryRecordKey(t *testing.T) {
 	uuid := gUuid.New()
 	key := entwine.PrimaryRecordKey(uuid)
-	assert.Equal(t, fmt.Sprintf("%s-n", uuid.String()), key)
+	assert.Equal(t, fmt.Sprintf("%s:n", uuid.String()), key)
 }
 
 func TestPreviousNodeKey(t *testing.T) {
 	uuid := gUuid.New()
 	key := entwine.PreviousNodeKey(uuid)
-	assert.Equal(t, fmt.Sprintf("%s-p", uuid.String()), key)
+	assert.Equal(t, fmt.Sprintf("%s:p", uuid.String()), key)
 }
 
 func TestAnchorNodeKey(t *testing.T) {
 	uuid := gUuid.New()
 	key := entwine.AnchorNodeKey(uuid)
-	assert.Equal(t, fmt.Sprintf("%s-a", uuid.String()), key)
+	assert.Equal(t, fmt.Sprintf("%s:a", uuid.String()), key)
 }
 
 func TestNameKeyPrefix(t *testing.T) {
@@ -41,7 +41,7 @@ func TestNameKeyPrefix(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	assert.Equal(t, fmt.Sprintf("%s-%s", hex.EncodeToString(hasher.Sum(nil))[:4], testName), namePrefix)
+	assert.Equal(t, fmt.Sprintf("%s:n:%s", hex.EncodeToString(hasher.Sum(nil))[:4], testName), namePrefix)
 }
 
 func TestNameEntry(t *testing.T) {
@@ -52,7 +52,19 @@ func TestNameEntry(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	assert.Equal(t, fmt.Sprintf("%s-%s", namePrefix, uuid.String()), entwine.NameEntry(namePrefix, uuid))
+	assert.Equal(t, fmt.Sprintf("%s:%s", namePrefix, uuid.String()), entwine.NameEntry(namePrefix, uuid))
+	extractedUuid, err := entwine.UuidFromNameKey(entwine.NameEntry(namePrefix, uuid))
+	assert.Equal(t, uuid.String(), extractedUuid)
+}
+
+func TestUuidFromNameKeyInvalid(t *testing.T) {
+	_, err := entwine.UuidFromNameKey("sdf:sdf-sdf0")
+	assert.Error(t, err)
+}
+
+func TestUuidFromTagKeyInvalid(t *testing.T) {
+	_, err := entwine.UuidFromTagKey("sdf:sdf-sdf0")
+	assert.Error(t, err)
 }
 
 func TestTagEntry(t *testing.T) {
@@ -63,7 +75,9 @@ func TestTagEntry(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	assert.Equal(t, fmt.Sprintf("%s-%s", tagPrefix, uuid.String()), entwine.TagEntry(tagPrefix, uuid))
+	assert.Equal(t, fmt.Sprintf("%s:%s", tagPrefix, uuid.String()), entwine.TagEntry(tagPrefix, uuid))
+	extractedUuid, err := entwine.UuidFromTagKey(entwine.NameEntry(tagPrefix, uuid))
+	assert.Equal(t, uuid.String(), extractedUuid)
 }
 
 func TestTagKeyPrefix(t *testing.T) {
@@ -79,7 +93,7 @@ func TestTagKeyPrefix(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	assert.Equal(t, fmt.Sprintf("%s-%s", hex.EncodeToString(hasher.Sum(nil))[:4], testTag), tagPrefix)
+	assert.Equal(t, fmt.Sprintf("%s:t:%s", hex.EncodeToString(hasher.Sum(nil))[:4], testTag), tagPrefix)
 }
 
 func TestBytesToUUID(t *testing.T) {
@@ -115,7 +129,7 @@ func TestProofIdentifierPrefix(t *testing.T) {
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
-	assert.Equal(t, fmt.Sprintf("%s-%s-pf", hex.EncodeToString(hasher.Sum(nil))[:4], subStreamID),
+	assert.Equal(t, fmt.Sprintf("%s:%s:pf", hex.EncodeToString(hasher.Sum(nil))[:4], subStreamID),
 		proofPrefix)
 }
 
@@ -128,5 +142,5 @@ func TestProofIdentifier(t *testing.T) {
 
 	proofID, err := entwine.ProofIdentifier(subStreamID, 1)
 
-	assert.Equal(t, fmt.Sprintf("%s-%d", proofPrefix, 1), proofID)
+	assert.Equal(t, fmt.Sprintf("%s:%d", proofPrefix, 1), proofID)
 }
