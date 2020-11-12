@@ -139,3 +139,14 @@ func ReverseStreamMessages(messages []*StreamImmutableMessage) {
 	}
 }
 
+// ReverseTickerMessages will reverse a list of stream immutable messages
+func ReverseTickerMessages(messages []*TickerImmutableMessage) {
+	if messages == nil {
+		return
+	}
+	for left, right := 0, len(messages)-1; left < right; left, right = left+1, right-1 {
+		messages[left], messages[right] = messages[right], messages[left]
+	}
+}
+
+

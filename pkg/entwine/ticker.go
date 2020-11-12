@@ -112,7 +112,14 @@ func (tickerStore *KVTickerStore) GetHistory(start gUuid.UUID, end gUuid.UUID) (
 		}
 		curr = prev
 	}
-	return tickerStore.GetMessages(chainedUuids)
+	messages, err := tickerStore.GetMessages(chainedUuids)
+	if err != nil {
+		return nil, err
+	}
+
+	ReverseTickerMessages(messages)
+
+	return messages, nil
 }
 
 // CreateGenesisProof will create a genesis proof for a substream; otherwise, return an error
