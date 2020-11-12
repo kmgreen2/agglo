@@ -1,6 +1,7 @@
 package entwine_test
 
 import (
+	gocrypto "crypto"
 	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/entwine"
@@ -10,8 +11,12 @@ import (
 )
 
 func TestKVStreamStore_GetMessagesByName(t *testing.T) {
+	messageSigner, _, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
 	kvStreamStore, _, _, uuidToName, err := test.GetKVStreamStore(6, entwine.SubStreamID("0"),
-		gUuid.New(), 0)
+		messageSigner, gUuid.New(), 0)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -27,7 +32,11 @@ func TestKVStreamStore_GetMessagesByName(t *testing.T) {
 }
 
 func TestKVStreamStore_GetMessagesByNameError(t *testing.T) {
-	kvStreamStore, _, _, _, err := test.GetKVStreamStore(6, entwine.SubStreamID("0"),
+	messageSigner, _, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	kvStreamStore, _, _, _, err := test.GetKVStreamStore(6, entwine.SubStreamID("0"), messageSigner,
 		gUuid.New(), 0)
 	if err != nil {
 		assert.FailNow(t, err.Error())
@@ -38,8 +47,12 @@ func TestKVStreamStore_GetMessagesByNameError(t *testing.T) {
 }
 
 func TestKVStreamStore_GetMessagesByTags(t *testing.T) {
+	messageSigner, _, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
 	kvStreamStore, _, _, uuidToName, err := test.GetKVStreamStore(6, entwine.SubStreamID("0"),
-		gUuid.New(), 0)
+		messageSigner, gUuid.New(), 0)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -58,7 +71,11 @@ func TestKVStreamStore_GetMessagesByTags(t *testing.T) {
 }
 
 func TestKVStreamStore_GetMessagesByTagsError(t *testing.T) {
-	kvStreamStore, _, _, _, err := test.GetKVStreamStore(6, entwine.SubStreamID("0"),
+	messageSigner, _, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	kvStreamStore, _, _, _, err := test.GetKVStreamStore(6, entwine.SubStreamID("0"), messageSigner,
 		gUuid.New(), 0)
 	if err != nil {
 		assert.FailNow(t, err.Error())
@@ -70,7 +87,12 @@ func TestKVStreamStore_GetMessagesByTagsError(t *testing.T) {
 
 func TestKVStreamStore_GetMessageByUUID(t *testing.T) {
 	subStreamID := entwine.SubStreamID("0")
-	kvStreamStore, _, _, _, err := test.GetKVStreamStore(6, subStreamID, gUuid.New(), 0)
+	messageSigner, _, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	kvStreamStore, _, _, _, err := test.GetKVStreamStore(6, subStreamID, messageSigner,
+		gUuid.New(), 0)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -88,7 +110,12 @@ func TestKVStreamStore_GetMessageByUUID(t *testing.T) {
 
 func TestKVStreamStore_GetMessageByUUIDError(t *testing.T) {
 	subStreamID := entwine.SubStreamID("0")
-	kvStreamStore, _, _, _, err := test.GetKVStreamStore(6, subStreamID, gUuid.New(), 0)
+	messageSigner, _, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	kvStreamStore, _, _, _, err := test.GetKVStreamStore(6, subStreamID, messageSigner,
+		gUuid.New(), 0)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -99,7 +126,11 @@ func TestKVStreamStore_GetMessageByUUIDError(t *testing.T) {
 
 func TestKVStreamStore_GetMessages(t *testing.T) {
 	subStreamID := entwine.SubStreamID("0")
-	kvStreamStore, _, _, uuidToName, err := test.GetKVStreamStore(6, subStreamID,
+	messageSigner, _, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	kvStreamStore, _, _, uuidToName, err := test.GetKVStreamStore(6, subStreamID, messageSigner,
 		gUuid.New(), 0)
 	if err != nil {
 		assert.FailNow(t, err.Error())
@@ -127,7 +158,12 @@ func TestKVStreamStore_GetMessages(t *testing.T) {
 
 func TestKVStreamStore_GetMessagesError(t *testing.T) {
 	subStreamID := entwine.SubStreamID("0")
-	kvStreamStore, _, _, _, err := test.GetKVStreamStore(6, subStreamID, gUuid.New(), 0)
+	messageSigner, _, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	kvStreamStore, _, _, _, err := test.GetKVStreamStore(6, subStreamID, messageSigner,
+		gUuid.New(), 0)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -142,7 +178,11 @@ func TestKVStreamStore_GetMessagesError(t *testing.T) {
 
 func TestKVStreamStore_GetHistory(t *testing.T) {
 	subStreamID := entwine.SubStreamID("0")
-	kvStreamStore, _, _, uuidToNames, err := test.GetKVStreamStore(12, subStreamID,
+	messageSigner, _, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	kvStreamStore, _, _, uuidToNames, err := test.GetKVStreamStore(12, subStreamID, messageSigner,
 		gUuid.New(), 0)
 	if err != nil {
 		assert.FailNow(t, err.Error())
@@ -176,7 +216,12 @@ func TestKVStreamStore_GetHistory(t *testing.T) {
 
 func TestKVStreamStore_GetHistoryError(t *testing.T) {
 	subStreamID := entwine.SubStreamID("0")
-	kvStreamStore, _, _, _, err := test.GetKVStreamStore(12, subStreamID, gUuid.New(), 0)
+	messageSigner, _, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	kvStreamStore, _, _, _, err := test.GetKVStreamStore(12, subStreamID, messageSigner,
+		gUuid.New(), 0)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -187,7 +232,12 @@ func TestKVStreamStore_GetHistoryError(t *testing.T) {
 
 func TestKVStreamStore_GetHistoryToLastAnchor(t *testing.T) {
 	subStreamID := entwine.SubStreamID("0")
-	kvStreamStore, _, _, uuidToNames, err := test.GetKVStreamStore(12, subStreamID,
+	messageSigner, _, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	kvStreamStore, _, _, uuidToNames, err := test.GetKVStreamStore(12, subStreamID, messageSigner,
 		gUuid.New(), 4)
 	if err != nil {
 		assert.FailNow(t, err.Error())
@@ -217,7 +267,12 @@ func TestKVStreamStore_GetHistoryToLastAnchor(t *testing.T) {
 
 func TestKVStreamStore_GetHistoryToLastAnchorError(t *testing.T) {
 	subStreamID := entwine.SubStreamID("0")
-	kvStreamStore, _, _, _, err := test.GetKVStreamStore(12, subStreamID, gUuid.New(), 0)
+	messageSigner, _, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	kvStreamStore, _, _, _, err := test.GetKVStreamStore(12, subStreamID, messageSigner,
+		gUuid.New(), 0)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}

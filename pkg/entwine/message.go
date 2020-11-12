@@ -194,6 +194,7 @@ func NewStreamGenesisMessage(subStreamID SubStreamID, digestType common.DigestTy
 	message.idx = 0
 	message.ts = 0
 	message.objectDescriptor = storage.NewObjectDescriptor(&storage.NilObjectStoreBackendParams{}, "")
+	message.objectDigest = []byte{}
 	message.prevUuid = gUuid.Nil
 
 	message.signature, err = message.ComputeSignature(signer)

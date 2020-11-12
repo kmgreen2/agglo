@@ -190,6 +190,10 @@ func (streamStore *KVStreamStore) GetHistory(start gUuid.UUID, end gUuid.UUID) (
 	curr := end
 
 	for {
+		// If a nil start UUID is given, then process the entire history back to the genesis block
+		if curr == gUuid.Nil && start == gUuid.Nil {
+			break
+		}
 		if err := streamStore.kvStore.Head(curr.String()); err != nil {
 			return nil, err
 		}

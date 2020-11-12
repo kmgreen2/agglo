@@ -122,6 +122,11 @@ func (proof *Proof) IsGenesis() (bool, error) {
 		GenesisProofUuidBytes) == 0, nil
 }
 
+// TickerUuid will return the ticker UUID associated with this proof
+func (proof *Proof) TickerUuid() gUuid.UUID {
+	return proof.tickerUuid
+}
+
 // NewProof will create a proof for  a sequence of substream immutable messages, which are assumed to be anchored
 // at the provided ticker message
 func NewProof(messages []*StreamImmutableMessage, subStreamID SubStreamID,
@@ -143,9 +148,7 @@ func NewProof(messages []*StreamImmutableMessage, subStreamID SubStreamID,
 // NewProofFromBytes will deserialize a byte slice into a proof; otherwise, return an error
 func NewProofFromBytes(proofBytes []byte) (*Proof, error) {
 	proof := &Proof{}
-	byteBuffer := bytes.NewBuffer(proofBytes)
-	gDecoder := gob.NewDecoder(byteBuffer)
-	err := gDecoder.Decode(proof)
+	err := DeserializeProof(proofBytes, proof)
 	if err != nil {
 		return nil, err
 	}
@@ -156,9 +159,7 @@ func NewProofFromBytes(proofBytes []byte) (*Proof, error) {
 func (proof *Proof) Validate() bool {
 	var prevDigest []byte
 	for i, fingerprint := range proof.messageFingerprints {
-		if i == 0 {
-			prevDigest = fingerprint.Digest
-		} else {
+		if i > 0 {
 			digest := common.InitHash(fingerprint.DigestType)
 			digest.Write(prevDigest)
 			digest.Write(fingerprint.Signature)
@@ -166,19 +167,9 @@ func (proof *Proof) Validate() bool {
 				return false
 			}
 		}
+		prevDigest = fingerprint.Digest
 	}
 	return true
-}
-
-// Serialize will serialize the proof; otherwise return an error
-func (proof *Proof) Serialize() ([]byte, error) {
-	byteBuffer := bytes.NewBuffer(make([]byte, 0))
-	gEncoder := gob.NewEncoder(byteBuffer)
-	err := gEncoder.Encode(proof)
-	if err != nil {
-		return nil, err
-	}
-	return byteBuffer.Bytes(), nil
 }
 
 // IsConsistent will return true if this proof is consistent with the previous proof; otherwise return false or an error

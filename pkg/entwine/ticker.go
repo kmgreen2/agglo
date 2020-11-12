@@ -123,7 +123,7 @@ func (tickerStore *KVTickerStore) GetHistory(start gUuid.UUID, end gUuid.UUID) (
 }
 
 // CreateGenesisProof will create a genesis proof for a substream; otherwise, return an error
-func (tickerStore *KVTickerStore) CreateGenesisProof(subStreamID SubStreamID) error {
+func (tickerStore *KVTickerStore) CreateGenesisProof(subStreamID SubStreamID) (*Proof, error) {
 	if _, ok := tickerStore.proofLocks[string(subStreamID)]; !ok {
 		tickerStore.proofLocks[string(subStreamID)] = &sync.Mutex{}
 	}
@@ -133,29 +133,29 @@ func (tickerStore *KVTickerStore) CreateGenesisProof(subStreamID SubStreamID) er
 	tickerMessage := tickerStore.head
 	proof, err := NewGenesisProof(subStreamID, tickerMessage)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Serialize and store the new proof
 	proofBytes, err := SerializeProof(proof)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// ID == 0 because this is the genesis proof
 	proofKey, err := ProofIdentifier(subStreamID, 0)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = tickerStore.kvStore.Put(proofKey, proofBytes)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tickerStore.proofIndexes[string(subStreamID)] = 0
 
-	return nil
+	return proof, nil
 }
 
 // GetLatestProofKey will return the latest known proof for a substream; otherwise, return an error
@@ -165,7 +165,7 @@ func (tickerStore *KVTickerStore) GetLatestProofKey(subStreamID SubStreamID) (st
 		return "", err
 	}
 	if idx, ok := tickerStore.proofIndexes[string(subStreamID)]; ok {
-		return fmt.Sprintf("%s-%d", proofPrefix, idx), nil
+		return ProofIdentifier(subStreamID, idx)
 	}
 
 
@@ -184,7 +184,7 @@ func (tickerStore *KVTickerStore) GetLatestProofKey(subStreamID SubStreamID) (st
 
 	for _, key := range keys {
 		var idx int
-		_, err = fmt.Sscanf(key, proofPrefix + "-%d", &idx)
+		_, err = fmt.Sscanf(key, proofPrefix + ":%d", &idx)
 		if err != nil {
 			return "", err
 		}
@@ -192,12 +192,18 @@ func (tickerStore *KVTickerStore) GetLatestProofKey(subStreamID SubStreamID) (st
 			maxIdx = idx
 		}
 	}
+
+	// ToDo(KMG): This is opportunistic cache population.  Should this be validated instead of populated?
+	tickerStore.proofLocks[string(subStreamID)].Lock()
 	tickerStore.proofIndexes[string(subStreamID)] = maxIdx
-	return fmt.Sprintf("%s-%d", proofPrefix, maxIdx), nil
+	tickerStore.proofLocks[string(subStreamID)].Unlock()
+
+	return ProofIdentifier(subStreamID, maxIdx)
 }
 
 // GetProofStartUuid will return the UUID of the last message in the latest known proof for a substream; otherwise,
 // return an error
+// Note: Returns a Nil Uuid if there are no proofs beyond the genesis proof
 func (tickerStore *KVTickerStore) GetProofStartUuid(subStreamID SubStreamID) (gUuid.UUID, error) {
 	proofKey, err := tickerStore.GetLatestProofKey(subStreamID)
 	if err != nil {
@@ -211,6 +217,14 @@ func (tickerStore *KVTickerStore) GetProofStartUuid(subStreamID SubStreamID) (gU
 	proof, err := NewProofFromBytes(proofBytes)
 	if err != nil {
 		return gUuid.Nil, err
+	}
+
+	isGenesis, err := proof.IsGenesis()
+	if err != nil {
+		return gUuid.Nil, err
+	}
+	if isGenesis {
+		return gUuid.Nil, nil
 	}
 
 	return proof.endUuid, nil

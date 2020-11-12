@@ -10,7 +10,7 @@ import (
 
 func TestKVTickerStore_GetMessageByUUID(t *testing.T) {
 	var uuid gUuid.UUID
-	tickerStore, err := test.GetTickerStore(10)
+	tickerStore, _, err := test.GetTickerStore(10)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -30,7 +30,7 @@ func TestKVTickerStore_GetMessageByUUID(t *testing.T) {
 }
 
 func TestKVTickerStore_GetMessageByUUIDError(t *testing.T) {
-	tickerStore, err := test.GetTickerStore(10)
+	tickerStore, _, err := test.GetTickerStore(10)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -40,7 +40,7 @@ func TestKVTickerStore_GetMessageByUUIDError(t *testing.T) {
 }
 
 func TestKVTickerStore_GetMessages(t *testing.T) {
-	tickerStore, err := test.GetTickerStore(10)
+	tickerStore, _, err := test.GetTickerStore(10)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -75,7 +75,7 @@ func TestKVTickerStore_GetMessages(t *testing.T) {
 }
 
 func TestKVTickerStore_GetMessagesError(t *testing.T) {
-	tickerStore, err := test.GetTickerStore(10)
+	tickerStore, _, err := test.GetTickerStore(10)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -85,7 +85,7 @@ func TestKVTickerStore_GetMessagesError(t *testing.T) {
 }
 
 func TestKVTickerStore_GetHistory(t *testing.T) {
-	tickerStore, err := test.GetTickerStore(10)
+	tickerStore, _, err := test.GetTickerStore(10)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -119,9 +119,13 @@ func TestKVTickerStore_GetHistory(t *testing.T) {
 }
 
 func TestKVTickerStore_GetHistoryError(t *testing.T) {
-}
+	tickerStore, _, err := test.GetTickerStore(10)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
 
-func TestKVTickerStore_CreateGenesisProof(t *testing.T) {
+	_, err = tickerStore.GetHistory(gUuid.New(), gUuid.New())
+	assert.Error(t, err)
 }
 
 func TestKVTickerStore_CreateGenesisProofError(t *testing.T) {
@@ -140,6 +144,11 @@ func TestKVTickerStore_GetProofStartUuidError(t *testing.T) {
 }
 
 func TestKVTickerStore_Anchor(t *testing.T) {
+	substreamID := entwine.SubStreamID("0")
+	_, _, err := test.GetProofStream(12, 1, 3, 4, substreamID)
+	if err != nil {
+		assert.Fail(t, err.Error())
+	}
 }
 
 func TestKVTickerStore_AnchorError(t *testing.T) {

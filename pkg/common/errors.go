@@ -124,3 +124,4 @@ func NewSignatureError(msg string) *SignatureError {
 		msg: msg,
 	}
 }
+
