@@ -201,6 +201,20 @@ func GetTickerStore(numMessages int) (*entwine.KVTickerStore, crypto.Signer, err
 	return kvTickerStore, signer, nil
 }
 
+func GetProof(messages []*entwine.StreamImmutableMessage, subStreamID entwine.SubStreamID) (*entwine.Proof, error){
+	signer, _, _, err := GetSignerAuthenticator(gocrypto.SHA1)
+	if err != nil {
+		return nil, err
+	}
+
+	tickerMessage, err := entwine.NewTickerImmutableMessage(common.SHA1, signer, int64(1), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return entwine.NewProof(messages, subStreamID, tickerMessage)
+}
+
 func GetProofStream(startNumTicks, tickStride, messageStride, numEntanglements int,
 	subStreamID entwine.SubStreamID) (*entwine.
 	KVTickerStore, *entwine.KVStreamStore, error) {

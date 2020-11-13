@@ -91,6 +91,11 @@ func (tickerStore *KVTickerStore) GetHistory(start gUuid.UUID, end gUuid.UUID) (
 	curr := end
 
 	for {
+		// If a nil start UUID is given, then process the entire history back to the genesis block
+		if curr == gUuid.Nil && start == gUuid.Nil {
+			break
+		}
+
 		if err := tickerStore.kvStore.Head(curr.String()); err != nil {
 			return nil, err
 		}
@@ -232,12 +237,23 @@ func (tickerStore *KVTickerStore) GetProofStartUuid(subStreamID SubStreamID) (gU
 
 // Anchor will return a ticker anchor, given a sequence of messages (used as a proof) for a substream; otherwise, return
 // an error
+// ToDo(KMG): Need to rollback if failure, then add tests for that
 func (tickerStore *KVTickerStore) Anchor(messages []*StreamImmutableMessage, subStreamID SubStreamID,
 	authenticator crypto.Authenticator) (*TickerImmutableMessage, error) {
 
 	tickerMessage := tickerStore.head
+
+	err := tickerStore.ValidateTickerUuids(messages, tickerMessage)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create proof and validate
-	proof := NewProof(messages, subStreamID, tickerMessage)
+	proof, err := NewProof(messages, subStreamID, tickerMessage)
+	if err != nil {
+		return nil, err
+	}
+	// Create proof and validate
 	if !proof.Validate() {
 		return nil, NewInvalidError(fmt.Sprintf("Anchor - proof validation failed for substream: %s",
 			subStreamID))
@@ -303,6 +319,58 @@ func (tickerStore *KVTickerStore) Anchor(messages []*StreamImmutableMessage, sub
 	return tickerMessage, nil
 }
 
+// The following must hold (<message(s)>:tickerMessage)
+// m[0]:t
+// m[1:n]:t'
+// tickerMessage
+// t <= t' <= tickerMessage
+func (tickerStore *KVTickerStore) ValidateTickerUuids(messages []*StreamImmutableMessage,
+	currentTickerMessage *TickerImmutableMessage) error {
+	firstUuid := messages[0].GetAnchorUUID()
+	mainUuid := messages[1].GetAnchorUUID()
+
+	// All but the first message *must* have the same anchor into the ticker
+	for i := 2; i < len(messages); i++ {
+		if strings.Compare(messages[i].GetAnchorUUID().String(), mainUuid.String()) != 0 {
+			msg := fmt.Sprintf("ValidateTickerUuids - all anchor UUIDs, " +
+				"except the first, must be the same to establish proof")
+			return NewInvalidError(msg)
+		}
+	}
+
+	firstAnchor, err := tickerStore.GetMessageByUUID(firstUuid)
+	if err != nil {
+		return err
+	}
+	mainAnchor, err := tickerStore.GetMessageByUUID(mainUuid)
+	if err != nil {
+		return err
+	}
+
+	firstBeforeMain, err := tickerStore.HappenedBefore(firstAnchor, mainAnchor)
+	if err != nil {
+		return err
+	}
+
+	mainBeforeCurrent, err := tickerStore.HappenedBefore(mainAnchor, currentTickerMessage)
+	if err != nil {
+		return err
+	}
+
+	if !firstBeforeMain && strings.Compare(firstUuid.String(), mainUuid.String()) != 0 {
+		msg := fmt.Sprintf("ValidateTickerUuids - first message's anchor " +
+			"did not happen before or same as main message anchor")
+		return NewInvalidError(msg)
+	}
+
+	if !mainBeforeCurrent && strings.Compare(mainUuid.String(), currentTickerMessage.Uuid().String()) != 0 {
+		msg := fmt.Sprintf("ValidateTickerUuids - main message anchor " +
+			"did not happen before or same as current ticker message")
+		return NewInvalidError(msg)
+	}
+	return nil
+}
+
 // HappenedBefore returns true if lhs happened before rhs; otherwise return an error and/or false
 func (tickerStore *KVTickerStore) HappenedBefore(lhs *TickerImmutableMessage, rhs *TickerImmutableMessage) (bool,
 	error) {
@@ -311,6 +379,7 @@ func (tickerStore *KVTickerStore) HappenedBefore(lhs *TickerImmutableMessage, rh
 
 // Append will append an uncommitted message to a substream; otherwise, return
 // an error.
+// ToDo(KMG): Need to rollback if failure, then add tests for that
 func (tickerStore *KVTickerStore) Append(signer crypto.Signer) error {
 	ts := time.Now().Unix()
 	tickerStore.tickerLock.Lock()

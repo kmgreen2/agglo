@@ -3,6 +3,7 @@ package entwine
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"strings"
@@ -15,6 +16,7 @@ type messageFingerprint struct {
 	Digest []byte
 	DigestType common.DigestType
 	Uuid gUuid.UUID
+	AnchorUuid gUuid.UUID
 }
 
 // Proof is used to encapsulate a sequence of immutable fingerprints for verification
@@ -87,6 +89,7 @@ func NewMessageFingerprint(message *StreamImmutableMessage) *messageFingerprint 
 		Digest: message.Digest(),
 		DigestType: message.DigestType(),
 		Uuid: message.Uuid(),
+		AnchorUuid: message.GetAnchorUUID(),
 	}
 }
 
@@ -127,10 +130,16 @@ func (proof *Proof) TickerUuid() gUuid.UUID {
 	return proof.tickerUuid
 }
 
-// NewProof will create a proof for  a sequence of substream immutable messages, which are assumed to be anchored
-// at the provided ticker message
+// NewProof will create a proof for a sequence of substream immutable messages, which are assumed to be anchored
+// prior or with the same provided ticker message
+//
 func NewProof(messages []*StreamImmutableMessage, subStreamID SubStreamID,
-	tickerMessage *TickerImmutableMessage) *Proof {
+	tickerMessage *TickerImmutableMessage) (*Proof, error) {
+
+	if len(messages) == 0 {
+		msg := fmt.Sprintf("NewProof - no messages provided when creating proof for substreamID: %s", subStreamID)
+		return nil, NewInvalidError(msg)
+	}
 	proof := &Proof {
 		messageFingerprints: make([]*messageFingerprint, len(messages)),
 		subStreamID: subStreamID,
@@ -142,7 +151,7 @@ func NewProof(messages []*StreamImmutableMessage, subStreamID SubStreamID,
 	for i, _ := range messages {
 		proof.messageFingerprints[i] = NewMessageFingerprint(messages[i])
 	}
-	return proof
+	return proof, nil
 }
 
 // NewProofFromBytes will deserialize a byte slice into a proof; otherwise, return an error
@@ -154,6 +163,7 @@ func NewProofFromBytes(proofBytes []byte) (*Proof, error) {
 	}
 	return proof, nil
 }
+
 
 // Validate will return true if the proof is valid; otherwise, return false
 func (proof *Proof) Validate() bool {
@@ -172,8 +182,57 @@ func (proof *Proof) Validate() bool {
 	return true
 }
 
+func isConsistent(lhs, rhs *Proof) bool {
+	// Both proofs must have at least one fingerprint
+	if lhs == nil || rhs == nil || len(lhs.messageFingerprints) == 0 || len(rhs.messageFingerprints) == 0 {
+		return false
+	}
+
+	// The last message of the lhs fingerprint must be the same as the first rhs fingerprint
+
+	// First, check the UUIDs
+	if strings.Compare(lhs.endUuid.String(), rhs.startUuid.String()) != 0 {
+		return false
+	}
+
+	// Finally, verify the digests and signatures match
+	lhsLastFingerprint := lhs.messageFingerprints[len(lhs.messageFingerprints)-1]
+	rhsFirstFingerprint := rhs.messageFingerprints[0]
+	if bytes.Compare(lhsLastFingerprint.Digest, rhsFirstFingerprint.Digest) != 0 {
+		return false
+	}
+	if bytes.Compare(lhsLastFingerprint.Signature, rhsFirstFingerprint.Signature) != 0 {
+		return false
+	}
+
+	// Both proofs must be internally valid
+	if !lhs.Validate() {
+		return false
+	}
+	if !rhs.Validate() {
+		return false
+	}
+
+	// All but the first anchor UUIDs in the rhs proof *must* be lhs.tickerUuid
+	for i, message := range rhs.messageFingerprints {
+		if i == 0 {
+			continue
+		}
+		if strings.Compare(lhs.TickerUuid().String(), message.AnchorUuid.String()) != 0 {
+			return false
+		}
+	}
+
+	// If the adjacent messages have the same fingerprints and both proofs are internally valid, then the proofs
+	// contain a valid contiguous chain of fingerprints
+	return true
+}
+
 // IsConsistent will return true if this proof is consistent with the previous proof; otherwise return false or an error
 func (proof *Proof) IsConsistent(prevProof *Proof) (bool, error) {
+	if prevProof == nil {
+		return false, NewInvalidError(fmt.Sprintf("IsConsistent - nil previous proof provided"))
+	}
 	ok, err := prevProof.IsGenesis()
 	if err != nil {
 		return false, err
@@ -181,5 +240,5 @@ func (proof *Proof) IsConsistent(prevProof *Proof) (bool, error) {
 	if ok {
 		return true, nil
 	}
-	return strings.Compare(prevProof.endUuid.String(), proof.startUuid.String()) == 0, nil
+	return isConsistent(prevProof, proof), nil
 }

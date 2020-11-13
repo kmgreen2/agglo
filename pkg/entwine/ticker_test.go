@@ -128,9 +128,6 @@ func TestKVTickerStore_GetHistoryError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestKVTickerStore_CreateGenesisProofError(t *testing.T) {
-}
-
 func TestKVTickerStore_GetLatestProofKey(t *testing.T) {
 }
 
@@ -144,19 +141,73 @@ func TestKVTickerStore_GetProofStartUuidError(t *testing.T) {
 }
 
 func TestKVTickerStore_Anchor(t *testing.T) {
-	substreamID := entwine.SubStreamID("0")
-	_, _, err := test.GetProofStream(12, 1, 3, 4, substreamID)
+	subStreamID := entwine.SubStreamID("0")
+	startNumTicks := 12
+	tickStride := 1
+	messageStride := 3
+	numEntanglements := 4
+	tickerStore, streamStore, err := test.GetProofStream(startNumTicks, tickStride, messageStride, numEntanglements,
+		subStreamID)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	// Get all ticker messages
+	tickerHead := tickerStore.Head()
+	tickerMessages, err := tickerStore.GetHistory(gUuid.Nil, tickerHead.Uuid())
 	if err != nil {
 		assert.Fail(t, err.Error())
 	}
-}
 
-func TestKVTickerStore_AnchorError(t *testing.T) {
+	// Get all stream messages
+	streamHead, err := streamStore.Head(subStreamID)
+	if err != nil {
+		assert.Fail(t, err.Error())
+	}
+	streamMessages, err := streamStore.GetHistory(gUuid.Nil, streamHead.Uuid())
+	if err != nil {
+		assert.Fail(t, err.Error())
+	}
+
+	// Validate the following (assuming streams are created with GetProofStream(12, 1, 3, 4, subStreamID)
+	//
+	// TickerStream -> G (0) -> 1 -> 2 -> 3 -> ... -> 25
+	// MessageStream -> G (0) -> 1 -> 2 -> 3 -> ... -> 12
+	// Anchor:11 -> Messages:[0-3]
+	// Anchor:14 -> Messages:[4-6]
+	// Anchor:17 -> Messages:[7-9]
+	// Anchor:20 -> Messages:[10-12]
+	k := 0
+	currTick := startNumTicks - 1
+	for i := 0; i < numEntanglements; i++ {
+		anchorUuid := tickerMessages[currTick].Uuid()
+		// Genesis block must be accounted for
+		if i == 0 {
+			assert.Equal(t, anchorUuid.String(), streamMessages[0].GetAnchorUUID().String())
+			k++
+		}
+		for j := 0; j < messageStride; j++ {
+			assert.Equal(t, anchorUuid.String(), streamMessages[k].GetAnchorUUID().String())
+			k++
+			if k % tickStride == 0 {
+				currTick++
+			}
+		}
+	}
 }
 
 func TestKVTickerStore_HappenedBefore(t *testing.T) {
 }
 
-func TestKVTickerStore_Append(t *testing.T) {
+func TestKVTickerStore_AnchorInvalidMessages(t *testing.T) {
+}
+
+func TestKVTickerStore_AnchorInvalidSignature(t *testing.T) {
+}
+
+// ToDo(KMG): Add these once we have rollback for Append and Anchor
+func TestKVTickerStore_AnchorError(t *testing.T) {
+}
+func TestKVTickerStore_AppendError(t *testing.T) {
 }
 
