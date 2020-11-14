@@ -9,9 +9,9 @@ import (
 	"strings"
 )
 
-// messageFingerprint is the fingerprint used to prove historical timelines of substreams.  A fingerprint is
+// MessageFingerprint is the fingerprint used to prove historical timelines of substreams.  A fingerprint is
 // derived from a StreamImmutableMessage
-type messageFingerprint struct {
+type MessageFingerprint struct {
 	Signature []byte
 	Digest []byte
 	DigestType common.DigestType
@@ -19,17 +19,55 @@ type messageFingerprint struct {
 	AnchorUuid gUuid.UUID
 }
 
+// Proof is the interface for proofs.  This is mostly here to make mocking possible,
+// so we can easily test the proof functionality
+type Proof interface {
+	IsGenesis() (bool, error)
+	Fingerprints() []*MessageFingerprint
+	StartUuid() gUuid.UUID
+	EndUuid() gUuid.UUID
+	TickerUuid() gUuid.UUID
+	SubStreamID() SubStreamID
+	Validate() bool
+	IsConsistent(prevProof Proof) (bool, error)
+}
+
 // Proof is used to encapsulate a sequence of immutable fingerprints for verification
-type Proof struct {
-	messageFingerprints []*messageFingerprint
+type ProofImpl struct {
+	messageFingerprints []*MessageFingerprint
 	startUuid gUuid.UUID
 	endUuid gUuid.UUID
 	subStreamID SubStreamID
 	tickerUuid gUuid.UUID
 }
 
+// Fingerprints will return the ordered fingerprints for this proof
+func (proof *ProofImpl) Fingerprints() []*MessageFingerprint {
+	return proof.messageFingerprints
+}
+
+// StartUuid will return the start UUID for this proof
+func (proof *ProofImpl) StartUuid() gUuid.UUID {
+	return proof.startUuid
+}
+
+// EndUuid will return the end UUID for this proof
+func (proof *ProofImpl) EndUuid() gUuid.UUID {
+	return proof.endUuid
+}
+
+// TickerUuid will return the ticker UUID attached to this proof
+func (proof *ProofImpl) TickerUuid() gUuid.UUID {
+	return proof.tickerUuid
+}
+
+// SubstreamID will return the substream id for this proof
+func (proof *ProofImpl) SubStreamID() SubStreamID {
+	return proof.subStreamID
+}
+
 // SerializeProof serializes a Proof
-func SerializeProof(proof *Proof) ([]byte, error) {
+func SerializeProof(proof *ProofImpl) ([]byte, error) {
 	byteBuffer := bytes.NewBuffer(make([]byte, 0))
 	gEncoder := gob.NewEncoder(byteBuffer)
 	err := gEncoder.Encode(proof.messageFingerprints)
@@ -56,7 +94,7 @@ func SerializeProof(proof *Proof) ([]byte, error) {
 }
 
 // DeserializeProof deserializes a Proof
-func DeserializeProof(proofBytes []byte, proof *Proof) error {
+func DeserializeProof(proofBytes []byte, proof *ProofImpl) error {
 	byteBuffer := bytes.NewBuffer(proofBytes)
 	gDecoder := gob.NewDecoder(byteBuffer)
 	err := gDecoder.Decode(&proof.messageFingerprints)
@@ -82,9 +120,9 @@ func DeserializeProof(proofBytes []byte, proof *Proof) error {
 	return nil
 }
 
-// NewMessageFingerprint will create a messageFingerprint from an ImmutableMessage
-func NewMessageFingerprint(message *StreamImmutableMessage) *messageFingerprint {
-	return &messageFingerprint{
+// NewMessageFingerprint will create a MessageFingerprint from an ImmutableMessage
+func NewMessageFingerprint(message *StreamImmutableMessage) *MessageFingerprint {
+	return &MessageFingerprint{
 		Signature: message.Signature(),
 		Digest: message.Digest(),
 		DigestType: message.DigestType(),
@@ -97,12 +135,12 @@ func NewMessageFingerprint(message *StreamImmutableMessage) *messageFingerprint 
 var GenesisProofUuidBytes = []byte{220,241,234,178,108,41,73,73,162,150,124,204,66,118,33,160}
 
 // NewGenesisProof will create a new genesis proof for a substream, anchored at the provided ticker message
-func NewGenesisProof(subStreamID SubStreamID, message *TickerImmutableMessage) (*Proof, error) {
+func NewGenesisProof(subStreamID SubStreamID, message *TickerImmutableMessage) (*ProofImpl, error) {
 	genesisProofUuid, err := gUuid.FromBytes(GenesisProofUuidBytes)
 	if err != nil {
 		return nil, err
 	}
-	return &Proof {
+	return &ProofImpl {
 		subStreamID: subStreamID,
 		tickerUuid: message.Uuid(),
 		startUuid: genesisProofUuid,
@@ -112,7 +150,7 @@ func NewGenesisProof(subStreamID SubStreamID, message *TickerImmutableMessage) (
 
 // IsGenesis will return true if this proof is a genesis proof; false otherwise.  It may also return an error
 // if something goes wrong.
-func (proof *Proof) IsGenesis() (bool, error) {
+func (proof *ProofImpl) IsGenesis() (bool, error) {
 	startUuidBytes, err := proof.startUuid.MarshalBinary()
 	if err != nil {
 		return false, err
@@ -125,23 +163,18 @@ func (proof *Proof) IsGenesis() (bool, error) {
 		GenesisProofUuidBytes) == 0, nil
 }
 
-// TickerUuid will return the ticker UUID associated with this proof
-func (proof *Proof) TickerUuid() gUuid.UUID {
-	return proof.tickerUuid
-}
-
 // NewProof will create a proof for a sequence of substream immutable messages, which are assumed to be anchored
 // prior or with the same provided ticker message
 //
 func NewProof(messages []*StreamImmutableMessage, subStreamID SubStreamID,
-	tickerMessage *TickerImmutableMessage) (*Proof, error) {
+	tickerMessage *TickerImmutableMessage) (*ProofImpl, error) {
 
 	if len(messages) == 0 {
 		msg := fmt.Sprintf("NewProof - no messages provided when creating proof for substreamID: %s", subStreamID)
 		return nil, NewInvalidError(msg)
 	}
-	proof := &Proof {
-		messageFingerprints: make([]*messageFingerprint, len(messages)),
+	proof := &ProofImpl {
+		messageFingerprints: make([]*MessageFingerprint, len(messages)),
 		subStreamID: subStreamID,
 		startUuid: messages[0].Uuid(),
 		endUuid: messages[len(messages)-1].Uuid(),
@@ -155,8 +188,8 @@ func NewProof(messages []*StreamImmutableMessage, subStreamID SubStreamID,
 }
 
 // NewProofFromBytes will deserialize a byte slice into a proof; otherwise, return an error
-func NewProofFromBytes(proofBytes []byte) (*Proof, error) {
-	proof := &Proof{}
+func NewProofFromBytes(proofBytes []byte) (*ProofImpl, error) {
+	proof := &ProofImpl{}
 	err := DeserializeProof(proofBytes, proof)
 	if err != nil {
 		return nil, err
@@ -166,7 +199,7 @@ func NewProofFromBytes(proofBytes []byte) (*Proof, error) {
 
 
 // Validate will return true if the proof is valid; otherwise, return false
-func (proof *Proof) Validate() bool {
+func (proof *ProofImpl) Validate() bool {
 	var prevDigest []byte
 	for i, fingerprint := range proof.messageFingerprints {
 		if i > 0 {
@@ -182,22 +215,25 @@ func (proof *Proof) Validate() bool {
 	return true
 }
 
-func isConsistent(lhs, rhs *Proof) bool {
+func isConsistent(lhs, rhs Proof) bool {
 	// Both proofs must have at least one fingerprint
-	if lhs == nil || rhs == nil || len(lhs.messageFingerprints) == 0 || len(rhs.messageFingerprints) == 0 {
+	if lhs == nil || rhs == nil || len(lhs.Fingerprints()) == 0 || len(rhs.Fingerprints()) == 0 {
 		return false
 	}
 
 	// The last message of the lhs fingerprint must be the same as the first rhs fingerprint
 
 	// First, check the UUIDs
-	if strings.Compare(lhs.endUuid.String(), rhs.startUuid.String()) != 0 {
+	if strings.Compare(lhs.EndUuid().String(), rhs.StartUuid().String()) != 0 {
 		return false
 	}
 
+	lhsFingerprints := lhs.Fingerprints()
+	rhsFingerprints := rhs.Fingerprints()
+
 	// Finally, verify the digests and signatures match
-	lhsLastFingerprint := lhs.messageFingerprints[len(lhs.messageFingerprints)-1]
-	rhsFirstFingerprint := rhs.messageFingerprints[0]
+	lhsLastFingerprint := lhsFingerprints[len(lhsFingerprints)-1]
+	rhsFirstFingerprint := rhsFingerprints[0]
 	if bytes.Compare(lhsLastFingerprint.Digest, rhsFirstFingerprint.Digest) != 0 {
 		return false
 	}
@@ -214,11 +250,11 @@ func isConsistent(lhs, rhs *Proof) bool {
 	}
 
 	// All but the first anchor UUIDs in the rhs proof *must* be lhs.tickerUuid
-	for i, message := range rhs.messageFingerprints {
+	for i, fingerprint := range rhsFingerprints {
 		if i == 0 {
 			continue
 		}
-		if strings.Compare(lhs.TickerUuid().String(), message.AnchorUuid.String()) != 0 {
+		if strings.Compare(lhs.TickerUuid().String(), fingerprint.AnchorUuid.String()) != 0 {
 			return false
 		}
 	}
@@ -229,7 +265,7 @@ func isConsistent(lhs, rhs *Proof) bool {
 }
 
 // IsConsistent will return true if this proof is consistent with the previous proof; otherwise return false or an error
-func (proof *Proof) IsConsistent(prevProof *Proof) (bool, error) {
+func (proof *ProofImpl) IsConsistent(prevProof Proof) (bool, error) {
 	if prevProof == nil {
 		return false, NewInvalidError(fmt.Sprintf("IsConsistent - nil previous proof provided"))
 	}

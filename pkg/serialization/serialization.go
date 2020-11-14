@@ -19,7 +19,7 @@ func Serialize(object interface{}) ([]byte, error) {
 		return entwine.SerializeStreamImmutableMessage(v)
 	case *entwine.TickerImmutableMessage:
 		return entwine.SerializeTickerImmutableMessage(v)
-	case *entwine.Proof:
+	case *entwine.ProofImpl:
 		return entwine.SerializeProof(v)
 	default:
 		err = common.NewInvalidError(fmt.Sprintf("Serialize - invalid type: %T", v))
@@ -39,7 +39,7 @@ func Deserialize(objectBytes []byte, target interface{}) error {
 		return entwine.DeserializeStreamImmutableMessage(objectBytes, v)
 	case *entwine.TickerImmutableMessage:
 		return entwine.DeserializeTickerImmutableMessage(objectBytes, v)
-	case *entwine.Proof:
+	case *entwine.ProofImpl:
 		return entwine.DeserializeProof(objectBytes, v)
 	default:
 		err = common.NewInvalidError(fmt.Sprintf("Deserialize - invalid type: %T", v))

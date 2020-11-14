@@ -28,6 +28,7 @@ type TickerStore interface {
 		authenticator crypto.Authenticator) (*TickerImmutableMessage, error)
 	HappenedBefore(lhs *TickerImmutableMessage, rhs *TickerImmutableMessage) (bool, error)
 	Append(signer crypto.Signer) error
+	GetLatestProofKey(subStreamID SubStreamID) (string, error)
 	Head() *TickerImmutableMessage
 }
 
@@ -128,7 +129,7 @@ func (tickerStore *KVTickerStore) GetHistory(start gUuid.UUID, end gUuid.UUID) (
 }
 
 // CreateGenesisProof will create a genesis proof for a substream; otherwise, return an error
-func (tickerStore *KVTickerStore) CreateGenesisProof(subStreamID SubStreamID) (*Proof, error) {
+func (tickerStore *KVTickerStore) CreateGenesisProof(subStreamID SubStreamID) (Proof, error) {
 	if _, ok := tickerStore.proofLocks[string(subStreamID)]; !ok {
 		tickerStore.proofLocks[string(subStreamID)] = &sync.Mutex{}
 	}
