@@ -12,7 +12,7 @@ var invalidSequence []string = []string{":"}
 func hasInvalidChars(id string) error {
 	for _, sequence := range invalidSequence {
 		if strings.Contains(id, sequence) {
-			return NewInvalidError(fmt.Sprintf("Id (%s) contains invalid characters: %s", id, sequence))
+			return NewInvalidError(fmt.Sprintf("ID (%s) contains invalid characters: %s", id, sequence))
 		}
 	}
 	return nil
