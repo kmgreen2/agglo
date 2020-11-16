@@ -47,17 +47,28 @@ type RaceResult struct {
 }
 
 type Tally struct {
-	raceResults map[RaceID]RaceResult
+	raceResults map[RaceID]*RaceResult
 }
 
-func (ballot *Ballot) Bytes() ([]byte, error) {
+func SerializeBallot(ballot *Ballot) ([]byte, error) {
 	byteBuffer := bytes.NewBuffer([]byte{})
 	gEncoder := gob.NewEncoder(byteBuffer)
-	err := gEncoder.Encode(&ballot)
+	err := gEncoder.Encode(ballot)
 	if err != nil {
 		return nil, err
 	}
 	return byteBuffer.Bytes(), nil
+}
+
+func DeerializeBallot(ballotBytes []byte) (*Ballot, error) {
+	byteBuffer := bytes.NewBuffer(ballotBytes)
+	gEncoder := gob.NewDecoder(byteBuffer)
+	ballot := &Ballot{}
+	err := gEncoder.Decode(ballot)
+	if err != nil {
+		return nil, err
+	}
+	return ballot, nil
 }
 
 func (ballot *Ballot) InvalidRaces() []RaceID {
@@ -80,11 +91,16 @@ func (ballot *Ballot) InvalidRaces() []RaceID {
 // Add will add the votes from a ballot to a tally
 func (tally *Tally) Add(ballot *Ballot) error {
 	for raceID, race := range ballot.Races {
+		if tally.raceResults[raceID] == nil {
+			tally.raceResults[raceID] = &RaceResult{
+				make(map[string]int),
+			}
+		}
 		chosenCandidates := make([]string, 0)
 		i := 0
 		for candidateName, chosen := range race.Choices {
 			if chosen {
-				chosenCandidates[i] = candidateName
+				chosenCandidates = append(chosenCandidates, candidateName)
 				i++
 			}
 		}
@@ -101,6 +117,18 @@ func (tally *Tally) Add(ballot *Ballot) error {
 	}
 	return nil
 }
+
+func (tally *Tally) String() string {
+	s := ""
+	for raceID, raceResult := range tally.raceResults  {
+		s += fmt.Sprintf("Race %s:\n", raceID)
+		for candidate, count := range raceResult.results {
+			s += fmt.Sprintf("\t%s: %d\n", candidate, count)
+		}
+	}
+	return s
+}
+
 
 type Receipt struct {
 	voteDigest []byte
@@ -131,7 +159,7 @@ func NewLedger(municipality entwine.SubStreamID) (*Ledger, error) {
 		return nil, err
 	}
 	streamStore, _, objectStore, _, err := test.GetKVStreamStore(0, municipality, signer,
-		gUuid.Nil, 0)
+		gUuid.Nil, 0, true)
 	if err != nil {
 		return nil, err
 	}
@@ -158,9 +186,13 @@ func (ledger *Ledger) VoterAuthenticator(voterElectionUuid gUuid.UUID, authentic
 	return nil
 }
 
-func (ledger *Ledger) Vote(voterElectionUuid gUuid.UUID, voterElectionUuidSignatureBytes []byte, ballot *Ballot,
-	ballotSignatureBytes []byte) (*Receipt, error) {
+func (ledger *Ledger) Vote(voterElectionUuid gUuid.UUID, voterElectionUuidSignatureBytes []byte, ballotBytes []byte,
+	ballotSignatureBytes []byte, testAuth crypto.Authenticator) (*Receipt, error) {
 
+	ballot, err := DeerializeBallot(ballotBytes)
+	if err != nil {
+		return nil, err
+	}
 	// Make sure ballot is valid
 	invalidRaces := ballot.InvalidRaces()
 	if len(invalidRaces) > 0 {
@@ -186,10 +218,6 @@ func (ledger *Ledger) Vote(voterElectionUuid gUuid.UUID, voterElectionUuidSignat
 		return nil, err
 	}
 	if voterAuthenticator, ok := ledger.voterAuthenticators[voterElectionUuid]; ok {
-		ballotBytes, err := ballot.Bytes()
-		if err != nil {
-			return nil, err
-		}
 		if !voterAuthenticator.Verify(ballotBytes, ballotSignature) {
 			return nil, common.NewInvalidError(fmt.Sprintf("Vote - signature does not match ballot"))
 		}
@@ -248,11 +276,15 @@ func (ledger *Ledger) Tally() (*Tally, error) {
 	}
 
 	tally := &Tally {
-		make(map[RaceID]RaceResult),
+		make(map[RaceID]*RaceResult),
 	}
 
 	for {
 		votePayload := &VotePayload{}
+
+		if currNode.Prev() == gUuid.Nil {
+			break
+		}
 
 		reader, err := currNode.Data()
 		if err != nil {
@@ -273,9 +305,6 @@ func (ledger *Ledger) Tally() (*Tally, error) {
 			return nil, err
 		}
 
-		if currNode.Prev() == gUuid.Nil {
-			break
-		}
 		currNode, err = ledger.streamStore.GetMessageByUUID(currNode.Prev())
 		if err != nil {
 			return nil, err

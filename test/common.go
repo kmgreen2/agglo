@@ -143,7 +143,8 @@ func GetTickerStream(numMessages int) ([]*entwine.TickerImmutableMessage, crypto
 }
 
 func GetKVStreamStore(numMessages int, subStreamID entwine.SubStreamID, signer crypto.Signer,
-	anchorTickerUuid gUuid.UUID, newAnchorStride int) (*entwine.KVStreamStore, kvs.KVStore, storage.ObjectStore,
+	anchorTickerUuid gUuid.UUID, newAnchorStride int, defaultObjectStore bool) (*entwine.KVStreamStore, kvs.KVStore,
+	storage.ObjectStore,
 	map[string]string, error) {
 	currAnchorUuid := anchorTickerUuid
 	objects := make(map[string]*bytes.Buffer)
@@ -161,7 +162,7 @@ func GetKVStreamStore(numMessages int, subStreamID entwine.SubStreamID, signer c
 		objects[objKey] = bytes.NewBuffer([]byte(objKey))
 	}
 	objectStore, storageParams, err := GetTestObjectStoreWithObjects(storage.MemObjectStoreBackend, objects,
-		false)
+		defaultObjectStore)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -239,7 +240,7 @@ func GetProofStream(startNumTicks, tickStride, messageStride, numEntanglements i
 
 
 	kvStreamStore, _, _, _, err := GetKVStreamStore(0, subStreamID, messageSigner,
-		genesisProof.TickerUuid(), 0)
+		genesisProof.TickerUuid(), 0, false)
 	if err != nil {
 		return nil, nil, err
 	}

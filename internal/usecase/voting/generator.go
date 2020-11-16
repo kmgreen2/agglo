@@ -22,7 +22,7 @@ func NewGenerator(ledgerBackChannel LedgerBackChannel, registrarBackChannel Regi
 	if err != nil {
 		return nil, err
 	}
-	return &Generator{
+	generator := &Generator{
 		electionUuidToVoterID: make(map[gUuid.UUID]gUuid.UUID),
 		electionUuidToAuthenticator: make(map[gUuid.UUID]crypto.Authenticator),
 		voterIDToElectionUuid: make(map[gUuid.UUID]gUuid.UUID),
@@ -30,7 +30,14 @@ func NewGenerator(ledgerBackChannel LedgerBackChannel, registrarBackChannel Regi
 		authenticator: authenticator,
 		ledgerBackChannel: ledgerBackChannel,
 		registrarBackChannel: registrarBackChannel,
-	}, nil
+	}
+
+	err = ledgerBackChannel.GeneratorAuthenticator(authenticator)
+	if err != nil {
+		return nil, err
+	}
+
+	return generator, nil
 }
 
 // ListElectionUuids will list all of the registered UUIDs
@@ -68,7 +75,12 @@ func (generator *Generator) AllocateElectionUuid(voterID gUuid.UUID,
 		return electionUuid, nil
 	}
 
-	err = generator.registrarBackChannel.ElectionUUIDCommit(voterID, signature.Bytes())
+	signatureBytes, err := crypto.SerializeSignature(signature)
+	if err != nil {
+		return electionUuid, nil
+	}
+
+	err = generator.registrarBackChannel.ElectionUUIDCommit(voterID, signatureBytes)
 
 	return electionUuid, err
 }

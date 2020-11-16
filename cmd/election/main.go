@@ -1,14 +1,14 @@
 package main
 
 import (
-	"bytes"
 	gocrypto "crypto"
-	"encoding/gob"
 	"fmt"
 	"github.com/kmgreen2/agglo/internal/usecase/voting"
+	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/entwine"
 	"github.com/kmgreen2/agglo/test"
 	"math/rand"
+	"time"
 )
 
 func chooseRace() voting.RaceType {
@@ -32,7 +32,7 @@ func createPeople(numPeople int) []*voting.Person {
 
 	for i := 0; i < numPeople; i++ {
 		people[i] = &voting.Person {
-			ID:     fmt.Sprintf("%s", i),
+			ID:     fmt.Sprintf("%d", i),
 			Secret: chooseSecret(),
 			PublicInfo: &voting.PublicInfo{Age: chooseAge(),
 				Sex:  chooseSex(),
@@ -95,15 +95,20 @@ func peopleDoVote(voters []*voting.Voter, registrar *voting.Registrar, ledger *v
 			return err
 		}
 		ballot := getBallot()
-		byteBuffer := bytes.NewBuffer([]byte{})
-		gEncoder := gob.NewEncoder(byteBuffer)
-		err = gEncoder.Encode(&ballot)
+		ballotBytes, err := voting.SerializeBallot(ballot)
 		if err != nil {
 			return err
 		}
-
-		ballotSignature, err := voter.Signer.Sign(byteBuffer.Bytes())
-		receipt, err:= ledger.Vote(voter.ElectionUuid, electionUuidSignature, ballot, ballotSignature.Bytes())
+		ballotSignature, err := voter.Signer.Sign(ballotBytes)
+		if err != nil {
+			return err
+		}
+		ballotSignatureBytes, err := crypto.SerializeSignature(ballotSignature)
+		if err != nil {
+			return err
+		}
+		receipt, err:= ledger.Vote(voter.ElectionUuid, electionUuidSignature, ballotBytes, ballotSignatureBytes,
+			voter.Authenticator)
 		if err != nil {
 			return err
 		}
@@ -127,14 +132,23 @@ func main() {
 		panic(err.Error())
 	}
 
-	voters, err := peopleRegister(registrar, generator, people, 0.99)
+	start := time.Now().Unix()
+	voters, err := peopleRegister(registrar, generator, people, 1.0)
 	if err != nil {
 		panic(err.Error())
 	}
+	fmt.Printf("Register: %d\n", time.Now().Unix() - start)
 
-	err = peopleDoVote(voters, registrar, ledger, 0.95)
+	start = time.Now().Unix()
+	err = peopleDoVote(voters, registrar, ledger, 1.0)
 	if err != nil {
 		panic(err.Error())
 	}
+	fmt.Printf("Vote: %d\n", time.Now().Unix() - start)
 
+	tally, err := ledger.Tally()
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Print(tally.String())
 }

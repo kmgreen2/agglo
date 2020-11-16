@@ -16,7 +16,7 @@ func TestKVStreamStore_GetMessagesByName(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 	kvStreamStore, _, _, uuidToName, err := test.GetKVStreamStore(6, entwine.SubStreamID("0"),
-		messageSigner, gUuid.New(), 0)
+		messageSigner, gUuid.New(), 0, false)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -37,7 +37,7 @@ func TestKVStreamStore_GetMessagesByNameError(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 	kvStreamStore, _, _, _, err := test.GetKVStreamStore(6, entwine.SubStreamID("0"), messageSigner,
-		gUuid.New(), 0)
+		gUuid.New(), 0, false)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -52,7 +52,7 @@ func TestKVStreamStore_GetMessagesByTags(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 	kvStreamStore, _, _, uuidToName, err := test.GetKVStreamStore(6, entwine.SubStreamID("0"),
-		messageSigner, gUuid.New(), 0)
+		messageSigner, gUuid.New(), 0, false)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -76,7 +76,7 @@ func TestKVStreamStore_GetMessagesByTagsError(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 	kvStreamStore, _, _, _, err := test.GetKVStreamStore(6, entwine.SubStreamID("0"), messageSigner,
-		gUuid.New(), 0)
+		gUuid.New(), 0, false)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -92,7 +92,7 @@ func TestKVStreamStore_GetMessageByUUID(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 	kvStreamStore, _, _, _, err := test.GetKVStreamStore(6, subStreamID, messageSigner,
-		gUuid.New(), 0)
+		gUuid.New(), 0, false)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -115,7 +115,7 @@ func TestKVStreamStore_GetMessageByUUIDError(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 	kvStreamStore, _, _, _, err := test.GetKVStreamStore(6, subStreamID, messageSigner,
-		gUuid.New(), 0)
+		gUuid.New(), 0, false)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -131,7 +131,7 @@ func TestKVStreamStore_GetMessages(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 	kvStreamStore, _, _, uuidToName, err := test.GetKVStreamStore(6, subStreamID, messageSigner,
-		gUuid.New(), 0)
+		gUuid.New(), 0, false)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -163,7 +163,7 @@ func TestKVStreamStore_GetMessagesError(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 	kvStreamStore, _, _, _, err := test.GetKVStreamStore(6, subStreamID, messageSigner,
-		gUuid.New(), 0)
+		gUuid.New(), 0, false)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -183,7 +183,7 @@ func TestKVStreamStore_GetHistory(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 	kvStreamStore, _, _, uuidToNames, err := test.GetKVStreamStore(12, subStreamID, messageSigner,
-		gUuid.New(), 0)
+		gUuid.New(), 0, false)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -221,7 +221,7 @@ func TestKVStreamStore_GetHistoryError(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 	kvStreamStore, _, _, _, err := test.GetKVStreamStore(12, subStreamID, messageSigner,
-		gUuid.New(), 0)
+		gUuid.New(), 0, false)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -238,7 +238,7 @@ func TestKVStreamStore_GetHistoryToLastAnchor(t *testing.T) {
 	}
 
 	kvStreamStore, _, _, uuidToNames, err := test.GetKVStreamStore(12, subStreamID, messageSigner,
-		gUuid.New(), 4)
+		gUuid.New(), 4, false)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -272,7 +272,7 @@ func TestKVStreamStore_GetHistoryToLastAnchorError(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 	kvStreamStore, _, _, _, err := test.GetKVStreamStore(12, subStreamID, messageSigner,
-		gUuid.New(), 0)
+		gUuid.New(), 0, false)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
