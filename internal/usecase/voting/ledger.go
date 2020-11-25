@@ -2,7 +2,6 @@ package voting
 
 import (
 	"bytes"
-	gocrypto "crypto"
 	"encoding/gob"
 	"fmt"
 	gUuid "github.com/google/uuid"
@@ -10,8 +9,8 @@ import (
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/entwine"
 	"github.com/kmgreen2/agglo/pkg/storage"
-	"github.com/kmgreen2/agglo/test"
 	"io/ioutil"
+	"strings"
 	"time"
 )
 
@@ -143,7 +142,7 @@ type VotePayload struct {
 }
 
 type Ledger struct {
-	streamStore *entwine.KVStreamStore
+	streamStore entwine.StreamStore
 	objectStore storage.ObjectStore
 	generatorAuthenticator crypto.Authenticator
 	voterAuthenticators map[gUuid.UUID]crypto.Authenticator
@@ -151,18 +150,18 @@ type Ledger struct {
 	signer crypto.Signer
 	authenticator crypto.Authenticator
 	municipality entwine.SubStreamID
+	currTickerAnchorUuid gUuid.UUID
+	lastAnchorHeadUuid gUuid.UUID
 }
 
-func NewLedger(municipality entwine.SubStreamID) (*Ledger, error) {
-	signer, authenticator, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
+func NewLedger(municipality entwine.SubStreamID, anchorUuid gUuid.UUID, streamStore entwine.StreamStore,
+	objectStore storage.ObjectStore, signer crypto.Signer, authenticator crypto.Authenticator) (*Ledger, error) {
+
+	lastAnchorHead, err := streamStore.Head(municipality)
 	if err != nil {
 		return nil, err
 	}
-	streamStore, _, objectStore, _, err := test.GetKVStreamStore(0, municipality, signer,
-		gUuid.Nil, 0, true)
-	if err != nil {
-		return nil, err
-	}
+	lastAnchorHeadUuid := lastAnchorHead.Uuid()
 
 	return &Ledger {
 		streamStore: streamStore,
@@ -173,7 +172,47 @@ func NewLedger(municipality entwine.SubStreamID) (*Ledger, error) {
 		signer: signer,
 		authenticator: authenticator,
 		municipality: municipality,
+		lastAnchorHeadUuid: lastAnchorHeadUuid,
+		currTickerAnchorUuid: anchorUuid,
 	}, nil
+}
+
+func (ledger *Ledger) Municipality() entwine.SubStreamID {
+	return ledger.municipality
+}
+
+func (ledger *Ledger) SetAnchorUuid(anchorUuid gUuid.UUID) {
+	ledger.currTickerAnchorUuid = anchorUuid
+}
+
+func (ledger *Ledger) Entwine(ticker entwine.TickerStore) error {
+	endNode, err := ledger.streamStore.Head(ledger.municipality)
+	if err != nil {
+		return err
+	}
+
+	endUuid := endNode.Uuid()
+
+	startUuid, err := ticker.GetProofStartUuid(ledger.municipality)
+	if err != nil {
+		return err
+	}
+
+	messages, err := ledger.streamStore.GetHistory(startUuid, endUuid)
+	if err != nil {
+		return err
+	}
+
+	if len(messages) > 0 && strings.Compare(ledger.lastAnchorHeadUuid.String(), endUuid.String()) != 0 {
+		anchor, err := ticker.Anchor(messages, ledger.municipality, ledger.authenticator)
+		if err != nil {
+			return err
+		}
+
+		ledger.currTickerAnchorUuid = anchor.Uuid()
+	}
+
+	return nil
 }
 
 func (ledger *Ledger) GeneratorAuthenticator(generatorAuthenticator crypto.Authenticator) error {
@@ -251,7 +290,7 @@ func (ledger *Ledger) Vote(voterElectionUuid gUuid.UUID, voterElectionUuidSignat
 
 	message := entwine.NewUncommittedMessage(desc, voterElectionUuid.String(), []string{}, ledger.signer)
 
-	streamUuid, err := ledger.streamStore.Append(message, ledger.municipality, gUuid.Nil)
+	streamUuid, err := ledger.streamStore.Append(message, ledger.municipality, ledger.currTickerAnchorUuid)
 	if err != nil {
 		return nil, err
 	}
@@ -269,6 +308,27 @@ func (ledger *Ledger) Vote(voterElectionUuid gUuid.UUID, voterElectionUuidSignat
 	}, nil
 }
 
+func MessageToVotePayload(message *entwine.StreamImmutableMessage) (*VotePayload, error) {
+	votePayload := &VotePayload{}
+
+	reader, err := message.Data()
+	if err != nil {
+		return nil, err
+	}
+	votePayloadBytes, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+	byteBuffer := bytes.NewBuffer(votePayloadBytes)
+	gDecooder := gob.NewDecoder(byteBuffer)
+	err = gDecooder.Decode(&votePayload)
+	if err != nil {
+		return nil, err
+	}
+
+	return votePayload, nil
+}
+
 func (ledger *Ledger) Tally() (*Tally, error) {
 	currNode, err := ledger.streamStore.Head(ledger.municipality)
 	if err != nil {
@@ -280,26 +340,15 @@ func (ledger *Ledger) Tally() (*Tally, error) {
 	}
 
 	for {
-		votePayload := &VotePayload{}
-
 		if currNode.Prev() == gUuid.Nil {
 			break
 		}
 
-		reader, err := currNode.Data()
+		votePayload, err := MessageToVotePayload(currNode)
 		if err != nil {
 			return nil, err
 		}
-		votePayloadBytes, err := ioutil.ReadAll(reader)
-		if err != nil {
-			return nil, err
-		}
-		byteBuffer := bytes.NewBuffer(votePayloadBytes)
-		gDecooder := gob.NewDecoder(byteBuffer)
-		err = gDecooder.Decode(&votePayload)
-		if err != nil {
-			return nil, err
-		}
+
 		err = tally.Add(votePayload.Ballot)
 		if err != nil {
 			return nil, err

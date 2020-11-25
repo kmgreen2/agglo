@@ -1,7 +1,9 @@
 package entwine_test
 
 import (
+	"errors"
 	gUuid "github.com/google/uuid"
+	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/entwine"
 	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
@@ -147,7 +149,7 @@ func TestKVTickerStore_Anchor(t *testing.T) {
 	messageStride := 3
 	numEntanglements := 4
 	tickerStore, streamStore, err := test.GetProofStream(startNumTicks, tickStride, messageStride, numEntanglements,
-		subStreamID)
+		subStreamID, false)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -193,6 +195,87 @@ func TestKVTickerStore_Anchor(t *testing.T) {
 				currTick++
 			}
 		}
+	}
+}
+
+func TestKVTickerStore_GetProofForStreamIndex(t *testing.T) {
+	subStreamID := entwine.SubStreamID("0")
+	startNumTicks := 12
+	tickStride := 1
+	messageStride := 3
+	numEntanglements := 4
+	tickerStore, streamStore, err := test.GetProofStream(startNumTicks, tickStride, messageStride, numEntanglements,
+		subStreamID, true)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	// Get all stream messages
+	streamHead, err := streamStore.Head(subStreamID)
+	if err != nil {
+		assert.Fail(t, err.Error())
+	}
+	streamMessages, err := streamStore.GetHistory(gUuid.Nil, streamHead.Uuid())
+	if err != nil {
+		assert.Fail(t, err.Error())
+	}
+
+	for i, message := range streamMessages {
+		proof, err := tickerStore.GetProofForStreamIndex(subStreamID, message.Index())
+
+		if i <= 9 {
+			if err != nil {
+				assert.Fail(t, err.Error())
+			}
+			assert.True(t, message.Index() <= proof.EndIdx())
+			assert.True(t, message.Index() >= proof.StartIdx())
+		} else {
+			assert.True(t, errors.Is(err, &common.NotFoundError{}))
+		}
+
+	}
+}
+
+func TestKVTickerStore_GetProofs(t *testing.T) {
+	subStreamID := entwine.SubStreamID("0")
+	startNumTicks := 12
+	tickStride := 1
+	messageStride := 3
+	numEntanglements := 4
+	tickerStore, streamStore, err := test.GetProofStream(startNumTicks, tickStride, messageStride, numEntanglements,
+		subStreamID, true)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	// Get all stream messages
+	streamHead, err := streamStore.Head(subStreamID)
+	if err != nil {
+		assert.Fail(t, err.Error())
+	}
+	_, err = streamStore.GetHistory(gUuid.Nil, streamHead.Uuid())
+	if err != nil {
+		assert.Fail(t, err.Error())
+	}
+
+	allProofs, err := tickerStore.GetProofs(subStreamID, 0, -1)
+	if err != nil {
+		assert.Fail(t, err.Error())
+	}
+	assert.Len(t, allProofs, 4)
+
+	allProofs, err = tickerStore.GetProofs(subStreamID, 0, 10)
+	if err != nil {
+		assert.Fail(t, err.Error())
+	}
+	assert.Len(t, allProofs, 4)
+
+	for i := 0; i < 4; i++ {
+		proofs, err := tickerStore.GetProofs(subStreamID, i, 4)
+		if err != nil {
+			assert.Fail(t, err.Error())
+		}
+		assert.Len(t, proofs, 4-i)
 	}
 }
 

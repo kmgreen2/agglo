@@ -6,10 +6,11 @@ import (
 	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/common"
+	"sort"
 	"strings"
 )
 
-// MessageFingerprint is the fingerprint used to prove historical timelines of substreams.  A fingerprint is
+// MessageFingerprint is the fingerprint used to prove historical timelines of sub streams.  A fingerprint is
 // derived from a StreamImmutableMessage
 type MessageFingerprint struct {
 	Signature []byte
@@ -29,7 +30,29 @@ type Proof interface {
 	TickerUuid() gUuid.UUID
 	SubStreamID() SubStreamID
 	Validate() bool
+	StartIdx() int64
+	EndIdx() int64
+	TickerIdx() int64
+	String() string
 	IsConsistent(prevProof Proof) (bool, error)
+}
+
+// ByAge implements sort.Interface for []Person based on
+// the Age field.
+type ByAnchor []Proof
+
+func (a ByAnchor) Len() int           { return len(a) }
+func (a ByAnchor) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByAnchor) Less(i, j int) bool {
+	if a[i].SubStreamID().Equals(a[j].SubStreamID()) {
+		return a[i].StartIdx() < a[j].EndIdx()
+	}
+	return a[i].TickerIdx() < a[j].TickerIdx()
+}
+
+// SortProofs will sort the provided proofs by their ticker index
+func SortProofs(proofs []Proof) {
+	sort.Sort(ByAnchor(proofs))
 }
 
 // Proof is used to encapsulate a sequence of immutable fingerprints for verification
@@ -37,8 +60,16 @@ type ProofImpl struct {
 	messageFingerprints []*MessageFingerprint
 	startUuid gUuid.UUID
 	endUuid gUuid.UUID
+	startIdx int64
+	endIdx int64
 	subStreamID SubStreamID
 	tickerUuid gUuid.UUID
+	tickerIdx int64
+}
+
+// String
+func (proof *ProofImpl) String() string {
+	return fmt.Sprintf("%s: [%d, %d] <-> %d", proof.SubStreamID(), proof.StartIdx(), proof.EndIdx(), proof.TickerIdx())
 }
 
 // Fingerprints will return the ordered fingerprints for this proof
@@ -51,9 +82,24 @@ func (proof *ProofImpl) StartUuid() gUuid.UUID {
 	return proof.startUuid
 }
 
+// TickerIdx will return the idx of the ticker message for this proof
+func (proof *ProofImpl) TickerIdx() int64 {
+	return proof.tickerIdx
+}
+
+// StartIdx will return the idx of the start message for this proof
+func (proof *ProofImpl) StartIdx() int64 {
+	return proof.startIdx
+}
+
 // EndUuid will return the end UUID for this proof
 func (proof *ProofImpl) EndUuid() gUuid.UUID {
 	return proof.endUuid
+}
+
+// EndIdx will return the idx of the end message for this proof
+func (proof *ProofImpl) EndIdx() int64 {
+	return proof.endIdx
 }
 
 // TickerUuid will return the ticker UUID attached to this proof
@@ -82,6 +128,18 @@ func SerializeProof(proof *ProofImpl) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = gEncoder.Encode(proof.startIdx)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(proof.endIdx)
+	if err != nil {
+		return nil, err
+	}
+	err = gEncoder.Encode(proof.tickerIdx)
+	if err != nil {
+		return nil, err
+	}
 	err = gEncoder.Encode(proof.subStreamID)
 	if err != nil {
 		return nil, err
@@ -106,6 +164,18 @@ func DeserializeProof(proofBytes []byte, proof *ProofImpl) error {
 		return err
 	}
 	err = gDecoder.Decode(&proof.endUuid)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&proof.startIdx)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&proof.endIdx)
+	if err != nil {
+		return err
+	}
+	err = gDecoder.Decode(&proof.tickerIdx)
 	if err != nil {
 		return err
 	}
@@ -145,6 +215,9 @@ func NewGenesisProof(subStreamID SubStreamID, message *TickerImmutableMessage) (
 		tickerUuid: message.Uuid(),
 		startUuid: genesisProofUuid,
 		endUuid: genesisProofUuid,
+		startIdx: 0,
+		endIdx: 0,
+		tickerIdx: message.Index(),
 	}, nil
 }
 
@@ -179,6 +252,9 @@ func NewProof(messages []*StreamImmutableMessage, subStreamID SubStreamID,
 		startUuid: messages[0].Uuid(),
 		endUuid: messages[len(messages)-1].Uuid(),
 		tickerUuid: tickerMessage.Uuid(),
+		startIdx: messages[0].idx,
+		endIdx: messages[len(messages)-1].idx,
+		tickerIdx: tickerMessage.Index(),
 	}
 
 	for i, _ := range messages {

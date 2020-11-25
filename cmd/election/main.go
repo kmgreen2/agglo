@@ -4,10 +4,14 @@ import (
 	gocrypto "crypto"
 	"fmt"
 	"github.com/kmgreen2/agglo/internal/usecase/voting"
+	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/entwine"
+	"github.com/kmgreen2/agglo/pkg/kvs"
+	"github.com/kmgreen2/agglo/pkg/storage"
 	"github.com/kmgreen2/agglo/test"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -46,27 +50,48 @@ func createPeople(numPeople int) []*voting.Person {
 
 func peopleRegister(registrar *voting.Registrar, generator *voting.Generator, people []*voting.Person,
 	probOfRegister float64) ([]*voting.Voter, error) {
-	var voters []*voting.Voter
+	voters := make([]*voting.Voter, len(people))
+	var returnVoters []*voting.Voter
+	results := make([]error, len(people))
 
-	for _, person := range people {
+	wg := &sync.WaitGroup{}
+	wg.Add(len(people))
+
+	for i, person := range people {
 		if rand.Float64() > probOfRegister {
+			wg.Done()
 			continue
 		}
-		voterID, err := registrar.ElectionRegister(person.ID, person.Secret)
-		if err != nil {
-			return nil, err
-		}
-		signer, authenticator, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
-		if err != nil {
-			return nil, err
-		}
-		electionUuid, err := generator.AllocateElectionUuid(voterID, authenticator)
-		if err != nil {
-			return nil, err
-		}
-		voters = append(voters, voting.NewVoter(person, voterID, electionUuid, signer, authenticator))
+		go func(index int, person *voting.Person) {
+			defer wg.Done()
+			voterID, err := registrar.ElectionRegister(person.ID, person.Secret)
+			if err != nil {
+				results[index] = err
+			}
+			signer, authenticator, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
+			if err != nil {
+				results[index] = err
+			}
+			electionUuid, err := generator.AllocateElectionUuid(voterID, authenticator)
+			if err != nil {
+				results[index] = err
+			}
+			voters[index] = voting.NewVoter(person, voterID, electionUuid, signer, authenticator)
+		}(i, person)
 	}
-	return voters, nil
+
+	wg.Wait()
+
+	for i, _ := range voters {
+		if voters[i] != nil {
+			returnVoters = append(returnVoters, voters[i])
+		}
+		if results[i] != nil {
+			return nil, results[i]
+		}
+	}
+
+	return returnVoters, nil
 }
 
 func getBallot() *voting.Ballot {
@@ -83,10 +108,20 @@ func getBallot() *voting.Ballot {
 }
 
 func peopleDoVote(voters []*voting.Voter, registrar *voting.Registrar, ledger *voting.Ledger,
-	probOfVoting float64) error {
-	for _, voter := range voters {
+	ticker entwine.TickerStore, probOfVoting float64) error {
+	for i, voter := range voters {
 		if rand.Float64() > probOfVoting {
 			continue
+		}
+
+		sleepTime := time.Duration(rand.Int() % 50) * time.Millisecond
+		time.Sleep(sleepTime)
+
+		if i % 5 == 0 {
+			err := ledger.Entwine(ticker)
+			if err != nil {
+				return err
+			}
 		}
 
 		person := voter.Person
@@ -120,35 +155,175 @@ func peopleDoVote(voters []*voting.Voter, registrar *voting.Registrar, ledger *v
 	return nil
 }
 
-func main() {
-	people := createPeople(100)
-	registrar := voting.NewRegistrar(people)
-	ledger, err := voting.NewLedger(entwine.SubStreamID("foobarbaz"))
+func startTickerStore() (entwine.TickerStore, error) {
+	kvStore := kvs.NewMemKVStore()
+	kvTickerStore := entwine.NewKVTickerStore(kvStore, common.SHA1)
+	signer, _, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
+	}
+
+	err = kvTickerStore.Append(signer)
+	if err != nil {
+		return nil, err
+	}
+
+	go func () {
+		for {
+			time.Sleep(100*time.Millisecond)
+			err = kvTickerStore.Append(signer)
+			if err != nil {
+				fmt.Printf("WARN - Ticker failure: %s", err.Error())
+			}
+		}
+	}()
+
+	return kvTickerStore, nil
+}
+
+func runMunicipality(name string, numPeople int, ticker entwine.TickerStore,
+	objectStore storage.ObjectStore, streamStore entwine.StreamStore) (*voting.Ledger,
+	*voting.Tally, error) {
+	people := createPeople(numPeople)
+	registrar := voting.NewRegistrar(people)
+	genesisProof, err := ticker.CreateGenesisProof(entwine.SubStreamID(name))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	signer, authenticator, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = streamStore.Create(entwine.SubStreamID(name), common.SHA1, signer, genesisProof.TickerUuid())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ledger, err := voting.NewLedger(entwine.SubStreamID(name), genesisProof.TickerUuid(), streamStore, objectStore,
+		signer, authenticator)
+
+	if err != nil {
+		return nil, nil, err
 	}
 	generator, err := voting.NewGenerator(ledger, registrar)
 	if err != nil {
-		panic(err.Error())
+		return nil, nil, err
 	}
 
-	start := time.Now().Unix()
 	voters, err := peopleRegister(registrar, generator, people, 1.0)
 	if err != nil {
-		panic(err.Error())
+		return nil, nil, err
 	}
-	fmt.Printf("Register: %d\n", time.Now().Unix() - start)
 
-	start = time.Now().Unix()
-	err = peopleDoVote(voters, registrar, ledger, 1.0)
+	err = peopleDoVote(voters, registrar, ledger, ticker, 1.0)
 	if err != nil {
-		panic(err.Error())
+		return nil, nil, err
 	}
-	fmt.Printf("Vote: %d\n", time.Now().Unix() - start)
 
 	tally, err := ledger.Tally()
 	if err != nil {
-		panic(err.Error())
+		return nil, nil, err
 	}
-	fmt.Print(tally.String())
+
+	return ledger, tally, nil
+}
+
+func main() {
+	ticker, err := startTickerStore()
+	if err != nil {
+		panic(err)
+	}
+
+	numMunicipalities := 4
+	numPeople := 20
+
+	kvStore := kvs.NewMemKVStore()
+
+	streamStore := entwine.NewKVStreamStore(kvStore, common.SHA1)
+
+	objectStoreInstance := "default"
+	storageParams, err := storage.NewMemObjectStoreBackendParams(storage.MemObjectStoreBackend, objectStoreInstance)
+	if err != nil {
+		panic(err)
+	}
+	objectStore, err := storage.NewMemObjectStore(storageParams)
+	if err != nil {
+		panic(err)
+	}
+
+	ledgers := make([]*voting.Ledger, numMunicipalities)
+	tallies := make([]*voting.Tally, numMunicipalities)
+	wg := &sync.WaitGroup{}
+	wg.Add(numMunicipalities)
+
+	for i := 0; i < numMunicipalities; i++ {
+		go func(index int) {
+			var err error
+			defer wg.Done()
+			ledgers[index], tallies[index], err = runMunicipality(fmt.Sprintf("muni-%d", index), numPeople, ticker,
+				objectStore,
+				streamStore)
+			if err != nil {
+				panic(err)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	for i := 0; i < numMunicipalities; i++ {
+		fmt.Printf("%s\n", tallies[i].String())
+	}
+
+	var allProofs []entwine.Proof
+	var allMessages []*entwine.StreamImmutableMessage
+
+	for i := 0; i < numMunicipalities; i++ {
+		proofs, err := ticker.GetProofs(entwine.SubStreamID(fmt.Sprintf("muni-%d", i)), 0, -1)
+		if err != nil {
+			panic(err)
+		}
+		allProofs = append(allProofs, proofs...)
+	}
+
+	entwine.SortProofs(allProofs)
+
+	for _, proof := range allProofs {
+		fmt.Println(proof.String())
+		if ok, _ := proof.IsGenesis(); ok {
+			continue
+		}
+		messages, err := streamStore.GetHistory(proof.StartUuid(), proof.EndUuid())
+		if err != nil {
+			panic(err)
+		}
+		// First message in a proof always contains the last message from the previous epoch (anchored set)
+		messages = messages[1:]
+		allMessages = append(allMessages, messages...)
+	}
+
+	for i, _ := range allMessages {
+		if i == 0 {
+			continue
+		}
+		lhs := allMessages[i-1]
+		rhs := allMessages[i]
+		lhsHappenedBefore, err := lhs.HappenedBefore(rhs, ticker)
+		if err != nil {
+			panic(err)
+		}
+		rhsHappenedBefore, err := rhs.HappenedBefore(lhs, ticker)
+		if err != nil {
+			panic(err)
+		}
+
+		// lhs <= rhs
+		if lhsHappenedBefore || (!lhsHappenedBefore && !rhsHappenedBefore) {
+			continue
+		}
+		fmt.Printf("Message at idx=%d in %s did not happen before idx=%d in %s\n", lhs.Index(), lhs.SubStream(),
+			rhs.Index(), rhs.SubStream())
+	}
 }

@@ -52,6 +52,32 @@ type StreamImmutableMessage struct {
 	subStreamID SubStreamID
 }
 
+// StreamImmutableMessage will return true if this message happened before other; false otherwise or if an error
+// occurs.
+func (message *StreamImmutableMessage) HappenedBefore(other *StreamImmutableMessage, tickerStore TickerStore) (bool,
+	error) {
+	if message.subStreamID.Equals(other.subStreamID) {
+		return message.Index() < other.Index(), nil
+	}
+
+	proof, err := tickerStore.GetProofForStreamIndex(message.subStreamID, message.Index())
+	if err != nil {
+		return false, err
+	}
+
+	proofTickerAnchor, err := tickerStore.GetMessageByUUID(proof.TickerUuid())
+	if err != nil {
+		return false, err
+	}
+
+	otherTickerAnchor, err := tickerStore.GetMessageByUUID(other.GetAnchorUUID())
+	if err != nil {
+		return false, err
+	}
+
+	return proofTickerAnchor.Index() < otherTickerAnchor.Index(), nil
+}
+
 // SerializeStreamImmutableMessage serializes a StreamImmutableMessage
 func SerializeStreamImmutableMessage(message *StreamImmutableMessage) ([]byte, error) {
 	byteBuffer := bytes.NewBuffer(make([]byte, 0))

@@ -8,5 +8,6 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/jinzhu/gorm v1.9.16
 	github.com/spf13/viper v1.4.0
-	github.com/stretchr/testify v1.2.2
+	github.com/stretchr/testify v1.3.0
+	go.dedis.ch/kyber/v3 v3.0.13
 )

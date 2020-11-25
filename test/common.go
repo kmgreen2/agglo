@@ -217,7 +217,7 @@ func GetProof(messages []*entwine.StreamImmutableMessage, subStreamID entwine.Su
 }
 
 func GetProofStream(startNumTicks, tickStride, messageStride, numEntanglements int,
-	subStreamID entwine.SubStreamID) (*entwine.
+	subStreamID entwine.SubStreamID, skipLastEntanglement bool) (*entwine.
 	KVTickerStore, *entwine.KVStreamStore, error) {
 
 	var err error
@@ -281,6 +281,10 @@ func GetProofStream(startNumTicks, tickStride, messageStride, numEntanglements i
 					return nil, nil, err
 				}
 			}
+		}
+
+		if skipLastEntanglement && i == numEntanglements - 1 {
+			break
 		}
 		startUuid, err := tickerStore.GetProofStartUuid(subStreamID)
 		if err != nil {

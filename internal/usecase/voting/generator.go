@@ -5,6 +5,7 @@ import (
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/test"
+	"sync"
 )
 
 type Generator struct {
@@ -15,6 +16,7 @@ type Generator struct {
 	authenticator crypto.Authenticator
 	ledgerBackChannel LedgerBackChannel
 	registrarBackChannel RegistrarBackChannel
+	lock *sync.Mutex
 }
 
 func NewGenerator(ledgerBackChannel LedgerBackChannel, registrarBackChannel RegistrarBackChannel) (*Generator, error) {
@@ -30,6 +32,7 @@ func NewGenerator(ledgerBackChannel LedgerBackChannel, registrarBackChannel Regi
 		authenticator: authenticator,
 		ledgerBackChannel: ledgerBackChannel,
 		registrarBackChannel: registrarBackChannel,
+		lock: &sync.Mutex{},
 	}
 
 	err = ledgerBackChannel.GeneratorAuthenticator(authenticator)
@@ -53,6 +56,8 @@ func (generator *Generator) ListElectionUuids() ([]gUuid.UUID, error) {
 // Note: This needs to be idempotent!
 func (generator *Generator) AllocateElectionUuid(voterID gUuid.UUID,
 	voterAuthenticator crypto.Authenticator) (gUuid.UUID, error) {
+	generator.lock.Lock()
+	defer generator.lock.Unlock()
 	if electionUuid, ok := generator.voterIDToElectionUuid[voterID]; ok {
 		return electionUuid, nil
 	}

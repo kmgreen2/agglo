@@ -16,6 +16,7 @@ import (
 type MemObjectStore struct {
 	blobs map[string][]byte
 	config *ObjectStoreConfig
+	lock *sync.Mutex
 }
 
 // MemObjectStoreBackendParams are parameters used to access a MemObjectStore
@@ -130,6 +131,7 @@ func NewMemObjectStore(params ObjectStoreBackendParams) (*MemObjectStore, error)
 		memObjectStoreInstance[memObjectStoreParams.instanceName] = &MemObjectStore{
 			blobs: make(map[string][]byte),
 			config: osConfig,
+			lock: &sync.Mutex{},
 		}
 	}
 	return memObjectStoreInstance[memObjectStoreParams.instanceName], nil
@@ -137,6 +139,9 @@ func NewMemObjectStore(params ObjectStoreBackendParams) (*MemObjectStore, error)
 
 // Put will map the content read from a stream to a provided key and store the stream as a blob
 func (objStore *MemObjectStore) Put(key string, reader io.Reader)	error {
+	objStore.lock.Lock()
+	defer objStore.lock.Unlock()
+
 	length := 0
 	buf := make([]byte, objStore.config.streamingBufferSize)
 	if _, ok := objStore.blobs[key]; ok {
@@ -166,6 +171,8 @@ func (objStore *MemObjectStore) Put(key string, reader io.Reader)	error {
 
 // Get will return a reader that reads the stream of bytes associated with a keyed blob
 func (objStore *MemObjectStore) Get(key string) (io.Reader, error) {
+	objStore.lock.Lock()
+	defer objStore.lock.Unlock()
 	if payload, ok := objStore.blobs[key]; ok {
 		return bytes.NewBuffer(payload), nil
 	}
@@ -174,6 +181,8 @@ func (objStore *MemObjectStore) Get(key string) (io.Reader, error) {
 
 // Head will return nil if the key maps a blob exists and an error otherwise
 func (objStore *MemObjectStore) Head(key string) error {
+	objStore.lock.Lock()
+	defer objStore.lock.Unlock()
 	if _, ok := objStore.blobs[key]; ok {
 		return nil
 	}
@@ -182,6 +191,8 @@ func (objStore *MemObjectStore) Head(key string) error {
 
 // Delete will delete the key and blob from the underlying map
 func (objStore *MemObjectStore) Delete(key string) error {
+	objStore.lock.Lock()
+	defer objStore.lock.Unlock()
 	if _, ok := objStore.blobs[key]; ok {
 		delete(objStore.blobs, key)
 		return nil
@@ -193,6 +204,8 @@ func (objStore *MemObjectStore) Delete(key string) error {
 func (objStore *MemObjectStore) List(prefix string) ([]string, error) {
 	var result []string
 	prefixLength := len(prefix)
+	objStore.lock.Lock()
+	defer objStore.lock.Unlock()
 	for s, _ := range objStore.blobs {
 		if len(s) >= prefixLength && strings.Compare(prefix, s[:prefixLength]) == 0 {
 			result = append(result, s)

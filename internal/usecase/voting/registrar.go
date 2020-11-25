@@ -5,6 +5,7 @@ import (
 	"fmt"
 	gUuid "github.com/google/uuid"
 	"strings"
+	"sync"
 )
 
 type VoterRecord struct {
@@ -28,6 +29,7 @@ type Registrar struct {
 	registeredPeople map[string]gUuid.UUID  	// All people that showed intention to vote in this election
 	registeredVoterIDs map[gUuid.UUID]string    // All people that showed intention to vote in this election
 	polls []*Poll								// Voter can optionally supply a poll when they register intent to vote
+	lock *sync.Mutex
 }
 
 func NewRegistrar(registeredPeople []*Person) *Registrar {
@@ -41,6 +43,7 @@ func NewRegistrar(registeredPeople []*Person) *Registrar {
 		registeredPeople: make(map[string]gUuid.UUID),
 		registeredVoterIDs: make(map[gUuid.UUID]string),
 		polls: make([]*Poll, 0),
+		lock: &sync.Mutex{},
 	}
 }
 
@@ -78,6 +81,8 @@ func (registrar *Registrar) getVoterID(personID, secret string) (gUuid.UUID, err
 
 // ElectionRegister will allocate a unique election ID for this voter
 func (registrar *Registrar) ElectionRegister(personID, secret string) (gUuid.UUID, error) {
+	registrar.lock.Lock()
+	defer registrar.lock.Unlock()
 	voterID, err := registrar.getVoterID(personID, secret)
 
 	if errors.Is(err, &VoterIDNotFoundError{}) {
@@ -92,6 +97,8 @@ func (registrar *Registrar) ElectionRegister(personID, secret string) (gUuid.UUI
 
 // PrepareToVote will return the signature of the electionUuid, which is needed to vote
 func (registrar *Registrar) PrepareToVote(personID, secret string, pollBallot *Ballot) ([]byte, error) {
+	registrar.lock.Lock()
+	defer registrar.lock.Unlock()
 	voterID, err := registrar.getVoterID(personID, secret)
 	if err != nil {
 		return nil, err
@@ -113,6 +120,8 @@ func (registrar *Registrar) PrepareToVote(personID, secret string, pollBallot *B
 // ToDo(KMG): VoterID should be blinded, so the Generator does not have the mapping of voterID to electionUuid
 // The only entity that should have voterID and electionUuid is the voter
 func (registrar *Registrar) ElectionUUIDCommit(voterID gUuid.UUID, voterElectionUuidSignature []byte) error {
+	registrar.lock.Lock()
+	defer registrar.lock.Unlock()
 	if _, ok := registrar.voters[voterID]; ok {
 		return fmt.Errorf("Election ID already exists for voter with ID: %s", voterID.String())
 	}

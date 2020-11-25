@@ -7,6 +7,7 @@ import (
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/kvs"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +31,10 @@ type TickerStore interface {
 	Append(signer crypto.Signer) error
 	GetLatestProofKey(subStreamID SubStreamID) (string, error)
 	Head() *TickerImmutableMessage
+	CreateGenesisProof(subStreamID SubStreamID) (Proof, error)
+	GetProofStartUuid(subStreamID SubStreamID) (gUuid.UUID, error)
+	GetProofForStreamIndex(subStreamID SubStreamID, streamIdx int64) (Proof, error)
+	GetProofs(subStreamID SubStreamID, startIdx, endIdx int) ([]Proof, error)
 }
 
 // KVStreamStore is an implementation of TickerStore that is backed by an in-memory map
@@ -164,6 +169,40 @@ func (tickerStore *KVTickerStore) CreateGenesisProof(subStreamID SubStreamID) (P
 	return proof, nil
 }
 
+// GetProofs will get all of the proofs at the given indexes for a sub stream
+func (tickerStore *KVTickerStore) GetProofs(subStreamID SubStreamID, startIdx, endIdx int) ([]Proof, error) {
+	var proofs []Proof
+	if idx, ok := tickerStore.proofIndexes[string(subStreamID)]; ok {
+		if startIdx > idx {
+			return nil, NewInvalidError(fmt.Sprintf("GetProofs - start index is greater than current index: %d > %d",
+				startIdx, idx))
+		}
+		if endIdx == -1 || endIdx > idx {
+			endIdx = idx
+		}
+	} else {
+		return nil, NewInvalidError(fmt.Sprintf("GetProofs - no proofs stored for '%s'",
+			subStreamID))
+	}
+
+	for i := startIdx; i <= endIdx; i++ {
+		proofID, err := ProofIdentifier(subStreamID, i)
+		if err != nil {
+			return nil, err
+		}
+		proofBytes, err := tickerStore.kvStore.Get(proofID)
+		if err != nil {
+			return nil, err
+		}
+		proof, err := NewProofFromBytes(proofBytes)
+		if err != nil {
+			return nil, err
+		}
+		proofs = append(proofs, proof)
+	}
+	return proofs, nil
+}
+
 // GetLatestProofKey will return the latest known proof for a substream; otherwise, return an error
 func (tickerStore *KVTickerStore) GetLatestProofKey(subStreamID SubStreamID) (string, error) {
 	proofPrefix, err := ProofIdentifierPrefix(subStreamID)
@@ -173,7 +212,6 @@ func (tickerStore *KVTickerStore) GetLatestProofKey(subStreamID SubStreamID) (st
 	if idx, ok := tickerStore.proofIndexes[string(subStreamID)]; ok {
 		return ProofIdentifier(subStreamID, idx)
 	}
-
 
 	keys, err := tickerStore.kvStore.List(proofPrefix)
 	if err != nil {
@@ -205,6 +243,45 @@ func (tickerStore *KVTickerStore) GetLatestProofKey(subStreamID SubStreamID) (st
 	tickerStore.proofLocks[string(subStreamID)].Unlock()
 
 	return ProofIdentifier(subStreamID, maxIdx)
+}
+
+// GetProofForStreamIndex returns the proof that contains the message at the provided index in the stream.  If no
+// such proof can be found, it returns a NotFound error
+func (tickerStore *KVTickerStore) GetProofForStreamIndex(subStreamID SubStreamID, streamIdx int64) (Proof, error) {
+	if _, ok := tickerStore.proofIndexes[string(subStreamID)]; !ok {
+		return nil, common.NewNotFoundError(fmt.Sprintf(
+			"GetProofForStreamIndex - Cannot find proof for message at index '%d' for substream '%s'",
+			streamIdx, subStreamID))
+	}
+
+	firstIdx := 0
+	lastIdx := tickerStore.proofIndexes[string(subStreamID)]
+
+	for firstIdx <= lastIdx {
+		midIdx := int(math.Floor(float64(lastIdx + firstIdx) / 2))
+		midProofID, err := ProofIdentifier(subStreamID, midIdx)
+		if err != nil {
+			return nil, err
+		}
+		midProofBytes, err := tickerStore.kvStore.Get(midProofID)
+		if err != nil {
+			return nil, err
+		}
+		midProof, err := NewProofFromBytes(midProofBytes)
+		if err != nil {
+			return nil, err
+		}
+		if streamIdx < midProof.StartIdx() {
+			lastIdx = midIdx - 1
+		} else if streamIdx > midProof.EndIdx() {
+			firstIdx = midIdx + 1
+		} else {
+			return midProof, nil
+		}
+	}
+	return nil, common.NewNotFoundError(fmt.Sprintf(
+		"GetProofForStreamIndex - Cannot find proof for message at index '%d' for substream '%s'",
+		streamIdx, subStreamID))
 }
 
 // GetProofStartUuid will return the UUID of the last message in the latest known proof for a substream; otherwise,
@@ -378,7 +455,7 @@ func (tickerStore *KVTickerStore) HappenedBefore(lhs *TickerImmutableMessage, rh
 	return lhs.Index() < rhs.Index(), nil
 }
 
-// Append will append an uncommitted message to a substream; otherwise, return
+// Append will append an uncommitted message to a sub stream; otherwise, return
 // an error.
 // ToDo(KMG): Need to rollback if failure, then add tests for that
 func (tickerStore *KVTickerStore) Append(signer crypto.Signer) error {
