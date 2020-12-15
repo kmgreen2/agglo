@@ -17,3 +17,7 @@ vendor/
 .idea/
 
 test/mocks/
+
+.terraform/
+*.tfstate
+*.tfstate.backup
