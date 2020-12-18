@@ -1,41 +1,74 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
-	"go.dedis.ch/kyber/v3"
-	"go.dedis.ch/kyber/v3/pairing/bn256"
-	"go.dedis.ch/kyber/v3/sign/bls"
-	"go.dedis.ch/kyber/v3/util/random"
+	"github.com/kmgreen2/agglo/pkg/core"
+	"net/http"
 )
 
-func main(){
-	msg := []byte("Hello Boneh-Lynn-Shacham")
-	msg2 := []byte("ello Boneh-Lynn-Shacham")
-	suite := bn256.NewSuite()
-	private1, public1 := bls.NewKeyPair(suite, random.New())
-	private2, public2 := bls.NewKeyPair(suite, random.New())
-	sig1, err := bls.Sign(suite, private1, msg)
+func handler(w http.ResponseWriter, r *http.Request) {
+	var jsonBody map[string]interface{}
+	jsonDecoder := json.NewDecoder(r.Body)
+	err := jsonDecoder.Decode(&jsonBody)
 	if err != nil {
-		panic(err.Error())
+		fmt.Printf("Error decoding json: %s\n", err.Error())
 	}
-	sig2, err := bls.Sign(suite, private2, msg2)
-	if err != nil {
-		panic(err.Error())
-	}
-	aggregatedSig, err := bls.AggregateSignatures(suite, sig1, sig2)
-	if err != nil {
-		panic(err.Error())
-	}
+	fmt.Printf("Body: %v\n\n", jsonBody)
+}
 
-	aggregatedKey := bls.AggregatePublicKeys(suite, public1, public2)
-
-	err = bls.BatchVerify(suite, []kyber.Point{public1, public2}, [][]byte{msg, msg2}, aggregatedSig)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	err = bls.Verify(suite, aggregatedKey, msg, aggregatedSig)
-	if err == nil {
-		fmt.Printf("Should not be valid")
+func main() {
+	//http.HandleFunc("/", handler)
+	//log.Fatal(http.ListenAndServe(":8080", nil))
+	testJson := `
+{
+	"a": 1,
+	"b": {
+		"c": 2,
+		"d": [3,4,5]
+	},
+	"e": [6],
+	"f": {
+		"g": {
+			"h": 7
+		}
 	}
 }
+`
+
+	var jsonMap map[string]interface{}
+	decoder := json.NewDecoder(bytes.NewBuffer([]byte(testJson)))
+	err := decoder.Decode(&jsonMap)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	foldFunc := func(acc, v interface{}) (interface{}, error) {
+		if acc == nil {
+			acc = 0
+		}
+
+		if accVal, err := core.GetNumeric(acc); err != nil {
+			return nil, err
+		} else if vVal, err := core.GetNumeric(v); err != nil {
+			return nil, err
+		} else {
+			return accVal + vVal, nil
+
+		}
+	}
+
+	transformer := core.NewTransformer(nil, ".", ":")
+	transformer.AddSpec("foo.bar", core.NewTransformation("a", core.CopyTransformer{}))
+	transformer.AddSpec("foo.baz", core.NewTransformation("b.d", core.LeftFoldTransformer{foldFunc}))
+
+	transformedMap, err := transformer.Transform(jsonMap)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	fmt.Println(transformedMap)
+
+}
+
