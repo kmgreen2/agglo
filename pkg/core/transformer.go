@@ -49,34 +49,6 @@ func (t Transformable) Copy() *Transformable {
 	}
 }
 
-func GetNumeric(x interface{}) (float64, error) {
-	switch x := x.(type) {
-	case uint8:
-		return float64(x), nil
-	case int8:
-		return float64(x), nil
-	case uint16:
-		return float64(x), nil
-	case int16:
-		return float64(x), nil
-	case uint32:
-		return float64(x), nil
-	case int32:
-		return float64(x), nil
-	case uint64:
-		return float64(x), nil
-	case int64:
-		return float64(x), nil
-	case int:
-		return float64(x), nil
-	case float32:
-		return float64(x), nil
-	case float64:
-		return float64(x), nil
-	}
-	return 0, fmt.Errorf("Invalid numeric type: %v", reflect.TypeOf(x))
-}
-
 type FieldTransformer interface {
 	Transform(in *Transformable) (*Transformable, error)
 }
@@ -180,13 +152,25 @@ func (t SumTransformer) Transform(in *Transformable) (*Transformable, error) {
 
 type Transformation struct {
 	sourceField string
-	transformer FieldTransformer
+	transformers []FieldTransformer
 }
 
-func NewTransformation(source string, transformer FieldTransformer) *Transformation {
+func (t *Transformation) Transform(in *Transformable) (*Transformable, error) {
+	var err error
+	curr := in
+	for _, transformer := range t.transformers {
+		curr, err = transformer.Transform(curr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return curr, nil
+}
+
+func NewTransformation(source string, transformers []FieldTransformer) *Transformation {
 	return &Transformation{
 		source,
-		transformer,
+		transformers,
 	}
 }
 
@@ -222,6 +206,17 @@ func (t *Transformer) dictFromPath(key string, in map[string]interface{}) (map[s
 	return curr, nil
 }
 
+func (t *Transformer) valueFromPath(key string, in map[string]interface{}) (interface{}, error) {
+	fieldNames := strings.Split(key, t.fieldSeparator)
+	var curr map[string]interface{} = in
+	for i, fieldName := range fieldNames {
+		if i != len(fieldNames) - 1 {
+			curr = curr[fieldName].(map[string]interface{})
+		}
+	}
+	return curr[fieldNames[len(fieldNames)-1]], nil
+}
+
 func (t *Transformer) createPathAndTransform(tgtKey string, transformation *Transformation, in,
 	out map[string]interface{}) error {
 
@@ -240,7 +235,7 @@ func (t *Transformer) createPathAndTransform(tgtKey string, transformation *Tran
 		} else {
 			sourceFields := strings.Split(transformation.sourceField, t.fieldSeparator)
 			sourceField := sourceFields[len(sourceFields)-1]
-			result, err := transformation.transformer.Transform(&Transformable{sourceDict[sourceField]})
+			result, err := transformation.Transform(&Transformable{sourceDict[sourceField]})
 			if err != nil {
 				return err
 			}
