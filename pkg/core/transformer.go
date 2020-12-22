@@ -153,6 +153,7 @@ func (t SumTransformer) Transform(in *Transformable) (*Transformable, error) {
 type Transformation struct {
 	sourceField string
 	transformers []FieldTransformer
+	condition *Condition
 }
 
 func (t *Transformation) Transform(in *Transformable) (*Transformable, error) {
@@ -167,10 +168,18 @@ func (t *Transformation) Transform(in *Transformable) (*Transformable, error) {
 	return curr, nil
 }
 
-func NewTransformation(source string, transformers []FieldTransformer) *Transformation {
+func (t *Transformation) ShouldTransform(in map[string]interface{}) (bool, error) {
+	return t.condition.Evaluate(in)
+}
+
+func NewTransformation(source string, transformers []FieldTransformer, condition *Condition) *Transformation {
+	if condition == nil {
+		condition = TrueCondition
+	}
 	return &Transformation{
 		source,
 		transformers,
+		condition,
 	}
 }
 
@@ -227,6 +236,13 @@ func (t *Transformer) createPathAndTransform(tgtKey string, transformation *Tran
 	fieldNames := strings.Split(tgtKey, t.fieldSeparator)
 	var curr map[string]interface{} = out
 	for i, fieldName := range fieldNames {
+		should, err := transformation.ShouldTransform(Flatten(in))
+		if err != nil {
+			return err
+		}
+		if !should {
+			continue
+		}
 		if _, ok := curr[fieldName]; !ok {
 			curr[fieldName] = make(map[string]interface{})
 		}

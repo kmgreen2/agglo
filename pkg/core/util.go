@@ -33,3 +33,36 @@ func GetNumeric(x interface{}) (float64, error) {
 	return 0, fmt.Errorf("Invalid numeric type: %v", reflect.TypeOf(x))
 }
 
+func flatten(in interface{}, out map[string]interface{}, currKey string) {
+	var thisKey string
+	switch inVal := in.(type) {
+	case map[string]interface{}:
+		for k, _ := range inVal {
+			if len(currKey) == 0 {
+				thisKey = k
+			} else {
+				thisKey = fmt.Sprintf("%s.%s", currKey, k)
+			}
+			flatten(inVal[k], out, thisKey)
+		}
+	case []interface{}:
+		for i, v := range inVal {
+			if len(currKey) == 0 {
+				thisKey = fmt.Sprintf("%d", i)
+			} else {
+				thisKey = fmt.Sprintf("%s.%d", currKey, i)
+			}
+			flatten(v, out, thisKey)
+		}
+	default:
+		out[currKey] = in
+	}
+}
+
+func Flatten(in map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{})
+
+	flatten(in, out, "")
+	return out
+}
+

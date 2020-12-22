@@ -72,11 +72,15 @@ func main() {
 	}
 
 	transformer := core.NewTransformer(nil, ".", ":")
-	transformer.AddSpec("foo.bar", core.NewTransformation("a", []core.FieldTransformer{&core.CopyTransformer{}}))
+	transformer.AddSpec("foo.bar", core.NewTransformation("a", []core.FieldTransformer{&core.CopyTransformer{}}, nil))
 	transformer.AddSpec("foo.bizz.bar", core.NewTransformation("b.c",
-		[]core.FieldTransformer{&core.MapTransformer{mapFunc}}))
+		[]core.FieldTransformer{&core.MapTransformer{mapFunc}}, nil))
+	cond, err := core.NewCondition(core.NewComparatorExpression(core.Variable("b.d.0"), core.Numeric(3), core.Equal))
+	if err != nil {
+		panic(err.Error())
+	}
 	transformer.AddSpec("foo.baz", core.NewTransformation("b.d",
-		[]core.FieldTransformer{&core.MapTransformer{intMapFunc}, &core.LeftFoldTransformer{foldFunc}}))
+		[]core.FieldTransformer{&core.MapTransformer{intMapFunc}, &core.LeftFoldTransformer{foldFunc}}, cond))
 
 	transformedMap, err := transformer.Transform(jsonMap)
 	if err != nil {
@@ -84,6 +88,8 @@ func main() {
 	}
 
 	fmt.Println(transformedMap)
+
+	fmt.Println(core.Flatten(jsonMap))
 
 }
 
