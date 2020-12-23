@@ -5,18 +5,13 @@ import (
 	"fmt"
 )
 
+var invalidExpression string = "<INVALID>"
+
 type variable struct {
 	name string
 }
 func Variable(name string) variable {
 	return variable{name}
-}
-
-type numeric struct {
-	value float64
-}
-func Numeric(value float64) numeric {
-	return numeric{value}
 }
 
 type OperatorType int
@@ -81,12 +76,14 @@ const (
 type UnaryExpression struct {
 	rhs interface{}
 	operator UnaryOperator
+	valid bool
 }
 
 func NewUnaryExpression(rhs interface{}, operator UnaryOperator) *UnaryExpression {
 	return &UnaryExpression{
 		rhs: rhs,
 		operator: operator,
+		valid: true,
 	}
 }
 func (expr *UnaryExpression) String() string {
@@ -100,10 +97,13 @@ func (expr *UnaryExpression) String() string {
 	switch rhs := expr.rhs.(type) {
 	case variable:
 		return fmt.Sprintf("(%s[%s])", opStr, rhs.name)
-	case numeric:
-		return fmt.Sprintf("(%s%d)", opStr, int(rhs.value))
+	default:
+		numericValue, err := GetInteger(rhs)
+		if err != nil {
+			return invalidExpression
+		}
+		return fmt.Sprintf("(%s%d)", opStr, numericValue)
 	}
-	return "<invalid>"
 }
 func (expr *UnaryExpression) OperatorType() OperatorType {
 	return getOperatorType(expr.operator)
@@ -113,6 +113,7 @@ type BinaryExpression struct {
 	lhs interface{}
 	rhs interface{}
 	operator BinaryOperator
+	valid bool
 }
 
 func NewBinaryExpression(lhs, rhs interface{}, operator BinaryOperator) *BinaryExpression {
@@ -120,6 +121,7 @@ func NewBinaryExpression(lhs, rhs interface{}, operator BinaryOperator) *BinaryE
 		lhs: lhs,
 		rhs: rhs,
 		operator: operator,
+		valid: true,
 	}
 }
 func (expr *BinaryExpression) String() string {
@@ -130,9 +132,19 @@ func (expr *BinaryExpression) String() string {
 	case variable:
 		formatString += "[%s]"
 		argList = append(argList, lhs.name)
-	case numeric:
-		formatString += "%.4f"
-		argList = append(argList, lhs.value)
+	default:
+		integerValue, err := GetInteger(lhs)
+		if err == nil {
+			formatString += "%d"
+			argList = append(argList, integerValue)
+		} else {
+			numericValue, err := GetNumeric(lhs)
+			if err != nil {
+				return invalidExpression
+			}
+			formatString += "%.4f"
+			argList = append(argList, numericValue)
+		}
 	}
 	switch expr.operator {
 	case Addition: opStr ="+"
@@ -153,9 +165,19 @@ func (expr *BinaryExpression) String() string {
 	case variable:
 		formatString += " [%s]"
 		argList = append(argList, rhs.name)
-	case numeric:
-		formatString += " %.4f"
-		argList = append(argList, rhs.value)
+	default:
+		integerValue, err := GetInteger(rhs)
+		if err == nil {
+			formatString += " %d"
+			argList = append(argList, integerValue)
+		} else {
+			numericValue, err := GetNumeric(rhs)
+			if err != nil {
+				return invalidExpression
+			}
+			formatString += " %.4f"
+			argList = append(argList, numericValue)
+		}
 	}
 	formatString += ")"
 	return fmt.Sprintf(formatString, argList...)
@@ -168,6 +190,7 @@ type LogicalExpression struct {
 	lhs Expression
 	rhs Expression
 	operator LogicalOperator
+	valid bool
 }
 
 func NewLogicalExpression(lhs, rhs Expression, operator LogicalOperator) *LogicalExpression {
@@ -175,6 +198,7 @@ func NewLogicalExpression(lhs, rhs Expression, operator LogicalOperator) *Logica
 		lhs: lhs,
 		rhs: rhs,
 		operator: operator,
+		valid: true,
 	}
 }
 func (expr *LogicalExpression) String() string {
@@ -193,6 +217,7 @@ type ComparatorExpression struct {
 	lhs interface{}
 	rhs interface{}
 	operator ComparatorOperator
+	valid bool
 }
 
 func NewComparatorExpression(lhs, rhs interface{}, operator ComparatorOperator) *ComparatorExpression {
@@ -200,6 +225,7 @@ func NewComparatorExpression(lhs, rhs interface{}, operator ComparatorOperator) 
 		lhs: lhs,
 		rhs: rhs,
 		operator: operator,
+		valid: true,
 	}
 }
 func (expr *ComparatorExpression) String() string {
@@ -214,12 +240,22 @@ func (expr *ComparatorExpression) String() string {
 	case variable:
 		formatString += "[%s]"
 		argList = append(argList, lhs.name)
-	case numeric:
-		formatString += "%.4f"
-		argList = append(argList, lhs.value)
 	case Expression:
 		formatString += "%s"
 		argList = append(argList, lhs.String())
+	default:
+		integerValue, err := GetInteger(lhs)
+		if err == nil {
+			formatString += "%d"
+			argList = append(argList, integerValue)
+		} else {
+			numericValue, err := GetNumeric(lhs)
+			if err != nil {
+				return invalidExpression
+			}
+			formatString += "%.4f"
+			argList = append(argList, numericValue)
+		}
 	}
 
 	switch expr.operator {
@@ -243,12 +279,22 @@ func (expr *ComparatorExpression) String() string {
 	case variable:
 		formatString += " [%s]"
 		argList = append(argList, rhs.name)
-	case numeric:
-		formatString += " %.4f"
-		argList = append(argList, rhs.value)
 	case Expression:
 		formatString += " %s"
 		argList = append(argList, rhs.String())
+	default:
+		integerValue, err := GetInteger(rhs)
+		if err == nil {
+			formatString += " %d"
+			argList = append(argList, integerValue)
+		} else {
+			numericValue, err := GetNumeric(rhs)
+			if err != nil {
+				return invalidExpression
+			}
+			formatString += " %.4f"
+			argList = append(argList, numericValue)
+		}
 	}
 	formatString += ")"
 	return fmt.Sprintf(formatString, argList...)
@@ -277,7 +323,7 @@ func NewTrueExpression() *TrueExpression {
 type Expression interface {
 	String() string
 	OperatorType() OperatorType
-	//Validate() -> Account for inconvenience of returning error from the builder functions
+	//Validate() bool -> Account for inconvenience of returning error from the builder functions
 }
 
 type Condition struct {

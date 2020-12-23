@@ -262,7 +262,7 @@ func (t *Transformer) createPathAndTransform(tgtKey string, transformation *Tran
 	return nil
 }
 
-func (t *Transformer) Transform(in map[string]interface{}) (map[string]interface{}, error) {
+func (t *Transformer) Process(in map[string]interface{}) (map[string]interface{}, error) {
 	out := make(map[string]interface{})
 
 	for tgt, transformation := range t.spec {

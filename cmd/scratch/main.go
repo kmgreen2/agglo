@@ -75,14 +75,14 @@ func main() {
 	transformer.AddSpec("foo.bar", core.NewTransformation("a", []core.FieldTransformer{&core.CopyTransformer{}}, nil))
 	transformer.AddSpec("foo.bizz.bar", core.NewTransformation("b.c",
 		[]core.FieldTransformer{&core.MapTransformer{mapFunc}}, nil))
-	cond, err := core.NewCondition(core.NewComparatorExpression(core.Variable("b.d.0"), core.Numeric(3), core.Equal))
+	cond, err := core.NewCondition(core.NewComparatorExpression(core.Variable("b.d.0"), 2, core.Equal))
 	if err != nil {
 		panic(err.Error())
 	}
 	transformer.AddSpec("foo.baz", core.NewTransformation("b.d",
 		[]core.FieldTransformer{&core.MapTransformer{intMapFunc}, &core.LeftFoldTransformer{foldFunc}}, cond))
 
-	transformedMap, err := transformer.Transform(jsonMap)
+	transformedMap, err := transformer.Process(jsonMap)
 	if err != nil {
 		panic(err.Error())
 	}
