@@ -59,5 +59,53 @@ func (r SleepRunnable) Run() (interface{}, error) {
 	return r.value, nil
 }
 
+type SleepAndFailRunnable struct {
+	value int
+}
+
+func NewSleepAndFailRunnable(value int) *SleepAndFailRunnable {
+	return &SleepAndFailRunnable{
+		value: value,
+	}
+}
+
+func (r SleepAndFailRunnable) Run() (interface{}, error) {
+	if r.value > 0 {
+		time.Sleep(time.Duration(r.value) * time.Second)
+	}
+	return nil, NewInvalidError("Failed")
+}
+
+func (r *SleepAndFailRunnable) SetArgs(args ...interface{}) error {
+	if len(args) > 1 {
+		msg := fmt.Sprintf("SleepAndFailRunnable should have 1 int arg, found %d args", len(args))
+		return NewInvalidError(msg)
+	}
+	switch rv := args[0].(type) {
+	case int:
+		r.value = rv
+	default:
+		msg := fmt.Sprintf("SleepAndFailRunnable should have an int arg, found %v", reflect.TypeOf(args[0]))
+		return NewInvalidError(msg)
+	}
+	return nil
+}
+
+type FailRunnable struct {
+
+}
+
+func NewFailRunnable() *FailRunnable {
+	return &FailRunnable{}
+}
+
+func (r FailRunnable) Run() (interface{}, error) {
+	return nil, NewInvalidError("Failed")
+}
+
+func (r *FailRunnable) SetArgs(args ...interface{}) error {
+	return nil
+}
+
 
 

@@ -159,3 +159,18 @@ func NewTimedOutError(msg string) *TimedOutError {
 	}
 }
 
+// CancelledError
+type CancelledError struct {
+}
+
+// Error returns the error message
+func (err *CancelledError) Error() string {
+	return "Canceled"
+}
+
+// NewCancelledError will return a CancelledError object
+func NewCancelledError() *CancelledError {
+	return &CancelledError{
+	}
+}
+

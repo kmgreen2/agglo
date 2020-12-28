@@ -22,6 +22,7 @@ type Future interface {
 	Cancel() error
 	IsCancelled() bool
 	IsCompleted() bool
+	CallbacksCompleted() bool
 	OnSuccess(func (interface{})) Future
 	OnCancel(func ()) Future
 	OnFail(func (err error)) Future
@@ -42,7 +43,7 @@ func newFutureResult(value interface{}) *futureResult {
 func newCancelledFuture() *futureResult {
 	return &futureResult{
 		value: nil,
-		err: nil,
+		err: NewCancelledError(),
 	}
 }
 
@@ -53,18 +54,12 @@ func newFailedFuture(err error) *futureResult {
 	}
 }
 
-func newTimedOutFuture(msg string) *futureResult {
-	return &futureResult{
-		value: nil,
-		err: NewTimedOutError(msg),
-	}
-}
-
 type future struct {
 	result chan *futureResult
 	finalResult *futureResult
 	mutex sync.Mutex
 	state futureState
+	callbacksCompleted bool
 	successes []func (interface{})
 	fails []func (error)
 	cancels []func ()
@@ -72,9 +67,10 @@ type future struct {
 
 func newFuture() *future {
 	return &future{
-		result: make(chan *futureResult),
+		result: make(chan *futureResult, 1),
 		mutex: sync.Mutex{},
 		state: undefinedFuture,
+		callbacksCompleted: false,
 	}
 }
 
@@ -148,7 +144,7 @@ func (f *future) getWithContext(ctx context.Context) (interface{}, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case f.finalResult = <-f.result:
+	case <-f.result:
 		return f.finalResult.value, f.finalResult.err
 	}
 }
@@ -159,6 +155,10 @@ func (f *future) IsCancelled() bool {
 
 func (f *future) IsCompleted() bool {
 	return f.state == succeededFuture || f.state == failedFuture
+}
+
+func (f *future) CallbacksCompleted() bool {
+	return f.callbacksCompleted
 }
 
 func (f *future) OnSuccess(cb func (interface{})) Future {
@@ -194,9 +194,9 @@ func (f *future) success(result interface{}) error {
 	}
 
 	f.finalResult = newFutureResult(result)
-	f.result <- f.finalResult
 	f.state = succeededFuture
 	f.doCallbacks()
+	f.result <- f.finalResult
 	return nil
 }
 
@@ -209,9 +209,9 @@ func (f *future) fail(err error) error {
 	}
 
 	f.finalResult = newFailedFuture(err)
-	f.result <- f.finalResult
 	f.state = failedFuture
 	f.doCallbacks()
+	f.result <- f.finalResult
 	return nil
 }
 
@@ -224,9 +224,9 @@ func (f *future) Cancel() error {
 	}
 
 	f.finalResult = newCancelledFuture()
-	f.result <- f.finalResult
 	f.state = canceledFuture
 	f.doCallbacks()
+	f.result <- f.finalResult
 	return nil
 }
 
@@ -238,23 +238,38 @@ func (f *future) close() {
 }
 
 func (f *future) doCallbacks() {
+	wg := &sync.WaitGroup{}
+
+	defer func () {
+		go func() {
+			wg.Wait()
+			f.callbacksCompleted = true
+		}()
+	}()
+
 	switch f.state {
 	case succeededFuture:
 		for _, cb := range f.successes {
+			wg.Add(1)
 			go func(callback func(interface{})) {
 				callback(f.finalResult.value)
+				wg.Done()
 			}(cb)
 		}
 	case failedFuture:
 		for _, cb := range f.fails {
+			wg.Add(1)
 			go func(callback func(error)) {
 				callback(f.finalResult.err)
+				wg.Done()
 			}(cb)
 		}
 	case canceledFuture:
 		for _, cb := range f.cancels {
+			wg.Add(1)
 			go func(callback func()) {
 				callback()
+				wg.Done()
 			}(cb)
 		}
 	default:
