@@ -1,18 +1,21 @@
 package streaming
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type Publisher interface {
-	Publish(b []byte) error
-	Flush(timeout time.Duration) error
+	Publish(ctx context.Context, b []byte) error
+	Flush(ctx context.Context, timeout time.Duration) error
 }
 
 type Subscriber interface {
-	Subscribe(handler func(payload []byte)) error
+	Subscribe(handler func(ctx context.Context, payload []byte)) error
 	Stop() error
 	Status() SubscriberState
 }
 
 type Replayer interface {
-	Replay(handler func(payload []byte) error) error
+	Replay(handler func(ctx context.Context, payload []byte) error) error
 }

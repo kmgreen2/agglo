@@ -1,6 +1,7 @@
 package streaming_test
 
 import (
+	"context"
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/streaming"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +24,7 @@ func TestBasicHappyPath(t *testing.T) {
 
 	go func() {
 		for i := 0; i < numMessages; i++ {
-			fooPub.Publish([]byte(fmt.Sprintf("%d", i)))
+			fooPub.Publish(context.Background(), []byte(fmt.Sprintf("%d", i)))
 		}
 	}()
 
@@ -31,7 +32,7 @@ func TestBasicHappyPath(t *testing.T) {
 
 	consumeChannel := make(chan string)
 
-	handler := func(payload []byte) {
+	handler := func(ctx context.Context, payload []byte) {
 		consumeChannel <- string(payload)
 		numConsumed++
 		if numConsumed == numMessages {

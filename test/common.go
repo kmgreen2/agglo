@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"context"
 	gocrypto "crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -51,7 +52,7 @@ func GetTestObjectStoreWithObjects(backendType storage.BackendType,
 	}
 
 	for key, reader := range objects {
-		err = objectStore.Put(key, reader)
+		err = objectStore.Put(context.Background(), key, reader)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -65,7 +66,7 @@ func GetTestObjects(objectStore storage.ObjectStore, numObjects int) (map[string
 	for i := 0; i < numObjects; i++ {
 		key := fmt.Sprintf("%d", i)
 		objectMap[key] = bytes.NewBuffer([]byte(key))
-		err := objectStore.Put(key, objectMap[key])
+		err := objectStore.Put(context.Background(), key, objectMap[key])
 		if err != nil {
 			return nil, err
 		}

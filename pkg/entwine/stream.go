@@ -1,6 +1,7 @@
 package entwine
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
@@ -92,7 +93,7 @@ func (streamStore *KVStreamStore) GetMessagesByName(name string) ([]*StreamImmut
 	if err != nil {
 		return nil, err
 	}
-	keys, err := streamStore.kvStore.List(namePrefix)
+	keys, err := streamStore.kvStore.List(context.Background(), namePrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +108,7 @@ func (streamStore *KVStreamStore) GetMessagesByName(name string) ([]*StreamImmut
 		if err != nil {
 			return nil, err
 		}
-		messageBytes, err := streamStore.kvStore.Get(messageUuid)
+		messageBytes, err := streamStore.kvStore.Get(context.Background(), messageUuid)
 		if err != nil {
 			return nil, err
 		}
@@ -128,7 +129,7 @@ func (streamStore *KVStreamStore) GetMessagesByTags(tags []string) ([]*StreamImm
 		if err != nil {
 			return nil, err
 		}
-		keys, err := streamStore.kvStore.List(tagPrefix)
+		keys, err := streamStore.kvStore.List(context.Background(), tagPrefix)
 		if err != nil {
 			return nil, err
 		}
@@ -145,7 +146,7 @@ func (streamStore *KVStreamStore) GetMessagesByTags(tags []string) ([]*StreamImm
 		if err != nil {
 			return nil, err
 		}
-		messageBytes, err := streamStore.kvStore.Get(messageUuid)
+		messageBytes, err := streamStore.kvStore.Get(context.Background(), messageUuid)
 		if err != nil {
 			return nil, err
 		}
@@ -160,7 +161,7 @@ func (streamStore *KVStreamStore) GetMessagesByTags(tags []string) ([]*StreamImm
 
 // GetMessageByUUID will return the message with a given UUID; otherwise, return an error
 func (streamStore *KVStreamStore) GetMessageByUUID(uuid gUuid.UUID) (*StreamImmutableMessage, error) {
-	messageBytes, err := streamStore.kvStore.Get(uuid.String())
+	messageBytes, err := streamStore.kvStore.Get(context.Background(), uuid.String())
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +172,7 @@ func (streamStore *KVStreamStore) GetMessageByUUID(uuid gUuid.UUID) (*StreamImmu
 func (streamStore *KVStreamStore) GetMessages(uuids []gUuid.UUID) ([]*StreamImmutableMessage, error) {
 	var chainedMessages []*StreamImmutableMessage
 	for _, myUuid := range uuids {
-		messageBytes, err := streamStore.kvStore.Get(myUuid.String())
+		messageBytes, err := streamStore.kvStore.Get(context.Background(), myUuid.String())
 		if err != nil {
 			return nil, err
 		}
@@ -194,7 +195,7 @@ func (streamStore *KVStreamStore) GetHistory(start gUuid.UUID, end gUuid.UUID) (
 		if curr == gUuid.Nil && start == gUuid.Nil {
 			break
 		}
-		if err := streamStore.kvStore.Head(curr.String()); err != nil {
+		if err := streamStore.kvStore.Head(context.Background(), curr.String()); err != nil {
 			return nil, err
 		}
 
@@ -202,7 +203,7 @@ func (streamStore *KVStreamStore) GetHistory(start gUuid.UUID, end gUuid.UUID) (
 		if strings.Compare(curr.String(), start.String()) == 0 {
 			break
 		}
-		prevBytes, err := streamStore.kvStore.Get(PreviousNodeKey(curr))
+		prevBytes, err := streamStore.kvStore.Get(context.Background(), PreviousNodeKey(curr))
 
 		// No previous message, assumes we have reached the first
 		// ToDo(KMG): Do we care?  Should we check the first message and return an error?
@@ -229,7 +230,7 @@ func (streamStore *KVStreamStore) GetHistory(start gUuid.UUID, end gUuid.UUID) (
 
 // getAnchorUUID will return the anchor UUID for a give message; otherwise, return an error
 func (streamStore *KVStreamStore) getAnchorUUID(uuid gUuid.UUID) (gUuid.UUID, error) {
-	anchorBytes, err := streamStore.kvStore.Get(AnchorNodeKey(uuid))
+	anchorBytes, err := streamStore.kvStore.Get(context.Background(), AnchorNodeKey(uuid))
 	if err != nil {
 		return gUuid.Nil, err
 	}
@@ -252,11 +253,11 @@ func (streamStore *KVStreamStore) GetHistoryToLastAnchor(uuid gUuid.UUID) ([]*St
 	}
 	chainedUuids = append(chainedUuids, curr)
 	for {
-		if err := streamStore.kvStore.Head(curr.String()); err != nil {
+		if err := streamStore.kvStore.Head(context.Background(), curr.String()); err != nil {
 			return nil, err
 		}
 
-		prevBytes, err := streamStore.kvStore.Get(PreviousNodeKey(curr))
+		prevBytes, err := streamStore.kvStore.Get(context.Background(), PreviousNodeKey(curr))
 		// No previous message, assumes we have reached the first
 		// ToDo(KMG): Do we care?  Should we check the first message and return an error?
 		if errors.Is(err, &common.NotFoundError{}) {
@@ -351,7 +352,7 @@ func (streamStore *KVStreamStore) append(message *StreamImmutableMessage) error 
 		if err != nil {
 			return err
 		}
-		err = streamStore.kvStore.Put(TagEntry(tagPrefix, newUuid), []byte(nil))
+		err = streamStore.kvStore.Put(context.Background(), TagEntry(tagPrefix, newUuid), []byte(nil))
 		if err != nil {
 			return err
 		}
@@ -362,26 +363,26 @@ func (streamStore *KVStreamStore) append(message *StreamImmutableMessage) error 
 	if err != nil {
 		return err
 	}
-	err = streamStore.kvStore.Put(NameEntry(namePrefix, newUuid), []byte(nil))
+	err = streamStore.kvStore.Put(context.Background(), NameEntry(namePrefix, newUuid), []byte(nil))
 	if err != nil {
 		return err
 	}
 
 	// Store previous node reference
-	err = streamStore.kvStore.Put(PreviousNodeKey(newUuid), prevUuidBytes)
+	err = streamStore.kvStore.Put(context.Background(), PreviousNodeKey(newUuid), prevUuidBytes)
 	if err != nil {
 		return err
 	}
 
 	// Store anchor reference
-	err = streamStore.kvStore.Put(AnchorNodeKey(newUuid), anchorUuidBytes)
+	err = streamStore.kvStore.Put(context.Background(), AnchorNodeKey(newUuid), anchorUuidBytes)
 	if err != nil {
 		return err
 	}
 
 	// Store main record
 	messageBytes, err := SerializeStreamImmutableMessage(message)
-	err = streamStore.kvStore.Put(newUuid.String(), messageBytes)
+	err = streamStore.kvStore.Put(context.Background(), newUuid.String(), messageBytes)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,7 @@
 package entwine
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
@@ -61,7 +62,7 @@ func NewKVTickerStore(kvStore kvs.KVStore, digestType common.DigestType) *KVTick
 
 // GetMessageByUUID will return the message with a given UUID; otherwise, return an error
 func (tickerStore *KVTickerStore) GetMessageByUUID(uuid gUuid.UUID) (*TickerImmutableMessage, error) {
-	messageBytes, err := tickerStore.kvStore.Get(uuid.String())
+	messageBytes, err := tickerStore.kvStore.Get(context.Background(), uuid.String())
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +73,7 @@ func (tickerStore *KVTickerStore) GetMessageByUUID(uuid gUuid.UUID) (*TickerImmu
 func (tickerStore *KVTickerStore) GetMessages(uuids []gUuid.UUID) ([]*TickerImmutableMessage, error) {
 	var chainedMessages []*TickerImmutableMessage
 	for _, myUuid := range uuids {
-		messageBytes, err := tickerStore.kvStore.Get(myUuid.String())
+		messageBytes, err := tickerStore.kvStore.Get(context.Background(), myUuid.String())
 		if err != nil {
 			return nil, err
 		}
@@ -102,14 +103,14 @@ func (tickerStore *KVTickerStore) GetHistory(start gUuid.UUID, end gUuid.UUID) (
 			break
 		}
 
-		if err := tickerStore.kvStore.Head(curr.String()); err != nil {
+		if err := tickerStore.kvStore.Head(context.Background(), curr.String()); err != nil {
 			return nil, err
 		}
 		chainedUuids = append(chainedUuids, curr)
 		if strings.Compare(curr.String(), start.String()) == 0 {
 			break
 		}
-		prevBytes, err := tickerStore.kvStore.Get(PreviousNodeKey(curr))
+		prevBytes, err := tickerStore.kvStore.Get(context.Background(), PreviousNodeKey(curr))
 		// No previous message, assumes we have reached the first
 		// ToDo(KMG): Do we care?  Should we check the first message and return an error?
 		if errors.Is(err, &common.NotFoundError{}) {
@@ -159,7 +160,7 @@ func (tickerStore *KVTickerStore) CreateGenesisProof(subStreamID SubStreamID) (P
 		return nil, err
 	}
 
-	err = tickerStore.kvStore.Put(proofKey, proofBytes)
+	err = tickerStore.kvStore.Put(context.Background(), proofKey, proofBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +191,7 @@ func (tickerStore *KVTickerStore) GetProofs(subStreamID SubStreamID, startIdx, e
 		if err != nil {
 			return nil, err
 		}
-		proofBytes, err := tickerStore.kvStore.Get(proofID)
+		proofBytes, err := tickerStore.kvStore.Get(context.Background(), proofID)
 		if err != nil {
 			return nil, err
 		}
@@ -213,7 +214,7 @@ func (tickerStore *KVTickerStore) GetLatestProofKey(subStreamID SubStreamID) (st
 		return ProofIdentifier(subStreamID, idx)
 	}
 
-	keys, err := tickerStore.kvStore.List(proofPrefix)
+	keys, err := tickerStore.kvStore.List(context.Background(), proofPrefix)
 	if err != nil {
 		return "", err
 	}
@@ -263,7 +264,7 @@ func (tickerStore *KVTickerStore) GetProofForStreamIndex(subStreamID SubStreamID
 		if err != nil {
 			return nil, err
 		}
-		midProofBytes, err := tickerStore.kvStore.Get(midProofID)
+		midProofBytes, err := tickerStore.kvStore.Get(context.Background(), midProofID)
 		if err != nil {
 			return nil, err
 		}
@@ -292,7 +293,7 @@ func (tickerStore *KVTickerStore) GetProofStartUuid(subStreamID SubStreamID) (gU
 	if err != nil {
 		return gUuid.Nil, err
 	}
-	proofBytes, err := tickerStore.kvStore.Get(proofKey)
+	proofBytes, err := tickerStore.kvStore.Get(context.Background(), proofKey)
 	if err != nil {
 		return gUuid.Nil, err
 	}
@@ -357,7 +358,7 @@ func (tickerStore *KVTickerStore) Anchor(messages []*StreamImmutableMessage, sub
 		return nil, err
 	}
 
-	prevBytes, err := tickerStore.kvStore.Get(prevProofKey)
+	prevBytes, err := tickerStore.kvStore.Get(context.Background(), prevProofKey)
 	// There is no record of any previous proof, or something went wrong
 	if err != nil {
 		return nil, err
@@ -387,7 +388,7 @@ func (tickerStore *KVTickerStore) Anchor(messages []*StreamImmutableMessage, sub
 		return nil, err
 	}
 
-	err = tickerStore.kvStore.Put(proofKey, proofBytes)
+	err = tickerStore.kvStore.Put(context.Background(), proofKey, proofBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -479,7 +480,7 @@ func (tickerStore *KVTickerStore) Append(signer crypto.Signer) error {
 		if err != nil {
 			return err
 		}
-		err = tickerStore.kvStore.Put(PreviousNodeKey(newUuid), prevUuidBytes)
+		err = tickerStore.kvStore.Put(context.Background(), PreviousNodeKey(newUuid), prevUuidBytes)
 		if err != nil {
 			return err
 		}
@@ -487,7 +488,7 @@ func (tickerStore *KVTickerStore) Append(signer crypto.Signer) error {
 
 	// Store main record
 	messageBytes, err := SerializeTickerImmutableMessage(immutableMessage)
-	err = tickerStore.kvStore.Put(newUuid.String(), messageBytes)
+	err = tickerStore.kvStore.Put(context.Background(), newUuid.String(), messageBytes)
 	if err != nil {
 		return err
 	}

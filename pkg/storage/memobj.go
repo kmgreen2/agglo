@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"context"
 	"encoding/gob"
 	"errors"
 	"fmt"
@@ -138,7 +139,7 @@ func NewMemObjectStore(params ObjectStoreBackendParams) (*MemObjectStore, error)
 }
 
 // Put will map the content read from a stream to a provided key and store the stream as a blob
-func (objStore *MemObjectStore) Put(key string, reader io.Reader)	error {
+func (objStore *MemObjectStore) Put(ctx context.Context, key string, reader io.Reader)	error {
 	objStore.lock.Lock()
 	defer objStore.lock.Unlock()
 
@@ -170,7 +171,7 @@ func (objStore *MemObjectStore) Put(key string, reader io.Reader)	error {
 }
 
 // Get will return a reader that reads the stream of bytes associated with a keyed blob
-func (objStore *MemObjectStore) Get(key string) (io.Reader, error) {
+func (objStore *MemObjectStore) Get(ctx context.Context, key string) (io.Reader, error) {
 	objStore.lock.Lock()
 	defer objStore.lock.Unlock()
 	if payload, ok := objStore.blobs[key]; ok {
@@ -180,7 +181,7 @@ func (objStore *MemObjectStore) Get(key string) (io.Reader, error) {
 }
 
 // Head will return nil if the key maps a blob exists and an error otherwise
-func (objStore *MemObjectStore) Head(key string) error {
+func (objStore *MemObjectStore) Head(ctx context.Context, key string) error {
 	objStore.lock.Lock()
 	defer objStore.lock.Unlock()
 	if _, ok := objStore.blobs[key]; ok {
@@ -190,7 +191,7 @@ func (objStore *MemObjectStore) Head(key string) error {
 }
 
 // Delete will delete the key and blob from the underlying map
-func (objStore *MemObjectStore) Delete(key string) error {
+func (objStore *MemObjectStore) Delete(ctx context.Context, key string) error {
 	objStore.lock.Lock()
 	defer objStore.lock.Unlock()
 	if _, ok := objStore.blobs[key]; ok {
@@ -201,7 +202,7 @@ func (objStore *MemObjectStore) Delete(key string) error {
 }
 
 // List will return a slice of keys that are prefixed on the provided prefix
-func (objStore *MemObjectStore) List(prefix string) ([]string, error) {
+func (objStore *MemObjectStore) List(ctx context.Context, prefix string) ([]string, error) {
 	var result []string
 	prefixLength := len(prefix)
 	objStore.lock.Lock()

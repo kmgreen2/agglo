@@ -1,6 +1,7 @@
 package storage_test
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha1"
 	"errors"
@@ -77,15 +78,15 @@ func TestHappyPath(t *testing.T) {
 	}
 	randomReader := NewRandomReader(fileSize)
 
-	err = objStore.Put("foo", randomReader)
+	err = objStore.Put(context.Background(), "foo", randomReader)
 	assert.Nil(t, err)
 
 	objHash := randomReader.Hash()
 
-	err = objStore.Head("foo")
+	err = objStore.Head(context.Background(), "foo")
 	assert.Nil(t, err)
 
-	reader, err := objStore.Get("foo")
+	reader, err := objStore.Get(context.Background(), "foo")
 	assert.Nil(t, err)
 
 	readBytes := make([]byte, 1024)
@@ -108,7 +109,7 @@ func TestHappyPath(t *testing.T) {
 	}
 	assert.Equal(t, objHash, readDigest.Sum(nil))
 
-	err = objStore.Delete("foo")
+	err = objStore.Delete(context.Background(), "foo")
 	assert.Nil(t, err)
 }
 
@@ -123,12 +124,12 @@ func TestPutConflictError(t *testing.T) {
 	}
 	randomReader := NewRandomReader(1024)
 
-	err = objStore.Put("foo", randomReader)
+	err = objStore.Put(context.Background(), "foo", randomReader)
 	assert.Nil(t, err)
 
 	randomReader = NewRandomReader(1024)
 
-	err = objStore.Put("foo", randomReader)
+	err = objStore.Put(context.Background(), "foo", randomReader)
 	assert.Error(t, err)
 }
 
@@ -143,7 +144,7 @@ func TestPutReadError(t *testing.T) {
 	}
 	badReader := &BadReader{}
 
-	err = objStore.Put("foo", badReader)
+	err = objStore.Put(context.Background(), "foo", badReader)
 	assert.Error(t, err)
 }
 
@@ -156,7 +157,7 @@ func TestGetNotFound(t *testing.T) {
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
-	_, err = objStore.Get("baz")
+	_, err = objStore.Get(context.Background(), "baz")
 	assert.Error(t, err)
 }
 
@@ -169,21 +170,21 @@ func TestHeadNotFound(t *testing.T) {
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
-	err = objStore.Head("baz")
+	err = objStore.Head(context.Background(), "baz")
 	assert.Error(t, err)
 }
 
 func putObjects(objStore storage.ObjectStore, prefix string, numWithPrefix int, numWithoutPrefix int) error {
 	for i := 0; i < numWithPrefix; i++ {
 		randomReader := NewRandomReader(1024)
-		err := objStore.Put(fmt.Sprintf("%s%d", prefix, i), randomReader)
+		err := objStore.Put(context.Background(), fmt.Sprintf("%s%d", prefix, i), randomReader)
 		if err != nil {
 			return err
 		}
 	}
 	for i := 0; i < numWithoutPrefix; i++ {
 		randomReader := NewRandomReader(1024)
-		err := objStore.Put(fmt.Sprintf("%d%s%d", i, prefix, i), randomReader)
+		err := objStore.Put(context.Background(), fmt.Sprintf("%d%s%d", i, prefix, i), randomReader)
 		if err != nil {
 			return err
 		}
@@ -205,7 +206,7 @@ func TestListNone(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	results, err := objStore.List("notprefix")
+	results, err := objStore.List(context.Background(), "notprefix")
 	assert.Equal(t, len(results), 0)
 }
 
@@ -223,7 +224,7 @@ func TestListAll(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	results, err := objStore.List("")
+	results, err := objStore.List(context.Background(), "")
 	assert.Equal(t, len(results), 20)
 }
 
@@ -241,6 +242,6 @@ func TestListSome(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	results, err := objStore.List("testprefix")
+	results, err := objStore.List(context.Background(), "testprefix")
 	assert.Equal(t, len(results), 10)
 }

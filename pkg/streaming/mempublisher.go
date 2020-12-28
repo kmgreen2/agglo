@@ -1,6 +1,7 @@
 package streaming
 
 import (
+	"context"
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"time"
@@ -26,11 +27,11 @@ func NewMemPublisher(memPubSub *MemPubSub, topic string) (*MemPublisher, error) 
 }
 
 // Publish will publish a payload
-func (memPublisher *MemPublisher) Publish(payload []byte) error {
+func (memPublisher *MemPublisher) Publish(ctx context.Context, payload []byte) error {
 	return memPublisher.memPubSub.Publish(memPublisher.topic, payload)
 }
 
 // Flush is a no-op, since all changes immediately take effect
-func (memPublisher *MemPublisher) Flush(timeout time.Duration) error {
+func (memPublisher *MemPublisher) Flush(ctx context.Context, timeout time.Duration) error {
 	return nil
 }

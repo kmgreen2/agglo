@@ -1,6 +1,7 @@
 package streaming
 
 import (
+	"context"
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/common"
 )
@@ -37,7 +38,7 @@ func NewMemReplayer(memPubSub *MemPubSub, topic string, start, end int64) (*MemR
 }
 
 // Replay will replay the stream based on the replayer config and the provided handler function
-func (memReplayer *MemReplayer) Replay(handler func(payload []byte) error) error {
+func (memReplayer *MemReplayer) Replay(ctx context.Context, handler func(payload []byte) error) error {
 	for {
 		payload, err := memReplayer.memPubSub.Next(memReplayer.ctx)
 		if err != nil {

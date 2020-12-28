@@ -1,6 +1,7 @@
 package streaming
 
 import (
+	"context"
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/common"
 )
@@ -36,7 +37,7 @@ func terminateSubscriber(err error) bool {
 }
 
 // Subscribe will spawn a go routine that subscribes from a topic using the provided handler
-func (memSubscriber *MemSubscriber) Subscribe(handler func(payload []byte)) error {
+func (memSubscriber *MemSubscriber) Subscribe(handler func(ctx context.Context, payload []byte)) error {
 	if memSubscriber.state == SubscriberRunning {
 		return nil
 	}
@@ -52,7 +53,7 @@ func (memSubscriber *MemSubscriber) Subscribe(handler func(payload []byte)) erro
 					break
 				}
 			} else {
-				handler(payload)
+				handler(common.ExtractPubSubContext(payload), payload)
 			}
 		}
 	}()

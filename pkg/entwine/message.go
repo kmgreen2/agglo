@@ -2,6 +2,7 @@ package entwine
 
 import (
 	"bytes"
+	"context"
 	"encoding/gob"
 	"errors"
 	"fmt"
@@ -329,7 +330,7 @@ func (message *StreamImmutableMessage) Data() (io.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	reader, err := objectStore.Get(message.objectDescriptor.GetKey())
+	reader, err := objectStore.Get(context.Background(), message.objectDescriptor.GetKey())
 	if err != nil {
 		return nil, err
 	}

@@ -125,3 +125,37 @@ func NewSignatureError(msg string) *SignatureError {
 	}
 }
 
+// AlreadyCompletedError
+type AlreadyCompletedError struct {
+	msg string
+}
+
+// Error returns the error message
+func (err *AlreadyCompletedError) Error() string {
+	return err.msg
+}
+
+// NewAlreadyCompletedError will return a AlreadyCompletedError object
+func NewAlreadyCompletedError(msg string) *AlreadyCompletedError {
+	return &AlreadyCompletedError{
+		msg: msg,
+	}
+}
+
+// TimedOutError
+type TimedOutError struct {
+	msg string
+}
+
+// Error returns the error message
+func (err *TimedOutError) Error() string {
+	return err.msg
+}
+
+// NewTimedOutError will return a TimedOutError object
+func NewTimedOutError(msg string) *TimedOutError {
+	return &TimedOutError{
+		msg: msg,
+	}
+}
+

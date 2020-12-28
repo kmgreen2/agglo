@@ -1,6 +1,7 @@
 package kvs
 
 import (
+	"context"
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"strings"
@@ -22,7 +23,7 @@ func NewMemKVStore() *MemKVStore {
 }
 
 // Put will map a value to a key in the in-memory map
-func (kvStore *MemKVStore) Put(key string, value []byte) error {
+func (kvStore *MemKVStore) Put(ctx context.Context, key string, value []byte) error {
 	kvStore.lock.Lock()
 	defer kvStore.lock.Unlock()
 	if _, ok := kvStore.values[key]; ok {
@@ -33,7 +34,7 @@ func (kvStore *MemKVStore) Put(key string, value []byte) error {
 }
 
 // Get will return a value mapped to the provided key, or error if the mapping does not exist
-func (kvStore *MemKVStore) Get(key string) ([]byte, error) {
+func (kvStore *MemKVStore) Get(ctx context.Context, key string) ([]byte, error) {
 	kvStore.lock.Lock()
 	defer kvStore.lock.Unlock()
 	if _, ok := kvStore.values[key]; !ok {
@@ -43,7 +44,7 @@ func (kvStore *MemKVStore) Get(key string) ([]byte, error) {
 }
 
 // Head will return an error if the key is not mapped or nil if it is mapped
-func (kvStore *MemKVStore) Head(key string) error {
+func (kvStore *MemKVStore) Head(ctx context.Context, key string) error {
 	kvStore.lock.Lock()
 	defer kvStore.lock.Unlock()
 	if _, ok := kvStore.values[key]; !ok {
@@ -53,7 +54,7 @@ func (kvStore *MemKVStore) Head(key string) error {
 }
 
 // Delete will unmap a key, if it exists; otherwise returns an error
-func (kvStore *MemKVStore) Delete(key string) error {
+func (kvStore *MemKVStore) Delete(ctx context.Context, key string) error {
 	kvStore.lock.Lock()
 	defer kvStore.lock.Unlock()
 	if _, ok := kvStore.values[key]; !ok {
@@ -64,7 +65,7 @@ func (kvStore *MemKVStore) Delete(key string) error {
 }
 
 // List will return all of the keys with the given prefix
-func (kvStore *MemKVStore) List(prefix string) ([]string, error) {
+func (kvStore *MemKVStore) List(ctx context.Context, prefix string) ([]string, error) {
 	kvStore.lock.Lock()
 	defer kvStore.lock.Unlock()
 	var result []string

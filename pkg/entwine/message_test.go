@@ -1,6 +1,7 @@
 package entwine_test
 
 import (
+	"context"
 	gocrypto "crypto"
 	"github.com/kmgreen2/agglo/pkg/entwine"
 	"github.com/kmgreen2/agglo/pkg/serialization"
@@ -54,7 +55,7 @@ func TestNewStreamImmutableMessageBadData(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	err = objectStore.Delete(messages[1].Name())
+	err = objectStore.Delete(context.Background(), messages[1].Name())
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -122,7 +123,7 @@ func TestStreamImmutableMessage_DataInvalid(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	objectStore.Delete("0")
+	objectStore.Delete(context.Background(), "0")
 
 	_, err = messages[1].Data()
 	assert.Error(t, err)

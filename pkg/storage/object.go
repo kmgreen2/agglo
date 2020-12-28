@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"context"
 	"encoding/gob"
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/common"
@@ -10,11 +11,11 @@ import (
 
 // ObjectStore is the interface for an object store
 type ObjectStore interface {
-	Put(key string, reader io.Reader)	error
-	Get(key string) (io.Reader, error)
-	Head(key string) error
-	Delete(key string) error
-	List(prefix string) ([]string, error)
+	Put(ctx context.Context, key string, reader io.Reader)	error
+	Get(ctx context.Context, key string) (io.Reader, error)
+	Head(ctx context.Context, key string) error
+	Delete(ctx context.Context, key string) error
+	List(ctx context.Context, prefix string) ([]string, error)
 }
 
 // BackendType is the type of backend

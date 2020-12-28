@@ -2,6 +2,7 @@ package voting
 
 import (
 	"bytes"
+	"context"
 	"encoding/gob"
 	"fmt"
 	gUuid "github.com/google/uuid"
@@ -276,7 +277,7 @@ func (ledger *Ledger) Vote(voterElectionUuid gUuid.UUID, voterElectionUuidSignat
 		return nil, err
 	}
 
-	err = ledger.objectStore.Put(voterElectionUuid.String(), byteBuffer)
+	err = ledger.objectStore.Put(context.Background(), voterElectionUuid.String(), byteBuffer)
 	if err != nil {
 		return nil, err
 	}
