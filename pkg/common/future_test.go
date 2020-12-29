@@ -1,12 +1,14 @@
-package common
+package common_test
 
 import (
+	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
 
-func waitForCallbacks(f Future) {
+func waitForCallbacks(f common.Future) {
 	for !f.CallbacksCompleted() {
 
 	}
@@ -16,8 +18,8 @@ func TestCreateFuture(t *testing.T) {
 	testSuccess := false
 	testFailure := false
 	testCancel := false
-	runnable := NewSquareRunnable(10)
-	f := CreateFuture(runnable).OnSuccess(func (x interface{}) {
+	runnable := test.NewSquareRunnable(10)
+	f := common.CreateFuture(runnable).OnSuccess(func (x interface{}) {
 		testSuccess = true
 	}).OnFail(func (err error) {
 		testFailure = true
@@ -41,8 +43,8 @@ func TestCreateFutureFail(t *testing.T) {
 	testSuccess := false
 	testFailure := false
 	testCancel := false
-	runnable := NewSleepAndFailRunnable(0)
-	f := CreateFuture(runnable).OnSuccess(func (x interface{}) {
+	runnable := test.NewSleepAndFailRunnable(0)
+	f := common.CreateFuture(runnable).OnSuccess(func (x interface{}) {
 		testSuccess = true
 	}).OnFail(func (err error) {
 		testFailure = true
@@ -65,8 +67,8 @@ func TestCreateFutureCancel(t *testing.T) {
 	testSuccess := false
 	testFailure := false
 	testCancel := false
-	runnable := NewSleepRunnable(2)
-	f := CreateFuture(runnable).OnSuccess(func (x interface{}) {
+	runnable := test.NewSleepRunnable(2)
+	f := common.CreateFuture(runnable).OnSuccess(func (x interface{}) {
 		testSuccess = true
 	}).OnFail(func (err error) {
 		testFailure = true
@@ -91,9 +93,9 @@ func TestCreateDeferredFuture(t *testing.T) {
 	testSuccess := false
 	testFailure := false
 	testCancel := false
-	runnable := NewSquareRunnable(10)
+	runnable := test.NewSquareRunnable(10)
 	before := time.Now()
-	f := CreateDeferredFuture(2*time.Second, runnable).
+	f := common.CreateDeferredFuture(2*time.Second, runnable).
 		OnSuccess(func (x interface{}) {
 		testSuccess = true
 	}).OnFail(func (err error) {
@@ -119,8 +121,8 @@ func TestCreateFutureTimeout(t *testing.T) {
 	testSuccess := false
 	testFailure := false
 	testCancel := false
-	runnable := NewSleepRunnable(2)
-	f := CreateFuture(runnable).OnSuccess(func (x interface{}) {
+	runnable := test.NewSleepRunnable(2)
+	f := common.CreateFuture(runnable).OnSuccess(func (x interface{}) {
 		testSuccess = true
 	}).OnFail(func (err error) {
 		testFailure = true
@@ -144,8 +146,8 @@ func TestCreateFutureThen(t *testing.T) {
 	testThenSuccess := false
 	testThenFailure := false
 	testThenCancel := false
-	runnable := NewSquareRunnable(10)
-	f := CreateFuture(runnable).OnSuccess(func (x interface{}) {
+	runnable := test.NewSquareRunnable(10)
+	f := common.CreateFuture(runnable).OnSuccess(func (x interface{}) {
 		testSuccess = true
 	}).OnFail(func (err error) {
 		testFailure = true
@@ -178,9 +180,9 @@ func TestCreateFutureThenWithFailure(t *testing.T) {
 	testSecondSuccess := false
 	testFirstFailure := false
 	testSecondFailure := false
-	failRunnable := NewFailRunnable()
-	runnable := NewSquareRunnable(10)
-	f := CreateFuture(runnable).OnSuccess(func (x interface{}) {
+	failRunnable := test.NewFailRunnable()
+	runnable := test.NewSquareRunnable(10)
+	f := common.CreateFuture(runnable).OnSuccess(func (x interface{}) {
 		testFirstSuccess = true
 	}).Then(failRunnable).OnFail(func (err error) {
 		testFirstFailure = true
@@ -198,5 +200,30 @@ func TestCreateFutureThenWithFailure(t *testing.T) {
 	assert.True(t, testFirstFailure)
 	assert.True(t, testSecondFailure)
 	assert.False(t, testSecondSuccess)
+}
+
+func TestRetryableFuture(t *testing.T) {
+	testSuccess := false
+	testFailure := false
+	testCancel := false
+	runnable := test.NewFailThenSucceedRunnable(2)
+	f := common.CreateRetryableFuture(3, 100 * time.Millisecond, runnable).OnSuccess(func (x interface{}) {
+		testSuccess = true
+	}).OnFail(func (err error) {
+		testFailure = true
+	}).OnCancel(func () {
+		testCancel = true
+	})
+
+
+	result, err := f.Get()
+	assert.Nil(t, err)
+	assert.Equal(t, 2, result)
+	assert.True(t, f.IsCompleted())
+
+	waitForCallbacks(f)
+	assert.True(t, testSuccess)
+	assert.False(t, testCancel)
+	assert.False(t, testFailure)
 }
 

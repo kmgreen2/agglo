@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	gocrypto "crypto"
+	gorand "math/rand"
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"github.com/kmgreen2/agglo/pkg/entwine"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/pkg/storage"
+	"strings"
 	"time"
 )
 
@@ -310,4 +312,61 @@ func GetProofStream(startNumTicks, tickStride, messageStride, numEntanglements i
 		anchorUuid = anchorMessage.Uuid()
 	}
 	return tickerStore, kvStreamStore, nil
+}
+
+func GenRandomMap(maxLevels, maxKeys int) (map[string]interface{}, []string) {
+	letters := "abcdefghijklmnopqrstuvwxyz"
+	var flattenedKeys []string
+	out := make(map[string]interface{})
+	numKeys := (gorand.Int() % maxKeys) + 1
+
+	curr := out
+	for i := 0; i < numKeys; i++ {
+		flattenedKey := ""
+		numLevels := (gorand.Int() % maxLevels) + 1
+		for j := 0; j < numLevels; j++ {
+			key := gUuid.New().String()
+			if j == numLevels - 1 {
+				flattenedKey += key
+				curr[key] = string(letters[gorand.Int() % len(letters)])
+			} else {
+				flattenedKey += key + "."
+				if _, ok := curr[key]; !ok {
+					curr[key] = make(map[string]interface{})
+				}
+				curr = curr[key].(map[string]interface{})
+			}
+		}
+		flattenedKeys = append(flattenedKeys, flattenedKey)
+	}
+	return out, flattenedKeys
+}
+
+func GetJoinedMaps(numMaps, numJoined int, partitionID gUuid.UUID, name string) ([]map[string]interface{}, []string) {
+	joinedVal := "foobar"
+	var maps []map[string]interface{}
+	var joinedKeys []string
+	currJoined := 0
+
+	for i := 0; i < numMaps; i++ {
+		m, flattenedKeys := GenRandomMap(5, 16)
+		m["agglo:internal:partitionID"] = partitionID.String()
+		m["agglo:internal:name"] = name
+		if currJoined < numJoined {
+			keys := strings.Split(flattenedKeys[0], ".")
+			curr := m
+			for i, key := range keys {
+				if i == len(keys) - 1 {
+					curr[key] = joinedVal
+				} else {
+					curr = curr[key].(map[string]interface{})
+				}
+			}
+			joinedKeys = append(joinedKeys, flattenedKeys[0])
+			maps = append(maps, m)
+			currJoined++
+		}
+	}
+
+	return maps, joinedKeys
 }

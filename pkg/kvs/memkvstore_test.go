@@ -62,14 +62,47 @@ func TestHappyPath(t *testing.T) {
 	}
 }
 
-func TestPutConflict(t *testing.T) {
+func TestAtomicPut(t *testing.T) {
 	kvStore := kvs.NewMemKVStore()
+
+	err := kvStore.AtomicPut(context.Background(), "foo", nil, []byte("foobar"))
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	err = kvStore.Put(context.Background(), "foo", []byte("fizzbar"))
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	err = kvStore.AtomicPut(context.Background(), "foo", []byte("fizzbar"), []byte("barfoo"))
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	err = kvStore.AtomicPut(context.Background(), "foo", []byte("fizzbar"), []byte("barfoo"))
+	assert.Error(t, err)
+}
+
+func TestAtomicDelete(t *testing.T) {
+	kvStore := kvs.NewMemKVStore()
+
 	err := kvStore.Put(context.Background(), "foo", []byte("foobar"))
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
 
-	err = kvStore.Put(context.Background(), "foo", []byte("foobar"))
+	err = kvStore.Put(context.Background(), "foo", []byte("fizzbar"))
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	err = kvStore.AtomicDelete(context.Background(), "foo", []byte("fizzbar"))
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	err = kvStore.AtomicDelete(context.Background(), "foo", []byte("fizzbar"))
 	assert.Error(t, err)
 }
 

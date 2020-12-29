@@ -1,5 +1,36 @@
 package common
 
+import (
+	"github.com/pkg/errors"
+	"fmt"
+)
+
+type stackTracer interface {
+	StackTrace() errors.StackTrace
+}
+
+// StringWithTrace will print an error string with stacktrace
+func StringWithTrace(err error) string {
+	msg := err.Error()
+	if traceError, ok := err.(stackTracer); ok {
+		msg += "\n"
+		for _, f := range traceError.StackTrace() {
+			msg += fmt.Sprintf("%+s:%d\n", f, f)
+		}
+	}
+	return msg
+}
+
+// WithStack will decorate an error with a stack trace
+func WithStack(err error) error {
+	return errors.WithStack(err)
+}
+
+// Wrap will decorate an error with a stack trace and message
+func Wrap(err error, msg string) error {
+	return errors.Wrap(err, msg)
+}
+
 // ConflictError represents a conflict in a data, kv or object store
 type ConflictError struct {
 	msg string
@@ -172,5 +203,35 @@ func (err *CancelledError) Error() string {
 func NewCancelledError() *CancelledError {
 	return &CancelledError{
 	}
+}
+
+// EvictedError represents an error condition where an object is unexpectedly not found
+type EvictedError struct {
+	msg string
+}
+
+// NewEvictedError is the constructor for EvictedError
+func NewEvictedError(msg string) *EvictedError {
+	return &EvictedError{msg}
+}
+
+// Error returns the string representation of the EvictedError
+func (e *EvictedError) Error() string {
+	return e.msg
+}
+
+// InconsistentStateError represents an error condition where an object is unexpectedly not found
+type InconsistentStateError struct {
+	msg string
+}
+
+// NewInconsistentStateError is the constructor for InconsistentStateError
+func NewInconsistentStateError(msg string) *InconsistentStateError {
+	return &InconsistentStateError{msg}
+}
+
+// Error returns the string representation of the InconsistentStateError
+func (e *InconsistentStateError) Error() string {
+	return e.msg
 }
 

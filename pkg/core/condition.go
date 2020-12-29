@@ -318,6 +318,21 @@ func NewTrueExpression() *TrueExpression {
 	return &TrueExpression{}
 }
 
+type FalseExpression struct {
+}
+
+func (expr *FalseExpression) String() string {
+	return "false"
+}
+
+func (expr *FalseExpression) OperatorType() OperatorType {
+	return UnaryType
+}
+
+func NewFalseExpression() *FalseExpression {
+	return &FalseExpression{}
+}
+
 // ToDo(KMG): Create builder
 
 type Expression interface {
@@ -344,6 +359,10 @@ func NewCondition(expr Expression) (*Condition, error) {
 
 var TrueCondition = &Condition {
 	NewTrueExpression(),
+}
+
+var FalseCondition = &Condition {
+	NewFalseExpression(),
 }
 
 func (c *Condition) Evaluate(in map[string]interface{}) (bool, error) {

@@ -26,7 +26,7 @@ func (a Annotation) ShouldAnnotate(in map[string]interface{}) (bool, error) {
 	return a.condition.Evaluate(in)
 }
 
-// Annotate will annotate the provided map with the underlying annotation
+// Annotator will annotate the provided map with the underlying annotation
 func (a Annotation) Annotate(in map[string]interface{}) error {
 	if _, ok := in[a.fieldKey]; ok {
 		return fmt.Errorf("field exists: cannot annotate with field '%s'", a.fieldKey)
@@ -35,13 +35,13 @@ func (a Annotation) Annotate(in map[string]interface{}) error {
 	return nil
 }
 
-// Annotate is a pipeline processor that will conditionally apply underlying annotations to a provided map
-type Annotate struct {
+// Annotator is a pipeline processor that will conditionally apply underlying annotations to a provided map
+type Annotator struct {
 	annotations []*Annotation
 }
 
 // Process will conditionally apply underlying annotations to a copy of a provided map
-func (a Annotate) Process(in map[string]interface{}) (map[string]interface{}, error) {
+func (a Annotator) Process(in map[string]interface{}) (map[string]interface{}, error) {
 	out := CopyableMap(in).DeepCopy()
 	for _, annotation := range a.annotations {
 		should, err := annotation.ShouldAnnotate(Flatten(out))
@@ -59,25 +59,25 @@ func (a Annotate) Process(in map[string]interface{}) (map[string]interface{}, er
 	return out, nil
 }
 
-// AnnotateBuilder is a builder for an Annotate pipeline processor
-type AnnotateBuilder struct {
-	annotate *Annotate
+// AnnotatorBuilder is a builder for an Annotator pipeline processor
+type AnnotatorBuilder struct {
+	annotate *Annotator
 }
 
-// NewAnnotateBuilder creates a new AnnotateBuilder
-func NewAnnotateBuilder() *AnnotateBuilder {
-	return &AnnotateBuilder{
-		annotate: &Annotate{},
+// NewAnnotateBuilder creates a new AnnotatorBuilder
+func NewAnnotateBuilder() *AnnotatorBuilder {
+	return &AnnotatorBuilder{
+		annotate: &Annotator{},
 	}
 }
 
-// Add will add a new Annotation to the underlying AnnotateBuilder
-func (builder *AnnotateBuilder) Add(annotation *Annotation) *AnnotateBuilder {
+// Add will add a new Annotation to the underlying AnnotatorBuilder
+func (builder *AnnotatorBuilder) Add(annotation *Annotation) *AnnotatorBuilder {
 	builder.annotate.annotations = append(builder.annotate.annotations, annotation)
 	return builder
 }
 
-// Build will build a new Annotate object from the underlying builder
-func (builder *AnnotateBuilder) Build() *Annotate {
+// Build will build a new Annotator object from the underlying builder
+func (builder *AnnotatorBuilder) Build() *Annotator {
 	return builder.annotate
 }

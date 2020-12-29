@@ -1,12 +1,13 @@
-package common
+package common_test
 
 import (
+	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCompletableSuccess(t *testing.T) {
-	completable := NewCompletable()
+	completable := common.NewCompletable()
 
 	err := completable.Success(int(1337))
 	assert.Nil(t, err)
@@ -17,9 +18,9 @@ func TestCompletableSuccess(t *testing.T) {
 }
 
 func TestCompletableFail(t *testing.T) {
-	completable := NewCompletable()
+	completable := common.NewCompletable()
 
-	err := completable.Fail(NewInvalidError("Fail"))
+	err := completable.Fail(common.NewInvalidError("Fail"))
 	assert.Nil(t, err)
 
 	_, err = completable.Future().Get()
@@ -27,7 +28,7 @@ func TestCompletableFail(t *testing.T) {
 }
 
 func TestCompletableCancel(t *testing.T) {
-	completable := NewCompletable()
+	completable := common.NewCompletable()
 
 	err := completable.Cancel()
 	assert.Nil(t, err)

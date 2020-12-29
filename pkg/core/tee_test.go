@@ -19,7 +19,7 @@ func TestKVTee(t *testing.T) {
 	var storedMap map[string]interface{}
 	jsonMap := testJson()
 	kvStore := kvs.NewMemKVStore()
-	kvTee := core.NewKVTee(kvStore)
+	kvTee := core.NewKVTee(kvStore, core.TrueCondition)
 
 	out, err := kvTee.Process(jsonMap)
 	assert.Nil(t, err)
@@ -38,12 +38,23 @@ func TestKVTeeError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	jsonMap := testJson()
 	kvStore := test.NewMockKVStore(ctrl)
-	kvTee := core.NewKVTee(kvStore)
+	kvTee := core.NewKVTee(kvStore, core.TrueCondition)
 
 	kvStore.EXPECT().Put(context.Background(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("error"))
 	out, err := kvTee.Process(jsonMap)
 	assert.Nil(t, out)
 	assert.Error(t, err)
+}
+
+func TestKVTeeFalseCondition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	jsonMap := testJson()
+	kvStore := test.NewMockKVStore(ctrl)
+	kvTee := core.NewKVTee(kvStore, core.FalseCondition)
+
+	out, err := kvTee.Process(jsonMap)
+	assert.Equal(t, jsonMap, out)
+	assert.Nil(t, err)
 }
 
 func TestPublisherTee(t *testing.T) {
@@ -78,7 +89,7 @@ func TestPublisherTee(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	publisherTee := core.NewPubSubTee(publisher)
+	publisherTee := core.NewPubSubTee(publisher, core.TrueCondition)
 
 	_, err = publisherTee.Process(jsonMap)
 	assert.Nil(t, err)
@@ -92,10 +103,21 @@ func TestPublisherTeeError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	jsonMap := testJson()
 	publisher := test.NewMockPublisher(ctrl)
-	publisherTee := core.NewPubSubTee(publisher)
+	publisherTee := core.NewPubSubTee(publisher, core.TrueCondition)
 
 	publisher.EXPECT().Publish(context.Background(), gomock.Any()).Return(fmt.Errorf("error"))
 	out, err := publisherTee.Process(jsonMap)
 	assert.Nil(t, out)
 	assert.Error(t, err)
+}
+
+func TestPublisherTeeFalseCondition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	jsonMap := testJson()
+	publisher := test.NewMockPublisher(ctrl)
+	publisherTee := core.NewPubSubTee(publisher, core.FalseCondition)
+
+	out, err := publisherTee.Process(jsonMap)
+	assert.Equal(t, jsonMap, out)
+	assert.Nil(t, err)
 }

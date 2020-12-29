@@ -1,6 +1,7 @@
 package kvs
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/common"
@@ -22,13 +23,45 @@ func NewMemKVStore() *MemKVStore {
 	}
 }
 
+// AtomicPut will atomically map a value to a key in the in-memory map
+func (kvStore *MemKVStore) AtomicPut(ctx context.Context, key string, prev, value []byte) error {
+	kvStore.lock.Lock()
+	defer kvStore.lock.Unlock()
+
+	currBytes, _ := kvStore.values[key]
+
+	if prev == nil && currBytes == nil || (prev != nil && bytes.Compare(currBytes, prev) == 0){
+		kvStore.values[key] = value
+	} else {
+		msg := fmt.Sprintf("state has changed for '%s', cannot apply atomic update", key)
+		return common.NewConflictError(msg)
+	}
+
+	return nil
+}
+
+// AtomicDelete will atomically deletevalue to a key in the in-memory map
+func (kvStore *MemKVStore) AtomicDelete(ctx context.Context, key string, prev []byte) error {
+	kvStore.lock.Lock()
+	defer kvStore.lock.Unlock()
+
+	currBytes, _ := kvStore.values[key]
+
+	if prev != nil && bytes.Compare(currBytes, prev) == 0 {
+		delete(kvStore.values, key)
+		return nil
+	} else if prev == nil && currBytes == nil {
+		return nil
+	} else {
+		msg := fmt.Sprintf("state has changed for '%s', cannot apply atomic update", key)
+		return common.NewConflictError(msg)
+	}
+}
+
 // Put will map a value to a key in the in-memory map
 func (kvStore *MemKVStore) Put(ctx context.Context, key string, value []byte) error {
 	kvStore.lock.Lock()
 	defer kvStore.lock.Unlock()
-	if _, ok := kvStore.values[key]; ok {
-		return common.NewConflictError(fmt.Sprintf("MemKVStore - key exists: %s", key))
-	}
 	kvStore.values[key] = value
 	return nil
 }

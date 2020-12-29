@@ -204,7 +204,7 @@ func (t *Transformer) AddSpec(tgtField string, transformation *Transformation) {
 	t.spec[tgtField] = transformation
 }
 
-func (t *Transformer) dictFromPath(key string, in map[string]interface{}) (map[string]interface{}, error) {
+func (t Transformer) dictFromPath(key string, in map[string]interface{}) (map[string]interface{}, error) {
 	fieldNames := strings.Split(key, t.fieldSeparator)
 	var curr map[string]interface{} = in
 	for i, fieldName := range fieldNames {
@@ -215,7 +215,7 @@ func (t *Transformer) dictFromPath(key string, in map[string]interface{}) (map[s
 	return curr, nil
 }
 
-func (t *Transformer) valueFromPath(key string, in map[string]interface{}) (interface{}, error) {
+func (t Transformer) valueFromPath(key string, in map[string]interface{}) (interface{}, error) {
 	fieldNames := strings.Split(key, t.fieldSeparator)
 	var curr map[string]interface{} = in
 	for i, fieldName := range fieldNames {
@@ -226,7 +226,7 @@ func (t *Transformer) valueFromPath(key string, in map[string]interface{}) (inte
 	return curr[fieldNames[len(fieldNames)-1]], nil
 }
 
-func (t *Transformer) createPathAndTransform(tgtKey string, transformation *Transformation, in,
+func (t Transformer) createPathAndTransform(tgtKey string, transformation *Transformation, in,
 	out map[string]interface{}) error {
 
 	sourceDict, err := t.dictFromPath(transformation.sourceField, in)
@@ -262,7 +262,7 @@ func (t *Transformer) createPathAndTransform(tgtKey string, transformation *Tran
 	return nil
 }
 
-func (t *Transformer) Process(in map[string]interface{}) (map[string]interface{}, error) {
+func (t Transformer) Process(in map[string]interface{}) (map[string]interface{}, error) {
 	out := make(map[string]interface{})
 
 	for tgt, transformation := range t.spec {

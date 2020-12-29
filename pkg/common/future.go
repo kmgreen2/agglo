@@ -111,6 +111,30 @@ func CreateDeferredFuture(duration time.Duration, runnable Runnable) Future {
 	return completable.Future()
 }
 
+func CreateRetryableFuture(numRetries int, initialDelay time.Duration, runnable Runnable) Future {
+	completable := NewCompletable()
+
+	go func() {
+		var err error
+		var result interface{}
+		defer completable.Close()
+		delay := initialDelay
+		for i := 0; i < numRetries; i++ {
+			result, err = runnable.Run()
+			if err != nil {
+				time.Sleep(delay)
+				delay <<= 1
+				continue
+			} else {
+				_ = completable.Success(result)
+				return
+			}
+		}
+		_ = completable.Fail(err)
+	}()
+	return completable.Future()
+}
+
 func (f *future) Get() (interface{}, error) {
 	return f.getWithContext(context.Background())
 }
