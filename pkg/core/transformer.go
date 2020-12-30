@@ -6,13 +6,6 @@ import (
 	"strings"
 )
 
-type Convertable interface {
-	Map() map[string]interface{}
-	Json() string
-	Yaml() string
-	Bytes() []byte
-}
-
 type Transformable struct {
 	value interface{}
 }

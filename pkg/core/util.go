@@ -180,6 +180,19 @@ func NumericEqual(lhs, rhs interface{}) bool {
 	return true
 }
 
+func MapInterfaceToInt(in map[string]interface{}) (map[string]int, error) {
+	newMap := make(map[string]int)
+	for k, v := range in {
+		if numericV, err := GetNumeric(v); err == nil {
+			newMap[k] = int(numericV)
+		} else {
+			msg := fmt.Sprintf("cannot map value of type %v to int", reflect.TypeOf(v))
+			return nil, common.NewInvalidError(msg)
+		}
+	}
+	return newMap, nil
+}
+
 type CopyableMap map[string]interface{}
 type CopyableSlice []interface{}
 

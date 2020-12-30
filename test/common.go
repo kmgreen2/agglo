@@ -332,6 +332,18 @@ func GetVal() interface{} {
 	}
 }
 
+func GetRandomString(maxLen int) string {
+	letters := "abcdefghijklmnopqrstuvwxyz"
+	strLen := (gorand.Int() % maxLen) + 1
+	s := ""
+
+	for i := 0; i < strLen; i++ {
+		idx := gorand.Int() % len(letters)
+		s += string(letters[idx])
+	}
+	return s
+}
+
 func GenRandomMap(maxLevels, maxKeys int) (map[string]interface{}, []string) {
 	var flattenedKeys []string
 	out := make(map[string]interface{})
@@ -359,7 +371,7 @@ func GenRandomMap(maxLevels, maxKeys int) (map[string]interface{}, []string) {
 	return out, flattenedKeys
 }
 
-func GenRandomMapWithAddedKeys(paths [][]string) (map[string]interface{}, []float64) {
+func GenRandomMapWithAddedKeysWithFloats(paths [][]string) (map[string]interface{}, []float64) {
 	var values []float64
 	m, _ := GenRandomMap(3, 24)
 
@@ -378,14 +390,49 @@ func GenRandomMapWithAddedKeys(paths [][]string) (map[string]interface{}, []floa
 	return m, values
 }
 
-func GetAggMaps(numMaps int, paths [][]string, partitionID gUuid.UUID, name string) ([]map[string]interface{},
+func GenRandomMapWithAddedKeysWithStrings(paths [][]string, maxStrLen int) (map[string]interface{}, []string) {
+	var values []string
+	m, _ := GenRandomMap(3, 24)
+
+	for _, path := range paths {
+		curr := m
+		for i, key := range path {
+			if i == len(path) - 1 {
+				curr[key] = GetRandomString(maxStrLen)
+				values = append(values, curr[key].(string))
+			} else {
+				curr[key] = make(map[string]interface{})
+				curr = curr[key].(map[string]interface{})
+			}
+		}
+	}
+	return m, values
+}
+
+func GetAggMapsWithFloats(numMaps int, paths [][]string, partitionID gUuid.UUID, name string) ([]map[string]interface{},
 	[][]float64) {
 
 	var mapValues [][]float64
 	var maps []map[string]interface{}
 
 	for i := 0; i < numMaps; i++ {
-		m, values := GenRandomMapWithAddedKeys(paths)
+		m, values := GenRandomMapWithAddedKeysWithFloats(paths)
+		m["agglo:internal:partitionID"] = partitionID.String()
+		m["agglo:internal:name"] = name
+		mapValues = append(mapValues, values)
+		maps = append(maps, m)
+	}
+	return maps, mapValues
+}
+
+func GetAggMapsWithStrings(numMaps int, paths [][]string, partitionID gUuid.UUID,
+	name string, maxStrLen int) ([]map[string]interface{}, [][]string) {
+
+	var mapValues [][]string
+	var maps []map[string]interface{}
+
+	for i := 0; i < numMaps; i++ {
+		m, values := GenRandomMapWithAddedKeysWithStrings(paths, maxStrLen)
 		m["agglo:internal:partitionID"] = partitionID.String()
 		m["agglo:internal:name"] = name
 		mapValues = append(mapValues, values)

@@ -280,11 +280,19 @@ func (s *aggregationDiscreteHistogramState) ToMap() map[string]interface{} {
 }
 
 func AggregationDiscreteHistogramStateFromMap(in map[string]interface{}) (*aggregationDiscreteHistogramState, error) {
-	if value, ok := in["value"]; ok {
-		if mapValue, floatOk := value.(map[string]int); floatOk {
-			return &aggregationDiscreteHistogramState{mapValue}, nil
+	if value, ok := in["buckets"]; ok {
+		// When this is first created it will be a map[string]int
+		if mapIntValue, mapIntOk := value.(map[string]int); mapIntOk {
+			return &aggregationDiscreteHistogramState{mapIntValue}, nil
+		} else if mapValue, mapOk := value.(map[string]interface{}); mapOk {
+			// When this is deserialized via JSON, it will be a map[string]interface{}
+			intMap, err := MapInterfaceToInt(mapValue)
+			if err != nil {
+				return nil, err
+			}
+			return &aggregationDiscreteHistogramState{intMap}, nil
 		} else {
-			msg := fmt.Sprintf("invalid type for aggregation count in map: %v", reflect.TypeOf(value))
+			msg := fmt.Sprintf("invalid type for aggregation histogram in map: %v", reflect.TypeOf(value))
 			return nil, common.NewInvalidError(msg)
 		}
 	}
@@ -442,7 +450,7 @@ func (s *AggregationState) Create(path []string, aggType AggregationType) error 
 	case AggMin:
 		value = &aggregationMinState{math.MaxFloat64}
 	case AggDiscreteHistogram:
-		value = &aggregationDiscreteHistogramState{}
+		value = &aggregationDiscreteHistogramState{make(map[string]int)}
 	default:
 		return common.NewInternalError(fmt.Sprintf("invalid aggregation type: %v", aggType))
 	}

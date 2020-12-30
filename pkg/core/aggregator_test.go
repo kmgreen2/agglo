@@ -77,7 +77,7 @@ func TestBasicCount(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	maps, _ := test.GetAggMaps(numMaps, paths, partitionID, name)
+	maps, _ := test.GetAggMapsWithFloats(numMaps, paths, partitionID, name)
 	evalFunc := func(val interface{}, index int) error {
 		switch v := val.(type) {
 		case int64:
@@ -116,7 +116,7 @@ func TestBasicSum(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	maps, mapValues := test.GetAggMaps(numMaps, paths, partitionID, name)
+	maps, mapValues := test.GetAggMapsWithFloats(numMaps, paths, partitionID, name)
 	evalFunc := func(val interface{}, index int) error {
 		sum := float64(0)
 		for i := 0; i <= index; i++ {
@@ -165,7 +165,7 @@ func TestBasicMax(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	maps, mapValues := test.GetAggMaps(numMaps, paths, partitionID, name)
+	maps, mapValues := test.GetAggMapsWithFloats(numMaps, paths, partitionID, name)
 	evalFunc := func(val interface{}, index int) error {
 		switch v := val.(type) {
 		case float64:
@@ -212,7 +212,7 @@ func TestBasicMin(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	maps, mapValues := test.GetAggMaps(numMaps, paths, partitionID, name)
+	maps, mapValues := test.GetAggMapsWithFloats(numMaps, paths, partitionID, name)
 	evalFunc := func(val interface{}, index int) error {
 		switch v := val.(type) {
 		case float64:
@@ -259,7 +259,7 @@ func TestBasicAvg(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	maps, mapValues := test.GetAggMaps(numMaps, paths, partitionID, name)
+	maps, mapValues := test.GetAggMapsWithFloats(numMaps, paths, partitionID, name)
 
 	evalFunc := func(val interface{}, index int) error {
 		sum := float64(0)
@@ -295,4 +295,50 @@ func TestBasicAvg(t *testing.T) {
 
 
 	assert.Equal(t, sum / float64(len(mapValues)), avgState.Sum / avgState.Num)
+}
+
+func TestBasicDiscreteHistogram(t *testing.T) {
+	numMaps := 16
+	var paths [][]string = [][]string{
+		{"foo", "bar", "baz"},
+	}
+
+	name := "foo"
+
+	partitionID, err := gUuid.NewUUID()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	maps, mapValues := test.GetAggMapsWithStrings(numMaps, paths, partitionID, name, 2)
+
+	buckets := make(map[string]int)
+	evalFunc := func(val interface{}, index int) error {
+		buckets[mapValues[index][0]]++
+		switch v := val.(type) {
+		case map[string]int:
+			if len(buckets) == len(v) {
+				for k, _ := range buckets {
+					if buckets[k] != v[k] {
+						return fmt.Errorf("%v != %v", v, buckets)
+					}
+				}
+			}
+			return nil
+		default:
+			return fmt.Errorf("invalid type for val: %v", reflect.TypeOf(v))
+		}
+	}
+
+
+	val, err := doBasicAggregation(maps, core.AggDiscreteHistogram, name, partitionID, strings.Join(paths[0], "."), evalFunc)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	histogramState, err := core.AggregationDiscreteHistogramStateFromMap(val.(map[string]interface{}))
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	assert.Equal(t, buckets, histogramState.Buckets)
 }
