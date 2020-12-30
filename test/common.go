@@ -314,8 +314,25 @@ func GetProofStream(startNumTicks, tickStride, messageStride, numEntanglements i
 	return tickerStore, kvStreamStore, nil
 }
 
-func GenRandomMap(maxLevels, maxKeys int) (map[string]interface{}, []string) {
+func GetVal() interface{} {
 	letters := "abcdefghijklmnopqrstuvwxyz"
+	switch gorand.Int() % 4 {
+	case 0:
+		return string(letters[gorand.Int()%len(letters)])
+	case 1:
+		return gorand.Int()
+	case 2:
+		if gorand.Int()%2 == 0 {
+			return true
+		} else {
+			return false
+		}
+	default:
+		return gorand.Float64()
+	}
+}
+
+func GenRandomMap(maxLevels, maxKeys int) (map[string]interface{}, []string) {
 	var flattenedKeys []string
 	out := make(map[string]interface{})
 	numKeys := (gorand.Int() % maxKeys) + 1
@@ -328,7 +345,7 @@ func GenRandomMap(maxLevels, maxKeys int) (map[string]interface{}, []string) {
 			key := gUuid.New().String()
 			if j == numLevels - 1 {
 				flattenedKey += key
-				curr[key] = string(letters[gorand.Int() % len(letters)])
+				curr[key] = GetVal()
 			} else {
 				flattenedKey += key + "."
 				if _, ok := curr[key]; !ok {
@@ -342,8 +359,43 @@ func GenRandomMap(maxLevels, maxKeys int) (map[string]interface{}, []string) {
 	return out, flattenedKeys
 }
 
+func GenRandomMapWithAddedKeys(paths [][]string) (map[string]interface{}, []float64) {
+	var values []float64
+	m, _ := GenRandomMap(3, 24)
+
+	for _, path := range paths {
+		curr := m
+		for i, key := range path {
+			if i == len(path) - 1 {
+				curr[key] = float64(gorand.Uint32())
+				values = append(values, curr[key].(float64))
+			} else {
+				curr[key] = make(map[string]interface{})
+				curr = curr[key].(map[string]interface{})
+			}
+		}
+	}
+	return m, values
+}
+
+func GetAggMaps(numMaps int, paths [][]string, partitionID gUuid.UUID, name string) ([]map[string]interface{},
+	[][]float64) {
+
+	var mapValues [][]float64
+	var maps []map[string]interface{}
+
+	for i := 0; i < numMaps; i++ {
+		m, values := GenRandomMapWithAddedKeys(paths)
+		m["agglo:internal:partitionID"] = partitionID.String()
+		m["agglo:internal:name"] = name
+		mapValues = append(mapValues, values)
+		maps = append(maps, m)
+	}
+	return maps, mapValues
+}
+
 func GetJoinedMaps(numMaps, numJoined int, partitionID gUuid.UUID, name string) ([]map[string]interface{}, []string) {
-	joinedVal := "foobar"
+	joinedVal := GetVal()
 	var maps []map[string]interface{}
 	var joinedKeys []string
 	currJoined := 0
@@ -363,9 +415,9 @@ func GetJoinedMaps(numMaps, numJoined int, partitionID gUuid.UUID, name string) 
 				}
 			}
 			joinedKeys = append(joinedKeys, flattenedKeys[0])
-			maps = append(maps, m)
 			currJoined++
 		}
+		maps = append(maps, m)
 	}
 
 	return maps, joinedKeys

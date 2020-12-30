@@ -268,7 +268,7 @@ func (t Transformer) Process(in map[string]interface{}) (map[string]interface{},
 	for tgt, transformation := range t.spec {
 		err := t.createPathAndTransform(tgt, transformation, in, out)
 		if err != nil {
-			return nil, err
+			return in, err
 		}
 	}
 	return out, nil

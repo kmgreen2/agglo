@@ -46,12 +46,12 @@ func (a Annotator) Process(in map[string]interface{}) (map[string]interface{}, e
 	for _, annotation := range a.annotations {
 		should, err := annotation.ShouldAnnotate(Flatten(out))
 		if err != nil {
-			return nil, err
+			return in, err
 		}
 		if should {
 			err = annotation.Annotate(out)
 			if err != nil {
-				return nil, err
+				return in, err
 			}
 		}
 	}

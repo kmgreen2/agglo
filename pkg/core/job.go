@@ -6,7 +6,7 @@ import (
 )
 
 type Job interface {
-	Run(delay time.Duration, sync bool) error
+	Run(delay time.Duration, sync bool) common.Future
 }
 
 type LocalJob struct {

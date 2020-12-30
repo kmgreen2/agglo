@@ -2,6 +2,8 @@ package core
 
 import (
 	"fmt"
+	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/pkg/errors"
 	"math"
 	"reflect"
 	"strings"
@@ -93,6 +95,68 @@ func Flatten(in map[string]interface{}) map[string]interface{} {
 
 	flatten(in, out, "")
 	return out
+}
+
+func updateMap(in interface{}, path []string, value interface{}) error {
+	switch inVal := in.(type) {
+	case map[string]interface{}:
+		if len(path) == 1 {
+			inVal[path[0]] = value
+			return nil
+		} else if len(path) > 1 {
+			if v, ok := inVal[path[0]]; ok {
+				return updateMap(v, path[1:], value)
+			} else {
+				return &common.NotFoundError{}
+			}
+		}
+	}
+	return &common.InvalidError{}
+}
+
+func UpdateMap(in map[string]interface{}, path []string, value interface{}) error {
+	err := updateMap(in, path, value)
+
+	if err != nil && errors.Is(err, &common.NotFoundError{}) {
+		msg := fmt.Sprintf("path '%v' not found in map", path)
+		return common.NewNotFoundError(msg)
+	} else if err != nil {
+		msg := fmt.Sprintf("intermediate value in path '%v' resolves to non-map value in map", path)
+		return common.NewInvalidError(msg)
+	}
+	return nil
+}
+
+func getMap(in interface{}, path []string) (interface{}, error) {
+	switch inVal := in.(type) {
+	case map[string]interface{}:
+		if len(path) == 1 {
+			if v, ok := inVal[path[0]]; ok {
+				return v, nil
+			}
+			return nil, &common.NotFoundError{}
+		} else if len(path) > 1 {
+			if v, ok := inVal[path[0]]; ok {
+				return getMap(v, path[1:])
+			} else {
+				return nil, &common.NotFoundError{}
+			}
+		}
+	}
+	return nil, &common.InvalidError{}
+}
+
+func GetMap(in map[string]interface{}, path []string) (interface{}, error) {
+	val, err := getMap(in, path)
+
+	if err != nil && errors.Is(err, &common.NotFoundError{}) {
+		msg := fmt.Sprintf("path '%v' not found in map", path)
+		return nil, common.NewNotFoundError(msg)
+	} else if err != nil {
+		msg := fmt.Sprintf("intermediate value in path '%v' resolves to non-map value in map", path)
+		return nil, common.NewInvalidError(msg)
+	}
+	return val, nil
 }
 
 func NumericEqual(lhs, rhs interface{}) bool {

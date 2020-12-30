@@ -21,7 +21,6 @@ type Completion struct {
 	PartitionID gUuid.UUID  `json:"partitionID"`
 	JoinKeys []string		`json:"joinKeys"`
 	Timeout time.Duration	`json:"timeout"`
-	NotifyIfPartial bool	`json:"notifyIfPartial"`
 }
 
 func (c Completion) Bytes() ([]byte, error) {
@@ -45,15 +44,12 @@ func NewCompletionFromBytes(completionBytes []byte) (*Completion, error) {
 	return completion, nil
 }
 
-func NewCompletion(name string, partitionID gUuid.UUID, joinKeys []string, timeout time.Duration,
-	notifyIfPartial bool) *Completion {
-
+func NewCompletion(name string, partitionID gUuid.UUID, joinKeys []string, timeout time.Duration) *Completion {
 	return &Completion{
 		Name: name,
 		PartitionID: partitionID,
 		JoinKeys: joinKeys,
 		Timeout: timeout,
-		NotifyIfPartial: notifyIfPartial,
 	}
 }
 
@@ -129,11 +125,11 @@ func completionStateKey(partitionID gUuid.UUID, name string, value interface{}) 
 	if boolValue, ok := value.(bool); ok {
 		return fmt.Sprintf(completionStateKeyFormat + "%v", partitionID.String(), name, boolValue), nil
 	}
-	if numericValue, err := GetNumeric(value); err != nil {
-		return fmt.Sprintf(completionStateKeyFormat + "%f", partitionID.String(), name, numericValue), nil
-	}
-	if intValue, err := GetInteger(value); err != nil {
+	if intValue, err := GetInteger(value); err == nil {
 		return fmt.Sprintf(completionStateKeyFormat + "%d", partitionID.String(), name, intValue), nil
+	}
+	if numericValue, err := GetNumeric(value); err == nil {
+		return fmt.Sprintf(completionStateKeyFormat + "%f", partitionID.String(), name, numericValue), nil
 	}
 
 	msg := fmt.Sprintf("completionStateKey must be a string, float, int or bool.  found: %v",
@@ -176,11 +172,11 @@ func (c Completer) Process(in map[string]interface{}) (map[string]interface{}, e
 
 	partitionID, err := GetPartitionID(in)
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 	name, err := GetName(in)
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 
 	matchedKey, matchedVal, err := c.completion.Match(in)
@@ -188,25 +184,25 @@ func (c Completer) Process(in map[string]interface{}) (map[string]interface{}, e
 		if errors.Is(err, &common.NotFoundError{}) {
 			return out, nil
 		}
-		return nil, err
+		return out, err
 	}
 
 	completionStateBytes, err := c.getCompletionState(partitionID, name, matchedVal)
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 
 	if completionStateBytes != nil {
 		completionState, err = NewCompletionStateFromBytes(completionStateBytes)
 		if err != nil {
-			return nil, err
+			return out, err
 		}
 	}
 
 	if completionState == nil {
 		var completionDeadline int64 = -1
 		if c.completion.Timeout > 0 {
-			completionDeadline = time.Now().Add(c.completion.Timeout).Unix()
+			completionDeadline = time.Now().Add(c.completion.Timeout).UnixNano()
 		}
 		resolved := make(map[string]bool)
 		for _, key := range c.completion.JoinKeys {
@@ -219,26 +215,26 @@ func (c Completer) Process(in map[string]interface{}) (map[string]interface{}, e
 
 	stateKey, err := completionStateKey(partitionID, name, matchedVal)
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 
 	newCompletionBytes, err := completionState.Bytes()
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 
 	if completionState.IsDone() {
 		err = c.completionStateStore.AtomicDelete(context.Background(), stateKey, completionStateBytes)
 		if err != nil {
-			return nil, err
+			return out, err
 		}
 		out[fmt.Sprintf("agglo:completion:%s", name)] = "complete"
-	} else if completionState.CompletionDeadline > 0 && time.Now().Unix() > completionState.CompletionDeadline {
+	} else if completionState.CompletionDeadline > 0 && time.Now().UnixNano() > completionState.CompletionDeadline {
 			out[fmt.Sprintf("agglo:completion:%s", name)] = "timedout"
 	} else {
 		err = c.completionStateStore.AtomicPut(context.Background(), stateKey, completionStateBytes, newCompletionBytes)
 		if err != nil {
-			return nil, err
+			return out, err
 		}
 		out[fmt.Sprintf("agglo:completion:%s", name)] = "triggered"
 	}

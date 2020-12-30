@@ -131,3 +131,38 @@ func TestDeepCopy(t *testing.T) {
 	assert.False(t, core.CopyableMap(jsonMap).DeepCompare(jsonMapCopy))
 }
 
+func TestUpdateMap(t *testing.T) {
+	jsonMap := testJson()
+
+	err := core.UpdateMap(jsonMap, []string{"b", "c"}, "hi")
+	assert.Nil(t, err)
+	assert.Equal(t, "hi", jsonMap["b"].(map[string]interface{})["c"])
+
+	err = core.UpdateMap(jsonMap, []string{"b", "d"}, []int{1,2})
+	assert.Nil(t, err)
+	assert.Equal(t, []int{1,2}, jsonMap["b"].(map[string]interface{})["d"])
+
+	err = core.UpdateMap(jsonMap, []string{"b", "e", "f"}, []int{1,2})
+	assert.Error(t, err)
+
+	err = core.UpdateMap(jsonMap, []string{"i", "0", "j"}, []int{1,2})
+	assert.Error(t, err)
+}
+
+func TestGetMap(t *testing.T) {
+	jsonMap := testJson()
+
+	val, err := core.GetMap(jsonMap, []string{"b", "c"})
+	assert.Nil(t, err)
+	assert.Equal(t, "hello", val)
+
+	val, err = core.GetMap(jsonMap, []string{"b", "d"})
+	assert.Nil(t, err)
+	assert.Equal(t, []interface{}{float64(3),float64(4),float64(5)}, val)
+
+	_, err = core.GetMap(jsonMap, []string{"b", "e", "f"})
+	assert.Error(t, err)
+
+	_, err = core.GetMap(jsonMap, []string{"i", "0", "j"})
+	assert.Error(t, err)
+}

@@ -29,7 +29,7 @@ func TestLocalJobSync(t *testing.T) {
 	f := job.Run(-1, true)
 	end := time.Now()
 
-	assert.True(t, end.Sub(start) > 1)
+	assert.True(t, end.Sub(start) > 1 * time.Second)
 
 	result, err := f.Get()
 	assert.Nil(t, err)
@@ -56,7 +56,7 @@ func TestLocalJobDeferred(t *testing.T) {
 	f := job.Run(1*time.Second, true)
 	end := time.Now()
 
-	assert.True(t, end.Sub(start) > 2)
+	assert.True(t, end.Sub(start) > 2 * time.Second)
 
 	result, err := f.Get()
 	assert.Nil(t, err)
