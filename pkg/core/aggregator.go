@@ -9,6 +9,7 @@ import (
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/kvs"
+	"math"
 	"reflect"
 	"strings"
 )
@@ -201,7 +202,7 @@ func AggregationAvgStateFromMap(in map[string]interface{}) (*aggregationAvgState
 	}
 	if value, ok := in["num"]; ok {
 		if floatValue, floatOk := value.(float64); floatOk {
-			sum = floatValue
+			num = floatValue
 		} else {
 			msg := fmt.Sprintf("invalid type for aggregation avg ('sum') in map: %v", reflect.TypeOf(value))
 			return nil, common.NewInvalidError(msg)
@@ -322,14 +323,14 @@ type Aggregation struct {
 	// This can be added by having an annotation process prior to the aggregation
 	Name string								`json:"name"`
 	PartitionID gUuid.UUID  				`json:"partitionID"`
-	FieldAggregations []*FieldAggregation 	`json:"fieldAggregations"`
+	FieldAggregation *FieldAggregation 		`json:"fieldAggregation"`
 }
 
-func NewAggregation(partitionID gUuid.UUID, name string, fieldAggregations []*FieldAggregation) *Aggregation {
+func NewAggregation(partitionID gUuid.UUID, name string, fieldAggregation *FieldAggregation) *Aggregation {
 	return &Aggregation{
 		Name: name,
 		PartitionID: partitionID,
-		FieldAggregations: fieldAggregations,
+		FieldAggregation: fieldAggregation,
 	}
 }
 
@@ -340,53 +341,51 @@ func (a Aggregation) Update(in map[string]interface{}, state *AggregationState) 
 	var updatedValues []interface{}
 	flattened := Flatten(in)
 
-	for _, fieldAggregation := range a.FieldAggregations {
-		if val, ok := flattened[fieldAggregation.Key]; ok {
-			var currVal map[string]interface{}
-			groupByPath := fieldAggregation.getGroupByPath(in)
+	if val, ok := flattened[a.FieldAggregation.Key]; ok {
+		var currVal map[string]interface{}
+		groupByPath := a.FieldAggregation.getGroupByPath(in)
+		currVal, err = state.Get(groupByPath)
+		if err != nil && errors.Is(err, &common.NotFoundError{}){
+			err = state.Create(groupByPath, a.FieldAggregation.Type)
+			if err != nil {
+				return nil, nil, err
+			}
 			currVal, err = state.Get(groupByPath)
-			if err != nil && errors.Is(err, &common.NotFoundError{}){
-				err = state.Create(groupByPath, fieldAggregation.Type)
-				if err != nil {
-					return nil, nil, err
-				}
-				currVal, err = state.Get(groupByPath)
-				if err != nil {
-					return nil, nil, err
-				}
-			} else if err != nil {
-				return nil, nil, err
-			}
-			switch fieldAggregation.Type {
-			case AggCount:
-				fieldAggregationState, err = AggregationCountStateFromMap(currVal)
-			case AggSum:
-				fieldAggregationState, err = AggregationSumStateFromMap(currVal)
-			case AggAvg:
-				fieldAggregationState, err = AggregationAvgStateFromMap(currVal)
-			case AggMax:
-				fieldAggregationState, err = AggregationMaxStateFromMap(currVal)
-			case AggMin:
-				fieldAggregationState, err = AggregationMinStateFromMap(currVal)
-			case AggDiscreteHistogram:
-				fieldAggregationState, err = AggregationDiscreteHistogramStateFromMap(currVal)
-			default:
-				err = common.NewInternalError(fmt.Sprintf("invalid aggregation type: %v", fieldAggregation.Type))
-			}
 			if err != nil {
 				return nil, nil, err
 			}
-			err = fieldAggregationState.Update(val)
-			if err != nil {
-				return nil, nil, err
-			}
-			err = state.Update(groupByPath, fieldAggregationState)
-			if err != nil {
-				return nil, nil, err
-			}
-			updatedPaths = append(updatedPaths, strings.Join(groupByPath, "."))
-			updatedValues = append(updatedValues, fieldAggregationState.Get())
+		} else if err != nil {
+			return nil, nil, err
 		}
+		switch a.FieldAggregation.Type {
+		case AggCount:
+			fieldAggregationState, err = AggregationCountStateFromMap(currVal)
+		case AggSum:
+			fieldAggregationState, err = AggregationSumStateFromMap(currVal)
+		case AggAvg:
+			fieldAggregationState, err = AggregationAvgStateFromMap(currVal)
+		case AggMax:
+			fieldAggregationState, err = AggregationMaxStateFromMap(currVal)
+		case AggMin:
+			fieldAggregationState, err = AggregationMinStateFromMap(currVal)
+		case AggDiscreteHistogram:
+			fieldAggregationState, err = AggregationDiscreteHistogramStateFromMap(currVal)
+		default:
+			err = common.NewInternalError(fmt.Sprintf("invalid aggregation type: %v", a.FieldAggregation.Type))
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		err = fieldAggregationState.Update(val)
+		if err != nil {
+			return nil, nil, err
+		}
+		err = state.Update(groupByPath, fieldAggregationState)
+		if err != nil {
+			return nil, nil, err
+		}
+		updatedPaths = append(updatedPaths, strings.Join(groupByPath, "."))
+		updatedValues = append(updatedValues, fieldAggregationState.Get())
 	}
 	return updatedPaths, updatedValues, nil
 }
@@ -441,7 +440,7 @@ func (s *AggregationState) Create(path []string, aggType AggregationType) error 
 	case AggMax:
 		value = &aggregationMaxState{}
 	case AggMin:
-		value = &aggregationMinState{}
+		value = &aggregationMinState{math.MaxFloat64}
 	case AggDiscreteHistogram:
 		value = &aggregationDiscreteHistogramState{}
 	default:
