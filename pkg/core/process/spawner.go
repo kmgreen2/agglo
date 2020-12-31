@@ -1,4 +1,4 @@
-package pipeline
+package process
 
 import (
 	"github.com/kmgreen2/agglo/pkg/core"

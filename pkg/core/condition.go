@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/Knetic/govaluate"
 	"fmt"
+	"strings"
 )
 
 var invalidExpression string = "<INVALID>"
@@ -21,6 +22,7 @@ const (
 	BinaryType
 	LogicalType
 	ComparatorType
+	ExistsType
 )
 
 func getOperatorType(operator interface{}) OperatorType {
@@ -29,9 +31,16 @@ func getOperatorType(operator interface{}) OperatorType {
 	case BinaryOperator: return BinaryType
 	case LogicalOperator: return LogicalType
 	case ComparatorOperator: return ComparatorType
+	case ExistsOperator: return ExistsType
 	}
 	return UnknownType
 }
+
+type ExistsOperator int
+const (
+	NotExists ExistsOperator = iota
+	Exists
+)
 
 type UnaryOperator int
 const (
@@ -72,6 +81,48 @@ const (
 	RegexMatch
 	RegexNotMatch
 )
+
+type ExistsExpression struct {
+	keys []string
+	operators []ExistsOperator
+}
+
+type ExistsExpressionBuilder struct {
+	expression *ExistsExpression
+}
+
+func NewExistsExpressionBuilder() *ExistsExpressionBuilder {
+	return &ExistsExpressionBuilder{
+		&ExistsExpression{},
+	}
+}
+
+func (builder *ExistsExpressionBuilder) Add(key string, operator ExistsOperator) *ExistsExpressionBuilder {
+	builder.expression.keys = append(builder.expression.keys, key)
+	builder.expression.operators = append(builder.expression.operators, operator)
+	return builder
+}
+
+func (builder *ExistsExpressionBuilder) Get() *ExistsExpression {
+	return builder.expression
+}
+
+func (expr *ExistsExpression) String() string {
+	var components []string
+
+	for i, key := range expr.keys {
+		if expr.operators[i] == NotExists {
+			components = append(components, fmt.Sprintf("!%s", key))
+		} else {
+			components = append(components, fmt.Sprintf("%s", key))
+		}
+	}
+	return strings.Join(components, ",")
+}
+
+func (expr *ExistsExpression) OperatorType() OperatorType {
+	return ExistsType
+}
 
 type UnaryExpression struct {
 	rhs interface{}
@@ -353,6 +404,7 @@ func NewCondition(expr Expression) (*Condition, error) {
 	case *ComparatorExpression: return cond, nil
 	case *LogicalExpression: return cond, nil
 	case *TrueExpression: return cond, nil
+	case *ExistsExpression: return cond, nil
 	default: return nil, fmt.Errorf("")
 	}
 }
@@ -366,6 +418,34 @@ var FalseCondition = &Condition {
 }
 
 func (c *Condition) Evaluate(in map[string]interface{}) (bool, error) {
+	// govaluate does not support checking the existence of fields in,
+	// so we had to do it ourselves
+	// Note that Exists operations cannot be used in conjunction with
+	// other types of expressions, so they have to be different processes
+	// in a pipeline
+	if c.expr.OperatorType() == ExistsType {
+		flattened := Flatten(in)
+
+		components := strings.Split(c.expr.String(), ",")
+		for _, component := range components {
+			notExistOp := false
+			if component[0] == '!' {
+				component = component[1:]
+				notExistOp = true
+			}
+			if _, ok := flattened[component]; ok {
+				if notExistOp {
+					return false, nil
+				}
+			} else {
+				if !notExistOp {
+					return false, nil
+				}
+			}
+		}
+		return true, nil
+	}
+
 	expression, err := govaluate.NewEvaluableExpression(c.expr.String())
 	if err != nil {
 		return false, err

@@ -1,11 +1,11 @@
-package pipeline_test
+package process_test
 
 import (
 	"context"
 	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/core"
-	"github.com/kmgreen2/agglo/pkg/core/pipeline"
+	"github.com/kmgreen2/agglo/pkg/core/process"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +25,7 @@ name string, partitionID gUuid.UUID, aggPath string, evalValAt EvaluateValAt) (i
 
 	aggregation := core.NewAggregation(partitionID, name, fieldAggregation)
 
-	aggregator := pipeline.NewAggregator(aggregation, core.TrueCondition, kvStore)
+	aggregator := process.NewAggregator(aggregation, core.TrueCondition, kvStore)
 
 	for i, m := range maps {
 		out, err := aggregator.Process(m)

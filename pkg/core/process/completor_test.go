@@ -1,9 +1,9 @@
-package pipeline_test
+package process_test
 
 import (
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/core"
-	"github.com/kmgreen2/agglo/pkg/core/pipeline"
+	"github.com/kmgreen2/agglo/pkg/core/process"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
@@ -30,7 +30,7 @@ func DoCompleter(numMaps, numJoined int, timeout time.Duration, missingJoinKey s
 
 	kvStore := kvs.NewMemKVStore()
 
-	completer := pipeline.NewCompleter(completion, kvStore)
+	completer := process.NewCompleter(completion, kvStore)
 
 	numTriggered := 0
 	numComplete := 0

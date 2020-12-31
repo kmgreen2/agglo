@@ -1,4 +1,4 @@
-package pipeline
+package process
 
 import (
 	"fmt"
@@ -73,7 +73,7 @@ func (pipeline Pipeline) RunSync(in map[string]interface{}) (map[string]interfac
 	case map[string]interface{}:
 		return rv, nil
 	default:
-		msg := fmt.Sprintf("invalid return type in pipeline (expected map[string]interface{}: %v",
+		msg := fmt.Sprintf("invalid return type in process (expected map[string]interface{}: %v",
 			reflect.TypeOf(rv))
 		return nil, common.NewInvalidError(msg)
 	}

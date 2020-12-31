@@ -97,3 +97,29 @@ func TestComplexEvaluation(t *testing.T) {
 	assert.False(t, result)
 }
 
+func TestExistsEvaluation(t *testing.T) {
+	testMap := map[string]interface{}{
+		"foo": map[string]interface{}{
+			"a": 1,
+			"b": "hi",
+		},
+		"bar": 7,
+		"baz": 1,
+	}
+
+	builder := core.NewExistsExpressionBuilder()
+
+	builder.Add("foo.a", core.Exists)
+	builder.Add("foo.b", core.Exists)
+	builder.Add("baz", core.Exists)
+	builder.Add("buzz", core.NotExists)
+	builder.Add("fuzz.foo.bar", core.NotExists)
+
+	existsExpr := builder.Get()
+
+	cond, err := core.NewCondition(existsExpr)
+	assert.Nil(t, err)
+	result, err := cond.Evaluate(testMap)
+	assert.True(t, result)
+}
+

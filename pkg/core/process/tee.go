@@ -1,18 +1,21 @@
-package pipeline
+package process
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	gUuid "github.com/google/uuid"
+	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/core"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/pkg/streaming"
+	"net/http"
 )
 
 var uuidKey string = "_uuid_key"
 
-// Tee is a pipeline processor that will send a provided mapping to
+// Tee is a process processor that will send a provided mapping to
 // a system (i.e. KVStore, Pubsub, etc.) and return the map
 type Tee struct {
 	outputFunc func(key string, in map[string]interface{}) error
@@ -48,6 +51,40 @@ func NewPubSubTee(publisher streaming.Publisher, condition *core.Condition) *Tee
 			return err
 		}
 		return publisher.Publish(context.Background(), byteBuffer.Bytes())
+	}
+	return &Tee{
+		outputFunc,
+		condition,
+	}
+}
+
+// NewHttpTee will create a tee processor that posts JSON-encoded
+// maps to a specified endpoint
+func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition) *Tee {
+	outputFunc := func(key string, in map[string]interface{}) error {
+		byteBuffer := bytes.NewBuffer([]byte{})
+		encoder := json.NewEncoder(byteBuffer)
+		err := encoder.Encode(in)
+		if err != nil {
+			return err
+		}
+		req, err := http.NewRequest(http.MethodPost, url, byteBuffer)
+		if err != nil {
+			return err
+		}
+		headers := http.Header{}
+		headers.Set("Content-Type", "application/json")
+		req.Header = headers
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+		if resp.StatusCode >= 300 {
+			msg := fmt.Sprintf("error status %d posting to url '%s'", resp.StatusCode, url)
+			return common.NewInternalError(msg)
+		}
+		return nil
 	}
 	return &Tee{
 		outputFunc,

@@ -15,6 +15,7 @@ import (
 	"github.com/kmgreen2/agglo/pkg/entwine"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/pkg/storage"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -500,3 +501,25 @@ func TestJson() map[string]interface{} {
 	}
 	return jsonMap
 }
+
+type MockHttpClient struct {
+	err error
+	statusCode int
+	checkCallback func(req *http.Request)
+}
+
+func (client MockHttpClient) Do(req *http.Request) (*http.Response, error) {
+	client.checkCallback(req)
+	return &http.Response{
+		StatusCode: client.statusCode,
+	}, client.err
+}
+
+func NewMockHttpClient(err error, statusCode int, checkCallback func(req *http.Request)) *MockHttpClient {
+	return &MockHttpClient{
+		err: err,
+		statusCode: statusCode,
+		checkCallback: checkCallback,
+	}
+}
+

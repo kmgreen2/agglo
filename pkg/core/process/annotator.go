@@ -1,10 +1,10 @@
-package pipeline
+package process
 
 import (
 	"github.com/kmgreen2/agglo/pkg/core"
 )
 
-// Annotator is a pipeline processor that will conditionally apply underlying annotations to a provided map
+// Annotator is a process processor that will conditionally apply underlying annotations to a provided map
 type Annotator struct {
 	annotations []*core.Annotation
 }
@@ -28,7 +28,7 @@ func (a Annotator) Process(in map[string]interface{}) (map[string]interface{}, e
 	return out, nil
 }
 
-// AnnotatorBuilder is a builder for an Annotator pipeline processor
+// AnnotatorBuilder is a builder for an Annotator process processor
 type AnnotatorBuilder struct {
 	annotate *Annotator
 }
