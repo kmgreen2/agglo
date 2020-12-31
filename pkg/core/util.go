@@ -64,6 +64,16 @@ func GetNumeric(x interface{}) (float64, error) {
 	return 0, fmt.Errorf("Invalid numeric type: %v", reflect.TypeOf(x))
 }
 
+func NumericResolver(x, y interface{}) (float64, float64, error) {
+	if xVal, err := GetNumeric(x); err != nil {
+		return 0, 0, err
+	} else if yVal, err := GetNumeric(y); err != nil {
+		return 0, 0, err
+	} else {
+		return xVal, yVal, nil
+	}
+}
+
 func flatten(in interface{}, out map[string]interface{}, currKey string) {
 	var thisKey string
 	switch inVal := in.(type) {

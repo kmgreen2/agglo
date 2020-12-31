@@ -2,13 +2,11 @@ package core
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/common"
-	"github.com/kmgreen2/agglo/pkg/kvs"
 	"math"
 	"reflect"
 	"strings"
@@ -300,9 +298,9 @@ func AggregationDiscreteHistogramStateFromMap(in map[string]interface{}) (*aggre
 }
 
 type FieldAggregation struct {
-	Key string 				`json:"key"`
-	Type AggregationType 	`json:"type"`
-	GroupByKeys []string 	`json:"groupByKeys"`
+	Key         string          `json:"key"`
+	Type        AggregationType `json:"type"`
+	GroupByKeys []string        `json:"groupByKeys"`
 }
 
 func NewFieldAggregation(path string, aggType AggregationType, groupByKeys []string) *FieldAggregation {
@@ -329,9 +327,9 @@ type Aggregation struct {
 	// Unique name for the aggregation
 	// Source map must have field completion: "<name>" to be considered
 	// This can be added by having an annotation process prior to the aggregation
-	Name string								`json:"name"`
-	PartitionID gUuid.UUID  				`json:"partitionID"`
-	FieldAggregation *FieldAggregation 		`json:"fieldAggregation"`
+	Name string                        `json:"name"`
+	PartitionID gUuid.UUID             `json:"partitionID"`
+	FieldAggregation *FieldAggregation `json:"fieldAggregation"`
 }
 
 func NewAggregation(partitionID gUuid.UUID, name string, fieldAggregation *FieldAggregation) *Aggregation {
@@ -482,84 +480,3 @@ func AggregationStateKey(partitionID gUuid.UUID, name string) string {
 	return fmt.Sprintf(aggregationStateKeyFormat, partitionID.String(), name)
 }
 
-type Aggregator struct {
-	aggregation *Aggregation
-	condition *Condition
-	aggregatorStateStore kvs.KVStore
-}
-
-func NewAggregator(aggregation *Aggregation, condition *Condition, kvStore kvs.KVStore) *Aggregator {
-	return &Aggregator{
-		aggregation: aggregation,
-		condition: condition,
-		aggregatorStateStore: kvStore,
-	}
-}
-
-func (a Aggregator) getAggregationState(partitionID gUuid.UUID, name string) ([]byte, error) {
-	stateBytes, err := a.aggregatorStateStore.Get(context.Background(), AggregationStateKey(partitionID, name))
-	if err != nil {
-		if errors.Is(err, &common.NotFoundError{}) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return stateBytes, nil
-}
-
-func (a Aggregator) updateAggregationState(partitionID gUuid.UUID, name string, prev, newState []byte) error {
-	return a.aggregatorStateStore.AtomicPut(context.Background(), AggregationStateKey(partitionID, name), prev,
-		newState)
-}
-
-func (a Aggregator) Process(in map[string]interface{}) (map[string]interface{}, error) {
-	var aggregationState *AggregationState
-	out := CopyableMap(in).DeepCopy()
-
-	partitionID, err := GetPartitionID(in)
-	if err != nil {
-		return out, err
-	}
-	name, err := GetName(in)
-	if err != nil {
-		return out, err
-	}
-
-	stateBytes, err := a.getAggregationState(partitionID, name)
-	if err != nil {
-		return out, err
-	}
-
-	if stateBytes == nil {
-		aggregationState = NewAggregationState(make(map[string]interface{}))
-	} else {
-		aggregationState, err = NewAggregationStateFromBytes(stateBytes)
-		if err != nil {
-			return out, err
-		}
-	}
-
-	updatedKeys, updatedValues, err := a.aggregation.Update(in, aggregationState)
-	if err != nil {
-		return out, err
-	}
-
-	newStateBytes, err := aggregationState.Bytes()
-	if err != nil {
-		return out, err
-	}
-
-	err = a.updateAggregationState(partitionID, name, stateBytes, newStateBytes)
-	if err != nil {
-		return out, err
-	}
-
-	updatedMap := make(map[string]interface{})
-	for i, _ := range updatedKeys {
-		updatedMap[updatedKeys[i]] = updatedValues[i]
-	}
-
-	out[fmt.Sprintf("agglo:aggregation:%s", name)] = updatedMap
-
-	return out, nil
-}

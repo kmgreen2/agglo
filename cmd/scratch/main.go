@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/core"
+	"github.com/kmgreen2/agglo/pkg/core/pipeline"
 	"net/http"
 	"strings"
 )
@@ -71,16 +72,17 @@ func main() {
 		return strings.ToUpper(v.(string)), nil
 	}
 
-	transformer := core.NewTransformer(nil, ".", ":")
-	transformer.AddSpec("foo.bar", core.NewTransformation("a", []core.FieldTransformer{&core.CopyTransformer{}}, nil))
-	transformer.AddSpec("foo.bizz.bar", core.NewTransformation("b.c",
-		[]core.FieldTransformer{&core.MapTransformer{mapFunc}}, nil))
+	transformer := pipeline.NewTransformer(nil, ".", ":")
+	transformer.AddSpec("a", "foo.bar", core.NewTransformation([]core.FieldTransformation{&core.CopyTransformation{}},
+	nil))
+	transformer.AddSpec("b.c", "foo.bizz.bar", core.NewTransformation(
+		[]core.FieldTransformation{&core.MapTransformation{mapFunc}}, nil))
 	cond, err := core.NewCondition(core.NewComparatorExpression(core.Variable("b.d.0"), 2, core.Equal))
 	if err != nil {
 		panic(err.Error())
 	}
-	transformer.AddSpec("foo.baz", core.NewTransformation("b.d",
-		[]core.FieldTransformer{&core.MapTransformer{intMapFunc}, &core.LeftFoldTransformer{foldFunc}}, cond))
+	transformer.AddSpec("b.d", "foo.baz", core.NewTransformation(
+		[]core.FieldTransformation{&core.MapTransformation{intMapFunc}, &core.LeftFoldTransformation{foldFunc}}, cond))
 
 	transformedMap, err := transformer.Process(jsonMap)
 	if err != nil {

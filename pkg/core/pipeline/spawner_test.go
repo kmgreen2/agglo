@@ -1,7 +1,8 @@
-package core_test
+package pipeline_test
 
 import (
 	"github.com/kmgreen2/agglo/pkg/core"
+	"github.com/kmgreen2/agglo/pkg/core/pipeline"
 	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -13,7 +14,7 @@ func TestSpawnerHappyPathAsync(t *testing.T) {
 	runnable := test.NewSleepRunnable(1)
 	job := core.NewLocalJob(runnable)
 
-	spawner := core.NewSpawner(job, core.TrueCondition, -1, false)
+	spawner := pipeline.NewSpawner(job, core.TrueCondition, -1, false)
 
 	out, err := spawner.Process(in)
 
@@ -26,7 +27,7 @@ func TestSpawnerHappyPathFalseCondition(t *testing.T) {
 	runnable := test.NewSleepRunnable(1)
 	job := core.NewLocalJob(runnable)
 
-	spawner := core.NewSpawner(job, core.FalseCondition, 10*time.Second, true)
+	spawner := pipeline.NewSpawner(job, core.FalseCondition, 10*time.Second, true)
 
 	start := time.Now()
 	out, err := spawner.Process(in)
@@ -43,7 +44,7 @@ func TestSpawnerHappyPathSync(t *testing.T) {
 	runnable := test.NewSleepRunnable(1)
 	job := core.NewLocalJob(runnable)
 
-	spawner := core.NewSpawner(job, core.TrueCondition, -1, true)
+	spawner := pipeline.NewSpawner(job, core.TrueCondition, -1, true)
 
 
 	start := time.Now()
@@ -60,7 +61,7 @@ func TestSpawnerFailSync(t *testing.T) {
 	runnable := test.NewFailRunnable()
 	job := core.NewLocalJob(runnable)
 
-	spawner := core.NewSpawner(job, core.TrueCondition, -1, true)
+	spawner := pipeline.NewSpawner(job, core.TrueCondition, -1, true)
 
 	out, err := spawner.Process(in)
 
@@ -73,7 +74,7 @@ func TestSpawnerHappyPathDelaySync(t *testing.T) {
 	runnable := test.NewSquareRunnable(2)
 	job := core.NewLocalJob(runnable)
 
-	spawner := core.NewSpawner(job, core.TrueCondition, 1*time.Second, true)
+	spawner := pipeline.NewSpawner(job, core.TrueCondition, 1*time.Second, true)
 
 
 	start := time.Now()

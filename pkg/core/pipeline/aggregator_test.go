@@ -1,10 +1,11 @@
-package core_test
+package pipeline_test
 
 import (
 	"context"
 	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/core"
+	"github.com/kmgreen2/agglo/pkg/core/pipeline"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +25,7 @@ name string, partitionID gUuid.UUID, aggPath string, evalValAt EvaluateValAt) (i
 
 	aggregation := core.NewAggregation(partitionID, name, fieldAggregation)
 
-	aggregator := core.NewAggregator(aggregation, core.TrueCondition, kvStore)
+	aggregator := pipeline.NewAggregator(aggregation, core.TrueCondition, kvStore)
 
 	for i, m := range maps {
 		out, err := aggregator.Process(m)
@@ -331,7 +332,8 @@ func TestBasicDiscreteHistogram(t *testing.T) {
 	}
 
 
-	val, err := doBasicAggregation(maps, core.AggDiscreteHistogram, name, partitionID, strings.Join(paths[0], "."), evalFunc)
+	val, err := doBasicAggregation(maps, core.AggDiscreteHistogram, name, partitionID, strings.Join(paths[0], "."),
+		evalFunc)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}

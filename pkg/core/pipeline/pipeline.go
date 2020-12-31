@@ -1,4 +1,4 @@
-package core
+package pipeline
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ type PipelineProcess interface {
 
 type RunnableStartProcess struct {
 	process PipelineProcess
-	in map[string]interface{}
+	in      map[string]interface{}
 }
 
 func (runnable *RunnableStartProcess) Run() (interface{}, error) {
@@ -28,7 +28,7 @@ func NewRunnableStartProcess(process PipelineProcess, in map[string]interface{})
 
 type RunnablePartialProcess struct {
 	process PipelineProcess
-	in map[string]interface{}
+	in      map[string]interface{}
 }
 
 func (runnable *RunnablePartialProcess) Run() (interface{}, error) {

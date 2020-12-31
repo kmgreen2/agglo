@@ -1,15 +1,18 @@
-package core
+package pipeline
 
-import "time"
+import (
+	"github.com/kmgreen2/agglo/pkg/core"
+	"time"
+)
 
 type Spawner struct {
-	job Job
-	condition *Condition
-	delay time.Duration
-	doSync bool
+	job       core.Job
+	condition *core.Condition
+	delay     time.Duration
+	doSync    bool
 }
 
-func NewSpawner(job Job, condition *Condition, delay time.Duration, doSync bool) *Spawner {
+func NewSpawner(job core.Job, condition *core.Condition, delay time.Duration, doSync bool) *Spawner {
 	return &Spawner{
 		job: job,
 		condition: condition,

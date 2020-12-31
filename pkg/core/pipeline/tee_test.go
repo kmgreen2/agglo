@@ -1,4 +1,4 @@
-package core_test
+package pipeline_test
 
 import (
 	"bytes"
@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"github.com/golang/mock/gomock"
 	"github.com/kmgreen2/agglo/pkg/core"
+	"github.com/kmgreen2/agglo/pkg/core/pipeline"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/pkg/streaming"
-	"github.com/kmgreen2/agglo/test/mocks"
+	"github.com/kmgreen2/agglo/test"
+	mocks "github.com/kmgreen2/agglo/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
@@ -17,9 +19,9 @@ import (
 
 func TestKVTee(t *testing.T) {
 	var storedMap map[string]interface{}
-	jsonMap := testJson()
+	jsonMap := test.TestJson()
 	kvStore := kvs.NewMemKVStore()
-	kvTee := core.NewKVTee(kvStore, core.TrueCondition)
+	kvTee := pipeline.NewKVTee(kvStore, core.TrueCondition)
 
 	out, err := kvTee.Process(jsonMap)
 	assert.Nil(t, err)
@@ -36,9 +38,9 @@ func TestKVTee(t *testing.T) {
 
 func TestKVTeeError(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	jsonMap := testJson()
-	kvStore := test.NewMockKVStore(ctrl)
-	kvTee := core.NewKVTee(kvStore, core.TrueCondition)
+	jsonMap := test.TestJson()
+	kvStore := mocks.NewMockKVStore(ctrl)
+	kvTee := pipeline.NewKVTee(kvStore, core.TrueCondition)
 
 	kvStore.EXPECT().Put(context.Background(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("error"))
 	out, err := kvTee.Process(jsonMap)
@@ -48,9 +50,9 @@ func TestKVTeeError(t *testing.T) {
 
 func TestKVTeeFalseCondition(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	jsonMap := testJson()
-	kvStore := test.NewMockKVStore(ctrl)
-	kvTee := core.NewKVTee(kvStore, core.FalseCondition)
+	jsonMap := test.TestJson()
+	kvStore := mocks.NewMockKVStore(ctrl)
+	kvTee := pipeline.NewKVTee(kvStore, core.FalseCondition)
 
 	out, err := kvTee.Process(jsonMap)
 	assert.Equal(t, jsonMap, out)
@@ -60,7 +62,7 @@ func TestKVTeeFalseCondition(t *testing.T) {
 func TestPublisherTee(t *testing.T) {
 	var storedMap map[string]interface{}
 	lock := sync.Mutex{}
-	jsonMap := testJson()
+	jsonMap := test.TestJson()
 	pubSub := streaming.NewMemPubSub()
 	err := pubSub.CreateTopic("testing")
 	if err != nil {
@@ -89,7 +91,7 @@ func TestPublisherTee(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	publisherTee := core.NewPubSubTee(publisher, core.TrueCondition)
+	publisherTee := pipeline.NewPubSubTee(publisher, core.TrueCondition)
 
 	_, err = publisherTee.Process(jsonMap)
 	assert.Nil(t, err)
@@ -101,9 +103,9 @@ func TestPublisherTee(t *testing.T) {
 
 func TestPublisherTeeError(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	jsonMap := testJson()
-	publisher := test.NewMockPublisher(ctrl)
-	publisherTee := core.NewPubSubTee(publisher, core.TrueCondition)
+	jsonMap := test.TestJson()
+	publisher := mocks.NewMockPublisher(ctrl)
+	publisherTee := pipeline.NewPubSubTee(publisher, core.TrueCondition)
 
 	publisher.EXPECT().Publish(context.Background(), gomock.Any()).Return(fmt.Errorf("error"))
 	out, err := publisherTee.Process(jsonMap)
@@ -113,9 +115,9 @@ func TestPublisherTeeError(t *testing.T) {
 
 func TestPublisherTeeFalseCondition(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	jsonMap := testJson()
-	publisher := test.NewMockPublisher(ctrl)
-	publisherTee := core.NewPubSubTee(publisher, core.FalseCondition)
+	jsonMap := test.TestJson()
+	publisher := mocks.NewMockPublisher(ctrl)
+	publisherTee := pipeline.NewPubSubTee(publisher, core.FalseCondition)
 
 	out, err := publisherTee.Process(jsonMap)
 	assert.Equal(t, jsonMap, out)

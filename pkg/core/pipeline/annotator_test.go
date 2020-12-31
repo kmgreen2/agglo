@@ -1,15 +1,17 @@
-package core_test
+package pipeline_test
 
 import (
 	"github.com/kmgreen2/agglo/pkg/core"
+	"github.com/kmgreen2/agglo/pkg/core/pipeline"
+	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestAnnotateHappyPath(t *testing.T) {
-	jsonMap := testJson()
+	jsonMap := test.TestJson()
 
-	builder := core.NewAnnotateBuilder()
+	builder := pipeline.NewAnnotatorBuilder()
 
 	cond, err := core.NewCondition(core.NewComparatorExpression(core.Variable("b.d.0"), 3, core.Equal))
 	if err != nil {
@@ -33,9 +35,9 @@ func TestAnnotateHappyPath(t *testing.T) {
 }
 
 func TestAnnotateDuplicateField(t *testing.T) {
-	jsonMap := testJson()
+	jsonMap := test.TestJson()
 
-	builder := core.NewAnnotateBuilder()
+	builder := pipeline.NewAnnotatorBuilder()
 
 	cond, err := core.NewCondition(core.NewComparatorExpression(core.Variable("b.d.0"), 3, core.Equal))
 	if err != nil {

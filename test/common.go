@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	gocrypto "crypto"
+	"encoding/json"
 	gorand "math/rand"
 	"crypto/rand"
 	"crypto/rsa"
@@ -468,4 +469,34 @@ func GetJoinedMaps(numMaps, numJoined int, partitionID gUuid.UUID, name string) 
 	}
 
 	return maps, joinedKeys
+}
+
+func TestJson() map[string]interface{} {
+	var jsonMap map[string]interface{}
+	inJson := `{
+	"a": 1,
+	"b": {
+		"c": "hello",
+		"d": [3,4,5]
+	},
+	"e": [6],
+	"f": {
+		"g": {
+			"h": 7
+		}
+	},
+	"i": [
+			{
+				"j": [8, 9]
+			},
+			"k"
+    ]
+}
+`
+	decoder := json.NewDecoder(bytes.NewBuffer([]byte(inJson)))
+	err := decoder.Decode(&jsonMap)
+	if err != nil {
+		panic(err.Error())
+	}
+	return jsonMap
 }

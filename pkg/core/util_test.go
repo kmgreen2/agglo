@@ -1,9 +1,8 @@
 package core_test
 
 import (
-	"bytes"
-	"encoding/json"
 	"github.com/kmgreen2/agglo/pkg/core"
+	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -42,38 +41,8 @@ func TestGetNumeric(t *testing.T) {
 	assert.Equal(t, int64(0), result)
 }
 
-func testJson() map[string]interface{} {
-	var jsonMap map[string]interface{}
-	inJson := `{
-	"a": 1,
-	"b": {
-		"c": "hello",
-		"d": [3,4,5]
-	},
-	"e": [6],
-	"f": {
-		"g": {
-			"h": 7
-		}
-	},
-	"i": [
-			{
-				"j": [8, 9]
-			},
-			"k"
-    ]
-}
-`
-	decoder := json.NewDecoder(bytes.NewBuffer([]byte(inJson)))
-	err := decoder.Decode(&jsonMap)
-	if err != nil {
-		panic(err.Error())
-	}
-	return jsonMap
-}
-
 func TestFlatten(t *testing.T) {
-	jsonMap := testJson()
+	jsonMap := test.TestJson()
 
 	expectedFlatJson := map[string]interface{}{
 		"a": float64(1),
@@ -119,7 +88,7 @@ func TestNumericEqual(t *testing.T) {
 }
 
 func TestDeepCopy(t *testing.T) {
-	jsonMap := testJson()
+	jsonMap := test.TestJson()
 
 	jsonMapCopy := core.CopyableMap(jsonMap).DeepCopy()
 	assert.True(t, core.CopyableMap(jsonMap).DeepCompare(jsonMapCopy))
@@ -132,7 +101,7 @@ func TestDeepCopy(t *testing.T) {
 }
 
 func TestUpdateMap(t *testing.T) {
-	jsonMap := testJson()
+	jsonMap := test.TestJson()
 
 	err := core.UpdateMap(jsonMap, []string{"b", "c"}, "hi")
 	assert.Nil(t, err)
@@ -150,7 +119,7 @@ func TestUpdateMap(t *testing.T) {
 }
 
 func TestGetMap(t *testing.T) {
-	jsonMap := testJson()
+	jsonMap := test.TestJson()
 
 	val, err := core.GetMap(jsonMap, []string{"b", "c"})
 	assert.Nil(t, err)
