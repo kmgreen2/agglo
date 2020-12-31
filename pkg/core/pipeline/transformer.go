@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"fmt"
+	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/core"
 	"strings"
 )
@@ -57,6 +59,24 @@ func (t Transformer) valueFromPath(key string, in map[string]interface{}) (inter
 
 func (t Transformer) createPathAndTransform(sourceField, targetField string, transformation *core.Transformation, in,
 	out map[string]interface{}) error {
+
+	if len(sourceField) == 0 && len(targetField) == 0 {
+		result, err := transformation.Transform(core.NewTransformable(in))
+		if err != nil {
+			return err
+		}
+
+		switch rVal := result.Value().(type) {
+		case map[string]interface{}:
+			for k, v := range rVal {
+				out[k] = v
+			}
+			return nil
+		default:
+			msg := fmt.Sprintf("source and target fields must be specified when transforming non-root maps")
+			return common.NewInvalidError(msg)
+		}
+	}
 
 	sourceDict, err := t.dictFromPath(sourceField, in)
 	if err != nil {

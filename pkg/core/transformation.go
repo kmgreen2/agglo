@@ -26,17 +26,11 @@ func (t Transformable) Value() interface{} {
 func (t Transformable) Copy() *Transformable {
 	if t.Kind() == reflect.Slice {
 		slice := t.Value().([]interface{})
-		var outSlice []interface{}
-		for _, v := range slice {
-			outSlice = append(outSlice, v)
-		}
+		outSlice := CopyableSlice(slice).DeepCopy()
 		return &Transformable{outSlice}
 	} else if t.Kind() == reflect.Map {
 		m := t.Value().(map[string]interface{})
-		outMap := make(map[string]interface{})
-		for k, v := range m {
-			outMap[k] = v
-		}
+		outMap := CopyableMap(m).DeepCopy()
 		return &Transformable{outMap}
 	} else {
 		return &Transformable{t.Value()}
@@ -90,14 +84,10 @@ func (t LeftFoldTransformation) Transform(in *Transformable) (*Transformable, er
 		slice := in.Value().([]interface{})
 		var acc interface{}
 		var err error
-		for i, v := range slice {
-			if i == 0 {
-				acc = v
-			} else {
-				acc, err = t.FoldFunc(acc, v)
-				if err != nil {
-					return nil, err
-				}
+		for _, v := range slice {
+			acc, err = t.FoldFunc(acc, v)
+			if err != nil {
+				return nil, err
 			}
 		}
 		return &Transformable{acc}, nil
@@ -115,13 +105,9 @@ func (t RightFoldTransformation) Transform(in *Transformable) (*Transformable, e
 		var acc interface{}
 		var err error
 		for i, _ := range slice {
-			if i == 0 {
-				acc = slice[len(slice)-1]
-			} else {
-				acc, err = t.FoldFunc(acc, slice[len(slice)-i-1])
-				if err != nil {
-					return nil, err
-				}
+			acc, err = t.FoldFunc(acc, slice[len(slice)-i-1])
+			if err != nil {
+				return nil, err
 			}
 		}
 		return &Transformable{acc}, nil
@@ -156,6 +142,10 @@ func (t SumTransformation) Transform(in *Transformable) (*Transformable, error) 
  * Fold helpers
  */
 func foldMinFunc(acc, v interface{}) (interface{}, error) {
+	if acc == nil {
+		acc = v
+		return acc, nil
+	}
 	accVal, vVal, err := NumericResolver(acc, v)
 	if err != nil {
 		return 0, err
@@ -166,6 +156,10 @@ func foldMinFunc(acc, v interface{}) (interface{}, error) {
 }
 
 func foldMaxFunc(acc, v interface{}) (interface{}, error) {
+	if acc == nil {
+		acc = v
+		return acc, nil
+	}
 	accVal, vVal, err := NumericResolver(acc, v)
 	if err != nil {
 		return 0, err
@@ -177,6 +171,13 @@ func foldMaxFunc(acc, v interface{}) (interface{}, error) {
 
 func foldCountFunc(matcher func(interface{}) bool) func (acc, v interface{}) (interface{}, error) {
 	return func(acc, v interface{}) (interface{}, error) {
+		if acc == nil {
+			acc = 0
+			if matcher(v) {
+				acc = float64(1)
+			}
+			return acc, nil
+		}
 		if accVal, err := GetNumeric(acc); err != nil {
 			return 0, err
 		} else {
@@ -316,7 +317,9 @@ type TransformationBuilder struct {
 
 func NewTransformationBuilder() *TransformationBuilder {
 	return &TransformationBuilder{
-		&Transformation{},
+		&Transformation{
+			condition: TrueCondition,
+		},
 	}
 }
 
@@ -324,6 +327,12 @@ func (t *TransformationBuilder) AddFieldTransformation(transformation FieldTrans
 	t.transformation.transformers = append(t.transformation.transformers, transformation)
 	return t
 }
+
+func (t *TransformationBuilder) AddCondition(condition *Condition) *TransformationBuilder {
+	t.transformation.condition = condition
+	return t
+}
+
 
 func (t *TransformationBuilder) Get() *Transformation {
 	return t.transformation

@@ -153,17 +153,107 @@ func TestMapMultConstant(t *testing.T) {
 	}
 }
 
-func TestFoldMin(t *testing.T) {
-}
+func doTestFolds(t *testing.T, testSlice []interface{}, expectedLeft, expectedRight interface{},
+	left *core.LeftFoldTransformation, right *core.RightFoldTransformation) {
 
-func TestFoldMax(t *testing.T) {
+	leftBuilder := core.NewTransformationBuilder()
+	leftBuilder.AddFieldTransformation(left)
+	leftTransformation := leftBuilder.Get()
+	leftResult, err := leftTransformation.Transform(core.NewTransformable(testSlice))
+	assert.Nil(t, err)
+
+	rightBuilder := core.NewTransformationBuilder()
+	rightBuilder.AddFieldTransformation(right)
+	rightTransformation := rightBuilder.Get()
+	rightResult, err := rightTransformation.Transform(core.NewTransformable(testSlice))
+	assert.Nil(t, err)
+
+	assert.Equal(t, expectedLeft, leftResult.Value())
+	assert.Equal(t, expectedRight, rightResult.Value())
 }
 
 func TestFoldCount(t *testing.T) {
+	testSlice := []interface{} {
+		1,
+		5,
+		7,
+	}
+
+	doTestFolds(t, testSlice, float64(3), float64(3), core.LeftFoldCountAll, core.RightFoldCountAll)
+}
+
+func TestFoldMin(t *testing.T) {
+	testSlice := []interface{} {
+		1,
+		5,
+		7,
+	}
+
+	doTestFolds(t, testSlice, float64(1), float64(1), core.LeftFoldMin, core.RightFoldMin)
+}
+
+func TestFoldMax(t *testing.T) {
+	testSlice := []interface{} {
+		1,
+		5,
+		7,
+	}
+
+	doTestFolds(t, testSlice, float64(7), float64(7), core.LeftFoldMax, core.RightFoldMax)
 }
 
 func TestSumTransformation(t *testing.T) {
+	testSlice := []interface{} {
+		10,
+		5,
+		7,
+	}
+
+	builder := core.NewTransformationBuilder()
+
+	builder.AddFieldTransformation(core.SumTransformation{})
+
+	transformation := builder.Get()
+
+	result, err := transformation.Transform(core.NewTransformable(testSlice))
+	assert.Nil(t, err)
+
+	switch v := result.Value().(type) {
+	case float64:
+		assert.Equal(t, float64(22), v)
+	}
 }
 
 func TestCopyTransformation(t *testing.T) {
+	testMap := map[string]interface{} {
+		"foo": 1,
+		"bar": 5,
+		"baz": 7,
+	}
+
+	testSlice := []interface{} {
+		"hello",
+		5,
+		7,
+	}
+
+	builder := core.NewTransformationBuilder()
+	builder.AddFieldTransformation(core.CopyTransformation{})
+	transformation := builder.Get()
+
+	result, err := transformation.Transform(core.NewTransformable(testMap))
+	assert.Nil(t, err)
+
+	switch v := result.Value().(type) {
+	case map[string]interface{}:
+		assert.Equal(t, testMap, v)
+	}
+
+	result, err = transformation.Transform(core.NewTransformable(testSlice))
+	assert.Nil(t, err)
+
+	switch v := result.Value().(type) {
+	case []interface{}:
+		assert.Equal(t, testSlice, v)
+	}
 }
