@@ -1,0 +1,143 @@
+syntax = "proto3";
+
+package pipeline;
+
+enum ProcessType {
+    Annotator = 0;
+    Aggregator = 1;
+    Completor = 2;
+    Filter = 3;
+    Spawner = 4;
+    Tee = 5;
+    Transformer = 6;
+}
+
+enum ExternalType {
+    ExternalKVStore = 0;
+    ExternalObjectStore = 1;
+    ExternalPubSub = 2;
+    ExternalHttp = 3;
+}
+
+enum AggregationType {
+    AggSum = 0;
+    AggMax = 1;
+    AggMin = 2;
+    AggAvg = 3;
+    AggCount = 4;
+    AggDiscreteHistogram = 5;
+}
+
+enum TransformationType {
+    TransformSum = 0;
+    TransformCopy = 1;
+    TransformMapRegex = 2;
+    TransformMapAdd = 3;
+    TransformMapMult = 4;
+    TransformCount = 5;
+    TransformLeftFold = 6;
+    TransformRightFold = 7;
+    TransformMap = 8;
+}
+
+message Pipeline {
+    repeated PipelineProcess processes = 1;
+}
+
+message PipelineProcess {
+    ProcessType processType = 1;
+    string name = 2;
+}
+
+message Annotator {
+    string name = 1;
+    repeated Annotation annotations = 2;
+}
+
+message Annotation {
+    string fieldKey = 1;
+    string value = 2;
+    Condition condition = 3;
+}
+
+message Aggregator {
+    string name = 1;
+    Condition condition = 2;
+    External stateStore = 3;
+    Aggregation aggregation = 4;
+}
+
+message Aggregation {
+    string key = 1;
+    AggregationType aggregationType = 2;
+    repeated string groupByKeys = 3;
+}
+
+message Completer {
+    string name = 1;
+    Condition condition = 2;
+    External stateStore = 3;
+    Completion completion = 4;
+}
+
+message Completion {
+    repeated string joinKeys = 1;
+    int64 timeoutMs = 2;
+}
+
+message Filter {
+    string name = 1;
+    string regex = 2;
+    bool keepMatched = 3;
+}
+
+message Spawner {
+    string name = 1;
+    Condition condition = 2;
+    int64 delayInMs = 3;
+    bool doSync = 4;
+    Job job = 5;
+}
+
+// Exec must take map[string]interface{} (JSON) as input
+// ToDo(KMG): Use exec and pipes to implement
+message Runnable {
+    string pathToExec = 1;
+}
+
+message Job {
+    Runnable runnable = 2;
+}
+
+message Tee {
+    string name = 1;
+    Condition condition = 2;
+    repeated TransformerSpec transformerSpecs = 3;
+    External outputConnector = 4;
+}
+
+message Transformer {
+    string name = 1;
+    repeated TransformerSpec specs = 2;
+}
+
+message TransformerSpec {
+    string sourceField = 2;
+    string targetField = 3;
+    Transformation transformation = 4;
+}
+
+message Transformation {
+    Condition condition = 2;
+    TransformationType transformationType = 3;
+}
+
+message Condition {
+
+}
+
+message External {
+    ExternalType externalType = 1;
+    string name = 2;
+    string connectionString = 3;
+}
