@@ -27,6 +27,10 @@ func NewTransformer(specs []*TransformerSpec, fieldSeparator, indexSeparator str
 	}
 }
 
+func DefaultTransformer() *Transformer {
+	return NewTransformer(nil, ".", ".")
+}
+
 func (t *Transformer) AddSpec(sourceField, targetField string, transformation *core.Transformation) {
 	t.specs = append(t.specs, &TransformerSpec{
 		sourceField: sourceField,

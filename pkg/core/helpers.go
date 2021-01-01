@@ -12,7 +12,7 @@ func GetPartitionID(in map[string]interface{}) (gUuid.UUID, error) {
 			return gUuid.Parse(partitionID)
 		}
 	}
-	msg := fmt.Sprintf("could not find valid 'agglo.internal.partitionID' in payload")
+	msg := fmt.Sprintf("could not find valid 'agglo:internal:partitionID' in payload")
 	return gUuid.Nil, common.NewInvalidError(msg)
 }
 
@@ -22,7 +22,7 @@ func GetName(in map[string]interface{}) (string, error) {
 			return name, nil
 		}
 	}
-	msg := fmt.Sprintf("could not find valid 'agglo.internal.name' in payload")
+	msg := fmt.Sprintf("could not find valid 'agglo:internal:name' in payload")
 	return "", common.NewInvalidError(msg)
 }
 

@@ -42,7 +42,7 @@ func DoCompleter(numMaps, numJoined int, timeout time.Duration, missingJoinKey s
 		}
 		if val, ok := out["agglo:completion:foo"]; ok {
 
-			// Timeout clock starts after first match for a join set
+			// Timeout clock starts after first keepMatched for a join set
 			if forceTimeout {
 				time.Sleep(timeout)
 				forceTimeout = false

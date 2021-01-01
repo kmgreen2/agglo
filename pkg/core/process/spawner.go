@@ -22,12 +22,13 @@ func NewSpawner(job core.Job, condition *core.Condition, delay time.Duration, do
 }
 
 func (s Spawner) Process(in map[string]interface{}) (map[string]interface{}, error) {
-	shouldRun, err := s.condition.Evaluate(in)
+	out := core.CopyableMap(in).DeepCopy()
+	shouldRun, err := s.condition.Evaluate(out)
 	if err != nil {
-		return in, err
+		return out, err
 	}
 	if shouldRun {
-		f := s.job.Run(s.delay, s.doSync)
+		f := s.job.Run(s.delay, s.doSync, out)
 		if s.doSync {
 			_, err := f.Get()
 			if err != nil {
@@ -35,5 +36,5 @@ func (s Spawner) Process(in map[string]interface{}) (map[string]interface{}, err
 			}
 		}
 	}
-	return in, nil
+	return out, nil
 }

@@ -51,6 +51,10 @@ func (r SleepRunnable) Run() (interface{}, error) {
 	return r.value, nil
 }
 
+func (r *SleepRunnable) SetArgs(args ...interface{}) error {
+	return nil
+}
+
 type SleepAndFailRunnable struct {
 	value int
 }
@@ -116,5 +120,36 @@ func (r FailThenSucceedRunnable) Run() (interface{}, error) {
 		return nil, common.NewInvalidError("Failed")
 	}
 	return r.numFails, nil
+}
+
+type FuncRunnable struct {
+	runFunc func(arg map[string]interface{})
+	arg map[string]interface{}
+}
+
+func (r FuncRunnable) Run() (interface{}, error) {
+	r.runFunc(r.arg)
+	return nil, nil
+}
+
+func (r *FuncRunnable) SetArgs(args ...interface{}) error {
+	if len(args) > 1 {
+		msg := fmt.Sprintf("FuncRunnable should have 1 map[string]interface{} arg, found %d args", len(args))
+		return common.NewInvalidError(msg)
+	}
+	switch rv := args[0].(type) {
+	case map[string]interface{}:
+		r.arg = rv
+	default:
+		msg := fmt.Sprintf("FuncRunnable should have an map[string]interface{} arg, found %v", reflect.TypeOf(args[0]))
+		return common.NewInvalidError(msg)
+	}
+	return nil
+}
+
+func NewFuncRunnable(runFunc func(arg map[string]interface{})) *FuncRunnable {
+	return &FuncRunnable{
+		runFunc: runFunc,
+	}
 }
 

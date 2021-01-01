@@ -70,3 +70,8 @@ func (memSubscriber *MemSubscriber) Stop() error {
 func (memSubscriber *MemSubscriber) Status() SubscriberState {
 	return memSubscriber.state
 }
+
+// ConnectionString will return a string that can be parsed to connect to the underlying pub/sub system
+func (memSubscriber *MemSubscriber) ConnectionString() string {
+	return "inMemPubSub"
+}

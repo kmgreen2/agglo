@@ -35,3 +35,8 @@ func (memPublisher *MemPublisher) Publish(ctx context.Context, payload []byte) e
 func (memPublisher *MemPublisher) Flush(ctx context.Context, timeout time.Duration) error {
 	return nil
 }
+
+// ConnectionString will return a string that can be parsed to connect to the underlying pub/sub system
+func (memPublisher *MemPublisher) ConnectionString() string {
+	return "inMemPubSub"
+}

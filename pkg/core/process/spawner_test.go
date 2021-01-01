@@ -71,7 +71,7 @@ func TestSpawnerFailSync(t *testing.T) {
 
 func TestSpawnerHappyPathDelaySync(t *testing.T) {
 	in, _ := test.GenRandomMap(3, 16)
-	runnable := test.NewSquareRunnable(2)
+	runnable := test.NewSleepRunnable(1)
 	job := core.NewLocalJob(runnable)
 
 	spawner := process.NewSpawner(job, core.TrueCondition, 1*time.Second, true)
@@ -81,7 +81,7 @@ func TestSpawnerHappyPathDelaySync(t *testing.T) {
 	out, err := spawner.Process(in)
 	end := time.Now()
 
-	assert.True(t, end.Sub(start) > 1 * time.Second)
+	assert.True(t, end.Sub(start) > 2 * time.Second)
 	assert.Nil(t, err)
 	assert.Equal(t, in, out)
 }

@@ -2,8 +2,11 @@ package process_test
 
 import (
 	"fmt"
+	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/core"
 	"github.com/kmgreen2/agglo/pkg/core/process"
+	"github.com/kmgreen2/agglo/pkg/kvs"
+	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -47,10 +50,19 @@ func pipelineTestMapsOne() []map[string]interface{} {
 }
 
 func TestPipelineBasic(t *testing.T) {
+	kvStore := kvs.NewMemKVStore()
 	testMaps := pipelineTestMapsOne()
-	//partitionID := gUuid.New()
-	//name := "test"
+	partitionID := gUuid.New()
+	name := "default"
 	builder := process.NewPipelineBuilder()
+
+	// Annotate the inbound map with the proper partitionID and name
+	// partitionID is meant to separate different organizations or departments
+	// name is meant to partition different classes of messages (e.g. CI/CD, messaging, etc.)
+	annotatorBuilder := process.NewAnnotatorBuilder()
+	annotatorBuilder.Add(core.NewAnnotation("agglo:internal:partitionID", partitionID.String(), core.TrueCondition))
+	annotatorBuilder.Add(core.NewAnnotation("agglo:internal:name", name, core.TrueCondition))
+	builder.Add(annotatorBuilder.Build())
 
 	// Annotate the different types of maps based on the existence of
 	// certain fields
@@ -63,7 +75,7 @@ func TestPipelineBasic(t *testing.T) {
 	condition, err := core.NewCondition(conditionBuilder.Get())
 	assert.Nil(t, err)
 
-	annotatorBuilder := process.NewAnnotatorBuilder()
+	annotatorBuilder = process.NewAnnotatorBuilder()
 	annotatorBuilder.Add(core.NewAnnotation("version-control", "git-dev", condition))
 	builder.Add(annotatorBuilder.Build())
 
@@ -79,6 +91,44 @@ func TestPipelineBasic(t *testing.T) {
 	annotatorBuilder.Add(core.NewAnnotation("deploy", "circleci-dev", condition))
 	builder.Add(annotatorBuilder.Build())
 
+	// Aggregate the annotated version control maps on author
+	aggregation := core.NewAggregation(partitionID, name, core.NewFieldAggregation("author",
+		core.AggDiscreteHistogram, []string{}))
+	condition, err = core.NewCondition(core.NewComparatorExpression(core.Variable("version-control"), "git-dev",
+		core.Equal))
+	builder.Add(process.NewAggregator(aggregation, condition, kvStore))
+
+	// Create a completion that joins on commit hash
+	completion := core.NewCompletion(name, partitionID, []string{"hash", "githash"}, -1)
+	completer := process.NewCompleter(completion, kvStore)
+	builder.Add(completer)
+
+	// Create transformations that set fields to be stored and tee them out to the kvstore
+	transformer := process.NewTransformer(nil, ".", ".")
+	condition, err = core.NewCondition(core.NewComparatorExpression(core.Variable("version-control"), "git-dev",
+		core.Equal))
+	transformationBuilder := core.NewTransformationBuilder()
+	transformationBuilder.AddFieldTransformation(&core.CopyTransformation{})
+	copyTransformation := transformationBuilder.Get()
+	transformer.AddSpec("author", "gitAuthor", copyTransformation)
+	transformer.AddSpec("hash", "gitHash", copyTransformation)
+
+	builder.Add(process.NewKVTee(kvStore, condition, transformer))
+
+	// Spawn a job for each completed completion that adds the git hash to a list
+	var spawnOutput []string
+	runnable := test.NewFuncRunnable(func (arg map[string]interface{}) {
+		spawnOutput = append(spawnOutput, arg["githash"].(string))
+	})
+
+	condition, err = core.NewCondition(core.NewComparatorExpression(core.Variable("agglo:completion:default"),
+		"complete",	core.Equal))
+
+	builder.Add(process.NewSpawner(core.NewLocalJob(runnable), condition, -1, true))
+
+	// Use a filter to strip the internally added fields
+	filter, err := process.NewRegexKeyFilter("^agglo.*", false)
+	builder.Add(filter)
 
 	pipeline := builder.Get()
 
@@ -88,5 +138,6 @@ func TestPipelineBasic(t *testing.T) {
 		assert.Nil(t, err)
 	}
 
+	fmt.Println(spawnOutput)
 
 }

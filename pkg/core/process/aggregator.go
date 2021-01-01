@@ -42,6 +42,11 @@ func (a Aggregator) updateAggregationState(partitionID gUuid.UUID, name string, 
 
 func (a Aggregator) Process(in map[string]interface{}) (map[string]interface{}, error) {
 	var aggregationState *core.AggregationState
+
+	if shouldProcess, err := a.condition.Evaluate(in); !shouldProcess || err != nil {
+		return in, err
+	}
+
 	out := core.CopyableMap(in).DeepCopy()
 
 	partitionID, err := core.GetPartitionID(in)

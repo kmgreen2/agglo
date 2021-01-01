@@ -11,20 +11,24 @@ import (
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/pkg/streaming"
 	"net/http"
+	"reflect"
 )
 
-var uuidKey string = "_uuid_key"
+var TeeMetadataKey string = "agglo:tee:output"
 
 // Tee is a process processor that will send a provided mapping to
 // a system (i.e. KVStore, Pubsub, etc.) and return the map
 type Tee struct {
 	outputFunc func(key string, in map[string]interface{}) error
 	condition *core.Condition
+	transformer *Transformer
+	outputType string
+	connectionString string
 }
 
 // NewKVTee will create a Tee processor that stores maps in the provided KVStore
 // Note: the returned map will contain the UUID of the KV entry with key "_uuid_key"
-func NewKVTee(kvStore kvs.KVStore, condition *core.Condition) *Tee {
+func NewKVTee(kvStore kvs.KVStore, condition *core.Condition, transformer *Transformer) *Tee {
 	outputFunc := func(key string, in map[string]interface{}) error {
 		byteBuffer := bytes.NewBuffer([]byte{})
 		encoder := json.NewEncoder(byteBuffer)
@@ -34,15 +38,26 @@ func NewKVTee(kvStore kvs.KVStore, condition *core.Condition) *Tee {
 		}
 		return kvStore.Put(context.Background(), key, byteBuffer.Bytes())
 	}
+
+	if transformer == nil {
+		transformation := core.NewTransformation(
+			[]core.FieldTransformation{&core.CopyTransformation{}},
+			core.TrueCondition)
+		transformer = DefaultTransformer()
+		transformer.AddSpec("", "", transformation)
+	}
 	return &Tee{
 		outputFunc,
 		condition,
+		transformer,
+		"kvstore",
+		kvStore.ConnectionString(),
 	}
 }
 
 // NewPubSubTee will create a Tee processor that publishes maps using the provided
 // publisher.
-func NewPubSubTee(publisher streaming.Publisher, condition *core.Condition) *Tee {
+func NewPubSubTee(publisher streaming.Publisher, condition *core.Condition, transformer *Transformer) *Tee {
 	outputFunc := func(key string, in map[string]interface{}) error {
 		byteBuffer := bytes.NewBuffer([]byte{})
 		encoder := json.NewEncoder(byteBuffer)
@@ -52,15 +67,26 @@ func NewPubSubTee(publisher streaming.Publisher, condition *core.Condition) *Tee
 		}
 		return publisher.Publish(context.Background(), byteBuffer.Bytes())
 	}
+
+	if transformer == nil {
+		transformation := core.NewTransformation(
+			[]core.FieldTransformation{&core.CopyTransformation{}},
+			core.TrueCondition)
+		transformer = DefaultTransformer()
+		transformer.AddSpec("", "", transformation)
+	}
 	return &Tee{
 		outputFunc,
 		condition,
+		transformer,
+		"pubsub",
+		publisher.ConnectionString(),
 	}
 }
 
 // NewHttpTee will create a tee processor that posts JSON-encoded
 // maps to a specified endpoint
-func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition) *Tee {
+func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition, transformer *Transformer) *Tee {
 	outputFunc := func(key string, in map[string]interface{}) error {
 		byteBuffer := bytes.NewBuffer([]byte{})
 		encoder := json.NewEncoder(byteBuffer)
@@ -86,9 +112,20 @@ func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition)
 		}
 		return nil
 	}
+
+	if transformer == nil {
+		transformation := core.NewTransformation(
+			[]core.FieldTransformation{&core.CopyTransformation{}},
+			core.TrueCondition)
+		transformer = DefaultTransformer()
+		transformer.AddSpec("", "", transformation)
+	}
 	return &Tee{
 		outputFunc,
 		condition,
+		transformer,
+		"web",
+		url,
 	}
 }
 
@@ -104,16 +141,40 @@ func (t Tee) Process(in map[string]interface{}) (map[string]interface{}, error) 
 		return in, nil
 	}
 
-	uuid, err := gUuid.NewUUID()
+	uuid, err := gUuid.NewRandom()
 	if err != nil {
 		return nil, err
 	}
-	out := core.CopyableMap(in).DeepCopy()
-	out[uuidKey] = uuid.String()
 
-	err = t.outputFunc(uuid.String(), in)
+	out := core.CopyableMap(in).DeepCopy()
+
+	teeOut, err := t.transformer.Process(in)
 	if err != nil {
 		return nil, err
 	}
+
+	err = t.outputFunc(uuid.String(), teeOut)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, ok := out[TeeMetadataKey]; !ok {
+		out[TeeMetadataKey] = make([]map[string]string, 0)
+	}
+
+	switch outVal := out[TeeMetadataKey].(type) {
+	case []map[string]string:
+		out[TeeMetadataKey] = append(outVal, map[string]string{
+			"uuid": uuid.String(),
+			"outputType": t.outputType,
+			"connectionString": t.connectionString,
+		})
+	default:
+		msg := fmt.Sprintf("detected corrupted %s in map when teeing.  expected []map[string]string, got %v",
+			TeeMetadataKey, reflect.TypeOf(outVal))
+		return nil, common.NewInternalError(msg)
+	}
+
 	return out, nil
+
 }

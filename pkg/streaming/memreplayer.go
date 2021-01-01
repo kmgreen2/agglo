@@ -38,16 +38,22 @@ func NewMemReplayer(memPubSub *MemPubSub, topic string, start, end int64) (*MemR
 }
 
 // Replay will replay the stream based on the replayer config and the provided handler function
-func (memReplayer *MemReplayer) Replay(ctx context.Context, handler func(payload []byte) error) error {
+func (memReplayer *MemReplayer) Replay(ctx context.Context, handler func(ctx context.Context,
+	payload []byte) error) error {
 	for {
 		payload, err := memReplayer.memPubSub.Next(memReplayer.ctx)
 		if err != nil {
 			return err
 		}
-		err = handler(payload)
+		err = handler(ctx, payload)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// ConnectionString will return a string that can be parsed to connect to the underlying pub/sub system
+func (memReplayer *MemReplayer) ConnectionString() string {
+	return "inMemPubSub"
 }

@@ -111,3 +111,9 @@ func (kvStore *MemKVStore) List(ctx context.Context, prefix string) ([]string, e
 	return result, nil
 }
 
+// ConnectionString will return a string that can be parsed by NewMemKVStore to create an instance
+// of KVStore
+func (kvStore *MemKVStore) ConnectionString() string {
+	return "inMemStore"
+}
+

@@ -36,33 +36,33 @@ func TestHttpTee(t *testing.T) {
 			checkErr = err
 		}
 		if !core.CopyableMap(bodyMap).DeepCompare(jsonMap) {
-			checkErr = fmt.Errorf("maps do not match: %v \n!=\n %v", bodyMap, jsonMap)
+			checkErr = fmt.Errorf("maps do not keepMatched: %v \n!=\n %v", bodyMap, jsonMap)
 		}
 		checkErr = nil
 	}
 
 	httpClient := test.NewMockHttpClient(nil, 200, checkFunc)
 
-	httpTee := process.NewHttpTee(httpClient, "foo", core.TrueCondition)
+	httpTee := process.NewHttpTee(httpClient, "foo", core.TrueCondition, nil)
 
 	out, err := httpTee.Process(jsonMap)
 	assert.Nil(t, err)
 	assert.Nil(t, checkErr)
-	delete(out, "_uuid_key")
+	delete(out, process.TeeMetadataKey)
 	assert.True(t, core.CopyableMap(out).DeepCompare(jsonMap))
 }
 
 func TestHttpTeeError(t *testing.T) {
 	jsonMap := test.TestJson()
 	httpClient := test.NewMockHttpClient(fmt.Errorf("error"),500, func(req *http.Request){})
-	httpTee := process.NewHttpTee(httpClient, "foo", core.TrueCondition)
+	httpTee := process.NewHttpTee(httpClient, "foo", core.TrueCondition, nil)
 
 	out, err := httpTee.Process(jsonMap)
 	assert.Nil(t, out)
 	assert.Error(t, err)
 
 	httpClient = test.NewMockHttpClient(nil, 500, func(req *http.Request){})
-	httpTee = process.NewHttpTee(httpClient, "foo", core.TrueCondition)
+	httpTee = process.NewHttpTee(httpClient, "foo", core.TrueCondition, nil)
 	out, err = httpTee.Process(jsonMap)
 	assert.Nil(t, out)
 	assert.Error(t, err)
@@ -71,7 +71,7 @@ func TestHttpTeeError(t *testing.T) {
 func TestHttpFalseCondition(t *testing.T) {
 	jsonMap := test.TestJson()
 	httpClient := test.NewMockHttpClient(nil, 200, func(req *http.Request){})
-	httpTee := process.NewHttpTee(httpClient, "foo", core.FalseCondition)
+	httpTee := process.NewHttpTee(httpClient, "foo", core.FalseCondition, nil)
 
 	out, err := httpTee.Process(jsonMap)
 	assert.Equal(t, jsonMap, out)
@@ -82,12 +82,14 @@ func TestKVTee(t *testing.T) {
 	var storedMap map[string]interface{}
 	jsonMap := test.TestJson()
 	kvStore := kvs.NewMemKVStore()
-	kvTee := process.NewKVTee(kvStore, core.TrueCondition)
+	kvTee := process.NewKVTee(kvStore, core.TrueCondition, nil)
 
 	out, err := kvTee.Process(jsonMap)
 	assert.Nil(t, err)
 
-	storedMapBytes, err := kvStore.Get(context.Background(), out["_uuid_key"].(string))
+	teeMetadata := out[process.TeeMetadataKey].([]map[string]string)
+
+	storedMapBytes, err := kvStore.Get(context.Background(), teeMetadata[0]["uuid"])
 	assert.Nil(t, err)
 
 	decoder := json.NewDecoder(bytes.NewBuffer(storedMapBytes))
@@ -95,7 +97,7 @@ func TestKVTee(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.True(t, core.CopyableMap(storedMap).DeepCompare(jsonMap))
-	delete(out, "_uuid_key")
+	delete(out, process.TeeMetadataKey)
 	assert.True(t, core.CopyableMap(out).DeepCompare(jsonMap))
 }
 
@@ -103,9 +105,11 @@ func TestKVTeeError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	jsonMap := test.TestJson()
 	kvStore := mocks.NewMockKVStore(ctrl)
-	kvTee := process.NewKVTee(kvStore, core.TrueCondition)
-
 	kvStore.EXPECT().Put(context.Background(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("error"))
+	kvStore.EXPECT().ConnectionString().Return("")
+
+	kvTee := process.NewKVTee(kvStore, core.TrueCondition,nil)
+
 	out, err := kvTee.Process(jsonMap)
 	assert.Nil(t, out)
 	assert.Error(t, err)
@@ -115,7 +119,8 @@ func TestKVTeeFalseCondition(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	jsonMap := test.TestJson()
 	kvStore := mocks.NewMockKVStore(ctrl)
-	kvTee := process.NewKVTee(kvStore, core.FalseCondition)
+	kvStore.EXPECT().ConnectionString().Return("")
+	kvTee := process.NewKVTee(kvStore, core.FalseCondition, nil)
 
 	out, err := kvTee.Process(jsonMap)
 	assert.Equal(t, jsonMap, out)
@@ -154,7 +159,7 @@ func TestPublisherTee(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	publisherTee := process.NewPubSubTee(publisher, core.TrueCondition)
+	publisherTee := process.NewPubSubTee(publisher, core.TrueCondition, nil)
 
 	out, err := publisherTee.Process(jsonMap)
 	assert.Nil(t, err)
@@ -162,7 +167,7 @@ func TestPublisherTee(t *testing.T) {
 	// Wait for subscriber
 	lock.Lock()
 	assert.True(t, core.CopyableMap(storedMap).DeepCompare(jsonMap))
-	delete(out, "_uuid_key")
+	delete(out, process.TeeMetadataKey)
 	assert.True(t, core.CopyableMap(out).DeepCompare(jsonMap))
 }
 
@@ -170,9 +175,10 @@ func TestPublisherTeeError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	jsonMap := test.TestJson()
 	publisher := mocks.NewMockPublisher(ctrl)
-	publisherTee := process.NewPubSubTee(publisher, core.TrueCondition)
-
 	publisher.EXPECT().Publish(context.Background(), gomock.Any()).Return(fmt.Errorf("error"))
+	publisher.EXPECT().ConnectionString().Return("")
+
+	publisherTee := process.NewPubSubTee(publisher, core.TrueCondition, nil)
 	out, err := publisherTee.Process(jsonMap)
 	assert.Nil(t, out)
 	assert.Error(t, err)
@@ -182,7 +188,8 @@ func TestPublisherTeeFalseCondition(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	jsonMap := test.TestJson()
 	publisher := mocks.NewMockPublisher(ctrl)
-	publisherTee := process.NewPubSubTee(publisher, core.FalseCondition)
+	publisher.EXPECT().ConnectionString().Return("")
+	publisherTee := process.NewPubSubTee(publisher, core.FalseCondition, nil)
 
 	out, err := publisherTee.Process(jsonMap)
 	assert.Equal(t, jsonMap, out)

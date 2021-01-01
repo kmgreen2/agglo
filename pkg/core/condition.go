@@ -120,6 +120,29 @@ func (expr *ExistsExpression) String() string {
 	return strings.Join(components, ",")
 }
 
+func (expr *ExistsExpression) VariablesExist(in map[string]interface{}) bool {
+	flattened := Flatten(in)
+
+	components := strings.Split(expr.String(), ",")
+	for _, component := range components {
+		notExistOp := false
+		if component[0] == '!' {
+			component = component[1:]
+			notExistOp = true
+		}
+		if _, ok := flattened[component]; ok {
+			if notExistOp {
+				return false
+			}
+		} else {
+			if !notExistOp {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func (expr *ExistsExpression) OperatorType() OperatorType {
 	return ExistsType
 }
@@ -137,6 +160,18 @@ func NewUnaryExpression(rhs interface{}, operator UnaryOperator) *UnaryExpressio
 		valid: true,
 	}
 }
+
+func (expr *UnaryExpression) VariablesExist(in map[string]interface{}) bool {
+	flattened := Flatten(in)
+	switch rhs := expr.rhs.(type) {
+	case variable:
+		if _, ok := flattened[rhs.name]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 func (expr *UnaryExpression) String() string {
 	var opStr string
 	switch expr.operator {
@@ -233,6 +268,24 @@ func (expr *BinaryExpression) String() string {
 	formatString += ")"
 	return fmt.Sprintf(formatString, argList...)
 }
+
+func (expr *BinaryExpression) VariablesExist(in map[string]interface{}) bool {
+	flattened := Flatten(in)
+	switch rhs := expr.rhs.(type) {
+	case variable:
+		if _, ok := flattened[rhs.name]; !ok {
+			return false
+		}
+	}
+	switch lhs := expr.lhs.(type) {
+	case variable:
+		if _, ok := flattened[lhs.name]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 func (expr *BinaryExpression) OperatorType() OperatorType {
 	return getOperatorType(expr.operator)
 }
@@ -260,6 +313,11 @@ func (expr *LogicalExpression) String() string {
 	}
 	return fmt.Sprintf("(%s %s %s)", expr.lhs.String(), opStr, expr.rhs.String())
 }
+
+func (expr *LogicalExpression) VariablesExist(in map[string]interface{}) bool {
+	return expr.lhs.VariablesExist(in) && expr.rhs.VariablesExist(in)
+}
+
 func (expr *LogicalExpression) OperatorType() OperatorType {
 	return getOperatorType(expr.operator)
 }
@@ -286,7 +344,7 @@ func (expr *ComparatorExpression) String() string {
 
 	switch lhs := expr.lhs.(type) {
 	case string:
-		formatString += "%s"
+		formatString += "\"%s\""
 		argList = append(argList, lhs)
 	case variable:
 		formatString += "[%s]"
@@ -325,7 +383,7 @@ func (expr *ComparatorExpression) String() string {
 
 	switch rhs := expr.rhs.(type) {
 	case string:
-		formatString += " %s"
+		formatString += " \"%s\""
 		argList = append(argList, rhs)
 	case variable:
 		formatString += " [%s]"
@@ -350,6 +408,24 @@ func (expr *ComparatorExpression) String() string {
 	formatString += ")"
 	return fmt.Sprintf(formatString, argList...)
 }
+
+func (expr *ComparatorExpression) VariablesExist(in map[string]interface{}) bool {
+	flattened := Flatten(in)
+	switch rhs := expr.rhs.(type) {
+	case variable:
+		if _, ok := flattened[rhs.name]; !ok {
+			return false
+		}
+	}
+	switch lhs := expr.lhs.(type) {
+	case variable:
+		if _, ok := flattened[lhs.name]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 func (expr *ComparatorExpression) OperatorType() OperatorType {
 	return getOperatorType(expr.operator)
 }
@@ -369,6 +445,10 @@ func NewTrueExpression() *TrueExpression {
 	return &TrueExpression{}
 }
 
+func (expr *TrueExpression) VariablesExist(map[string]interface{}) bool {
+	return true
+}
+
 type FalseExpression struct {
 }
 
@@ -380,6 +460,10 @@ func (expr *FalseExpression) OperatorType() OperatorType {
 	return UnaryType
 }
 
+func (expr *FalseExpression) VariablesExist(map[string]interface{}) bool {
+	return true
+}
+
 func NewFalseExpression() *FalseExpression {
 	return &FalseExpression{}
 }
@@ -389,6 +473,7 @@ func NewFalseExpression() *FalseExpression {
 type Expression interface {
 	String() string
 	OperatorType() OperatorType
+	VariablesExist(map[string]interface{}) bool
 	//Validate() bool -> Account for inconvenience of returning error from the builder functions
 }
 
@@ -404,6 +489,7 @@ func NewCondition(expr Expression) (*Condition, error) {
 	case *ComparatorExpression: return cond, nil
 	case *LogicalExpression: return cond, nil
 	case *TrueExpression: return cond, nil
+	case *FalseExpression: return cond, nil
 	case *ExistsExpression: return cond, nil
 	default: return nil, fmt.Errorf("")
 	}
@@ -417,33 +503,25 @@ var FalseCondition = &Condition {
 	NewFalseExpression(),
 }
 
+
 func (c *Condition) Evaluate(in map[string]interface{}) (bool, error) {
 	// govaluate does not support checking the existence of fields in,
 	// so we had to do it ourselves
 	// Note that Exists operations cannot be used in conjunction with
 	// other types of expressions, so they have to be different processes
 	// in a pipeline
+	variablesExist := c.expr.VariablesExist(in)
 	if c.expr.OperatorType() == ExistsType {
-		flattened := Flatten(in)
+		return variablesExist, nil
+	}
 
-		components := strings.Split(c.expr.String(), ",")
-		for _, component := range components {
-			notExistOp := false
-			if component[0] == '!' {
-				component = component[1:]
-				notExistOp = true
-			}
-			if _, ok := flattened[component]; ok {
-				if notExistOp {
-					return false, nil
-				}
-			} else {
-				if !notExistOp {
-					return false, nil
-				}
-			}
-		}
-		return true, nil
+	// ToDo(KMG): Should we return an error here?  It seems that non-existence
+	// of a field implies the condition is false, so not returning error for now
+	//
+	// This check is needed because govaluate will return an error is a variable
+	// in an expression is not found in the provided map
+	if !variablesExist {
+		return false, nil
 	}
 
 	expression, err := govaluate.NewEvaluableExpression(c.expr.String())
