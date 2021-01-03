@@ -115,8 +115,7 @@ message Pipeline {
 }
 
 message PipelineProcess {
-    ProcessType processType = 1;
-    string name = 2;
+    string name = 1;
 }
 
 message ProcessDefinition {

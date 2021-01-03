@@ -1,14 +1,15 @@
 package serialization
 
 import (
+	"bytes"
 	"fmt"
-	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/jsonpb"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/core"
 	"github.com/kmgreen2/agglo/pkg/core/process"
-	"github.com/kmgreen2/agglo/pkg/proto"
 	"github.com/kmgreen2/agglo/pkg/kvs"
+	"github.com/kmgreen2/agglo/pkg/proto"
 	"github.com/kmgreen2/agglo/pkg/streaming"
 	"net/http"
 	"reflect"
@@ -200,7 +201,7 @@ func buildExpression(expression *pipelineapi.Expression) (core.Expression, error
 }
 
 func buildCondition(condition *pipelineapi.Condition) (*core.Condition, error) {
-	if condition.Condition == nil {
+	if condition == nil || condition.Condition == nil {
 		return nil, nil
 	}
 	switch c := condition.Condition.(type) {
@@ -230,7 +231,9 @@ func buildTransformer(transformerSpecs []*pipelineapi.TransformerSpec) (*process
 			return nil, err
 		}
 		builder := core.NewTransformationBuilder()
-		builder.AddCondition(condition)
+		if condition != nil {
+			builder.AddCondition(condition)
+		}
 		switch spec.Transformation.TransformationType {
 		case pipelineapi.TransformationType_TransformCopy:
 			builder.AddFieldTransformation(&core.CopyTransformation{})
@@ -275,27 +278,32 @@ func buildTransformer(transformerSpecs []*pipelineapi.TransformerSpec) (*process
 	return transformer, nil
 }
 
-func PipelinesFromBytes(pipelineBytes []byte)  ([]*process.Pipeline, error) {
+func PipelinesFromJson(pipelineJson []byte) ([]*process.Pipeline, error) {
+	var pipelinesPb pipelineapi.Pipelines
+	byteBuffer := bytes.NewBuffer(pipelineJson)
+	err := jsonpb.Unmarshal(byteBuffer, &pipelinesPb)
+	if err != nil {
+		return nil, err
+	}
+	return PipelinesFromPb(&pipelinesPb)
+}
+
+func PipelinesFromPb(pipelinesPb *pipelineapi.Pipelines)  ([]*process.Pipeline, error) {
 	var builtPipelines  []*process.Pipeline
-	pipelines := &pipelineapi.Pipelines{}
 
 	externalKVStores := make(map[string]kvs.KVStore)
 	externalPublisher := make(map[string]streaming.Publisher)
 	externalHttp := make(map[string]string)
 	processes := make(map[string]process.PipelineProcess)
 
-	if err := proto.Unmarshal(pipelineBytes, pipelines); err != nil {
-		return nil, err
-	}
-
 	// Get Uuid
-	partitionUuid, err := gUuid.Parse(pipelines.PartitionUuid)
+	partitionUuid, err := gUuid.Parse(pipelinesPb.PartitionUuid)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get external systems
-	for _, externalSystem := range pipelines.ExternalSystems {
+	for _, externalSystem := range pipelinesPb.ExternalSystems {
 		switch externalSystem.ExternalType {
 		case pipelineapi.ExternalType_ExternalKVStore:
 			externalKVStores[externalSystem.Name] = kvs.NewMemKVStore()
@@ -311,7 +319,7 @@ func PipelinesFromBytes(pipelineBytes []byte)  ([]*process.Pipeline, error) {
 	}
 
 	// Get processes
-	for _, processDefinition := range pipelines.ProcessDefinitions {
+	for _, processDefinition := range pipelinesPb.ProcessDefinitions {
 		switch procDef := processDefinition.ProcessDefinition.(type) {
 		case *pipelineapi.ProcessDefinition_Annotator:
 			if _, ok := processes[procDef.Annotator.Name]; ok {
@@ -437,7 +445,7 @@ func PipelinesFromBytes(pipelineBytes []byte)  ([]*process.Pipeline, error) {
 	}
 
 	// Build pipelines
-	for _, pipeline := range pipelines.Pipelines {
+	for _, pipeline := range pipelinesPb.Pipelines {
 		pipelineBuilder := process.NewPipelineBuilder()
 		// Each pipeline must set annotations to ensure there are no conflicts in the state stores
 		annotatorBuilder := process.NewAnnotatorBuilder()

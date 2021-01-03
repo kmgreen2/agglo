@@ -5,8 +5,19 @@
       "name": "tester-pipeline",
       "processes": [
         {
-          "processType": "AnnotatorProcess",
           "name": "annotate-cicd"
+        },
+        {
+          "name": "aggregate-author"
+        },
+        {
+          "name": "completion-hashjoin"
+        },
+        {
+          "name": "tee-git-transform"
+        },
+        {
+          "name": "filter-internal"
         }
       ]
     }
@@ -71,7 +82,9 @@
           "expression": {
             "comparator": {
               "lhs": {
-                "variable": "version-control"
+                "variable": {
+                  "name": "version-control"
+                }
               },
               "rhs": {
                 "literal": "git-dev"
@@ -114,7 +127,9 @@
           "expression": {
             "comparator": {
               "lhs": {
-                "variable": "version-control"
+                "variable": {
+                  "name": "version-control"
+                }
               },
               "rhs": {
                 "literal": "git-dev"
@@ -130,14 +145,14 @@
             "sourceField": "author",
             "targetField": "gitAuthor",
             "transformation": {
-              "transformationType": "TransformationCopy"
+              "transformationType": "TransformCopy"
             }
           },
           {
             "sourceField": "hash",
             "targetField": "gitHash",
             "transformation": {
-              "transformationType": "TransformationCopy"
+              "transformationType": "TransformCopy"
             }
           }
         ]

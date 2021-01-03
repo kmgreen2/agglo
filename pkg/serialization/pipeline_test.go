@@ -1,9 +1,8 @@
 package serialization
 
 import (
-	"bytes"
-	"github.com/golang/protobuf/jsonpb"
-	pipelineapi "github.com/kmgreen2/agglo/pkg/proto"
+	"fmt"
+	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
@@ -11,8 +10,7 @@ import (
 )
 
 func TestPipelinesBasic(t *testing.T) {
-	var pipelinesPb pipelineapi.Pipelines
-	fp, err := os.Open("test/config/basic_pipeline.json")
+	fp, err := os.Open("../../test/config/basic_pipeline.json")
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -22,6 +20,18 @@ func TestPipelinesBasic(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	byteBuffer := bytes.NewBuffer(configBytes)
-	err = jsonpb.Unmarshal(byteBuffer, &pipelinesPb)
+	pipelines, err := PipelinesFromJson(configBytes)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	assert.NotNil(t, pipelines)
+	assert.Equal(t, 1, len(pipelines))
+
+	testMaps := test.PipelineTestMapsOne()
+
+	for _, m := range testMaps {
+		out, err := pipelines[0].RunSync(m)
+		fmt.Println(out)
+		assert.Nil(t, err)
+	}
 }

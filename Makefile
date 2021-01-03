@@ -53,4 +53,4 @@ coverage: setup genmocks ## check code coverage
 
 .PHONY: proto
 proto: api/proto/pipeline.proto
-	$(PROTOC) --go_out=pkg/core/proto api/proto/pipeline.proto 
+	$(PROTOC) --go_out=pkg/proto api/proto/pipeline.proto 

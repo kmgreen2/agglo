@@ -286,7 +286,7 @@ func TestNewExecMapTransformation(t *testing.T) {
 	}
 
 	builder := core.NewTransformationBuilder()
-	builder.AddFieldTransformation(core.NewExecMapTransformation("bin/regexmap", "^f.*",
+	builder.AddFieldTransformation(core.NewExecMapTransformation("../../bin/regexmap", "^f.*",
 		"hello", "foo", "bar", "baz"))
 
 	transformation := builder.Get()
