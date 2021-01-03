@@ -18,6 +18,9 @@
         },
         {
           "name": "filter-internal"
+        },
+        {
+          "name": "spawner-print-githash"
         }
       ]
     }
@@ -118,6 +121,32 @@
         "name": "filter-internal",
         "regex": "^agglo.*",
         "keepMatched": false
+      }
+    },
+    {
+      "spawner": {
+        "name": "spawner-print-githash",
+        "delayInMs": 0,
+        "doSync": true,
+        "condition": {
+          "exists": {
+            "ops": [
+              {
+                "key": "githash",
+                "op": "Exists"
+              }
+            ]
+          }
+        },
+        "job": {
+          "runnable": {
+            "pathToExec": "../../bin/printvals",
+            "cmdArgs": [
+              "/tmp/testPipelinesBasic",
+              "githash"
+            ]
+          }
+        }
       }
     },
     {

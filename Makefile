@@ -20,6 +20,7 @@ all: build
 .PHONY: build
 build: 
 	CGO_ENABLED=1 go build -o bin/regexmap cmd/regexmap/main.go
+	CGO_ENABLED=1 go build -o bin/printvals cmd/printvals/main.go
 
 .PHONY: genmocks
 genmocks:
@@ -53,4 +54,4 @@ coverage: setup genmocks ## check code coverage
 
 .PHONY: proto
 proto: api/proto/pipeline.proto
-	$(PROTOC) --go_out=pkg/proto api/proto/pipeline.proto 
+	$(PROTOC) --go_out=generated/proto api/proto/pipeline.proto 

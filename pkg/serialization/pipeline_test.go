@@ -1,7 +1,6 @@
 package serialization
 
 import (
-	"fmt"
 	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
@@ -10,6 +9,8 @@ import (
 )
 
 func TestPipelinesBasic(t *testing.T) {
+	tmpFile := "/tmp/testPipelinesBasic"
+	_ = os.Remove(tmpFile)
 	fp, err := os.Open("../../test/config/basic_pipeline.json")
 	if err != nil {
 		assert.FailNow(t, err.Error())
@@ -27,11 +28,35 @@ func TestPipelinesBasic(t *testing.T) {
 	assert.NotNil(t, pipelines)
 	assert.Equal(t, 1, len(pipelines))
 
+
 	testMaps := test.PipelineTestMapsOne()
 
 	for _, m := range testMaps {
 		out, err := pipelines[0].RunSync(m)
-		fmt.Println(out)
+		if _, ok := out["author"]; ok {
+			assert.Equal(t, "git-dev", out["version-control"].(string))
+		}
+		if deployer, ok := out["deploy"]; ok {
+			assert.Equal(t, "circleci-dev", deployer.(string))
+			assert.Equal(t, "deploybot", out["user"].(string))
+		}
 		assert.Nil(t, err)
 	}
+
+	file, err := os.OpenFile(tmpFile, os.O_RDONLY, 0)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	result, err := ioutil.ReadAll(file)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	assert.Equal(t, "abcd\nbeef\n", (string(result)))
+
+	_ = os.Remove(tmpFile)
 }

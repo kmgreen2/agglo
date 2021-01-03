@@ -181,9 +181,9 @@ message Spawner {
 }
 
 // Exec must take map[string]interface{} (JSON) as input
-// ToDo(KMG): Use exec and pipes to implement
 message Runnable {
     string pathToExec = 1;
+    repeated string cmdArgs = 2;
 }
 
 message Job {

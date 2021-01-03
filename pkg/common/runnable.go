@@ -86,6 +86,10 @@ func (runnable *ExecRunnable) Run() (interface{}, error) {
 		return nil, err
 	}
 
+	if len(out) == 0 {
+		return outMap, nil
+	}
+
 	decodeBuffer := bytes.NewBuffer(out)
 	switch runnable.args.(type) {
 	case map[string]interface{}:

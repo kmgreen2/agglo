@@ -9,7 +9,7 @@ import (
 	"github.com/kmgreen2/agglo/pkg/core"
 	"github.com/kmgreen2/agglo/pkg/core/process"
 	"github.com/kmgreen2/agglo/pkg/kvs"
-	"github.com/kmgreen2/agglo/pkg/proto"
+	"github.com/kmgreen2/agglo/generated/proto"
 	"github.com/kmgreen2/agglo/pkg/streaming"
 	"net/http"
 	"reflect"
@@ -201,8 +201,9 @@ func buildExpression(expression *pipelineapi.Expression) (core.Expression, error
 }
 
 func buildCondition(condition *pipelineapi.Condition) (*core.Condition, error) {
+	// If no condition is specified, then assume True
 	if condition == nil || condition.Condition == nil {
-		return nil, nil
+		return core.TrueCondition, nil
 	}
 	switch c := condition.Condition.(type) {
 	case *pipelineapi.Condition_Expression:
@@ -231,9 +232,7 @@ func buildTransformer(transformerSpecs []*pipelineapi.TransformerSpec) (*process
 			return nil, err
 		}
 		builder := core.NewTransformationBuilder()
-		if condition != nil {
-			builder.AddCondition(condition)
-		}
+		builder.AddCondition(condition)
 		switch spec.Transformation.TransformationType {
 		case pipelineapi.TransformationType_TransformCopy:
 			builder.AddFieldTransformation(&core.CopyTransformation{})
@@ -433,8 +432,7 @@ func PipelinesFromPb(pipelinesPb *pipelineapi.Pipelines)  ([]*process.Pipeline, 
 				msg := fmt.Sprintf("name conflict in process definitions: %s", procDef.Spawner.Name)
 				return nil, common.NewInvalidError(msg)
 			}
-			runnable := common.NewExecRunnable(procDef.Spawner.Job.Runnable.PathToExec)
-			job := core.NewLocalJob(runnable)
+			job := core.NewCmdJob(procDef.Spawner.Job.Runnable.PathToExec, procDef.Spawner.Job.Runnable.CmdArgs...)
 			condition, err := buildCondition(procDef.Spawner.Condition)
 			if err != nil {
 				return nil, err

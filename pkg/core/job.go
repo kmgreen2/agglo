@@ -11,6 +11,7 @@ type Job interface {
 
 type LocalJob struct {
 	runnable common.PartialRunnable
+	cmdArgs []string
 }
 
 func NewLocalJob(runnable common.PartialRunnable) *LocalJob {
@@ -19,9 +20,9 @@ func NewLocalJob(runnable common.PartialRunnable) *LocalJob {
 	}
 }
 
-func (j LocalJob) Run(delay time.Duration, sync bool, args ...interface{}) common.Future {
+func run(runnable common.PartialRunnable, delay time.Duration, sync bool, args ...interface{}) common.Future {
 	var future common.Future
-	err := j.runnable.SetArgs(args...)
+	err := runnable.SetArgs(args...)
 	if err != nil {
 		completable := common.NewCompletable()
 		// Note: This only fails if the completable is already completed.  Since this is
@@ -31,13 +32,32 @@ func (j LocalJob) Run(delay time.Duration, sync bool, args ...interface{}) commo
 	}
 
 	if delay > 0 {
-		future = common.CreateDeferredFuture(delay, j.runnable)
+		future = common.CreateDeferredFuture(delay, runnable)
 	} else {
-		future = common.CreateFuture(j.runnable)
+		future = common.CreateFuture(runnable)
 	}
 
 	if sync {
 		common.WaitAll([]common.Future{future}, -1)
 	}
 	return future
+}
+
+func (j LocalJob) Run(delay time.Duration, sync bool, args ...interface{}) common.Future {
+	return run(j.runnable, delay, sync, args...)
+}
+
+type CmdJob struct {
+	runnable common.PartialRunnable
+}
+
+func NewCmdJob(cmdPath string, cmdArgs ...string) *CmdJob {
+	runnable := common.NewExecRunnableWithCmdArgs(cmdPath, cmdArgs...)
+	return &CmdJob{
+		runnable: runnable,
+	}
+}
+
+func (j CmdJob) Run(delay time.Duration, sync bool, args ...interface{}) common.Future {
+	return run(j.runnable, delay, sync, args...)
 }
