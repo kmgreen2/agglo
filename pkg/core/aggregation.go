@@ -324,18 +324,11 @@ func (fieldAggregation *FieldAggregation) getGroupByPath(in map[string]interface
 }
 
 type Aggregation struct {
-	// Unique name for the aggregation
-	// Source map must have field completion: "<name>" to be considered
-	// This can be added by having an annotation process prior to the aggregation
-	Name string                        `json:"name"`
-	PartitionID gUuid.UUID             `json:"partitionID"`
 	FieldAggregation *FieldAggregation `json:"fieldAggregation"`
 }
 
-func NewAggregation(partitionID gUuid.UUID, name string, fieldAggregation *FieldAggregation) *Aggregation {
+func NewAggregation(fieldAggregation *FieldAggregation) *Aggregation {
 	return &Aggregation{
-		Name: name,
-		PartitionID: partitionID,
 		FieldAggregation: fieldAggregation,
 	}
 }

@@ -23,7 +23,7 @@ name string, partitionID gUuid.UUID, aggPath string, evalValAt EvaluateValAt) (i
 
 	fieldAggregation := core.NewFieldAggregation(aggPath, aggType, []string{})
 
-	aggregation := core.NewAggregation(partitionID, name, fieldAggregation)
+	aggregation := core.NewAggregation(fieldAggregation)
 
 	aggregator := process.NewAggregator(aggregation, core.TrueCondition, kvStore)
 

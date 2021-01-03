@@ -1,5 +1,7 @@
 .DEFAULT_GOAL := all
 
+PROTOC=protoc  -I=api/proto
+
 PKG_SOURCES = $(filter-out %_test.go,$(wildcard pkg/**/*.go))
 export GOOS ?= darwin
 
@@ -48,3 +50,7 @@ coverage: setup genmocks ## check code coverage
 	go test ./... -cover -coverprofile=coverage.txt
 	go tool cover -html=coverage.txt -o coverage.html
 
+
+.PHONY: proto
+proto: api/proto/pipeline.proto
+	$(PROTOC) --go_out=pkg/core/proto api/proto/pipeline.proto 

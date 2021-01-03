@@ -44,6 +44,21 @@ type FieldTransformation interface {
 type MapTransformation struct {
 	MapFunc func(interface{}) (interface{}, error)
 }
+
+func NewExecMapTransformation(path string) *MapTransformation {
+	execRunnable := common.NewExecRunnable(path)
+
+	return &MapTransformation{
+		func (in interface{}) (interface{}, error) {
+			err := execRunnable.SetArgs(in)
+			if err != nil {
+				return nil, err
+			}
+			return execRunnable.Run()
+		},
+	}
+}
+
 func (t MapTransformation) Transform(in *Transformable) (*Transformable, error) {
 	if in.Kind() == reflect.Slice {
 		slice := in.Value().([]interface{})
@@ -79,6 +94,35 @@ func (t MapTransformation) Transform(in *Transformable) (*Transformable, error) 
 type LeftFoldTransformation struct {
 	FoldFunc func(acc, v interface{}) (interface{}, error)
 }
+
+func NewExecLeftFoldTransformation(path string) *LeftFoldTransformation {
+	execRunnable := common.NewExecRunnable(path)
+
+	return &LeftFoldTransformation{
+		func (acc, in interface{}) (interface{}, error) {
+			switch val := in.(type) {
+			case map[string]interface{}:
+				if _, ok := val["agglo:acc"]; !ok {
+					val["agglo:acc"] = acc
+				} else {
+					msg := fmt.Sprintf("reserved key 'agglo:acc' should not be set in args to fold")
+					return nil, common.NewInvalidError(msg)
+				}
+			default:
+				msg := fmt.Sprintf("expected map[string]interface{} argument to fold.  Got %v",
+					reflect.TypeOf(val))
+				return nil, common.NewInvalidError(msg)
+			}
+
+			err := execRunnable.SetArgs(in)
+			if err != nil {
+				return nil, err
+			}
+			return execRunnable.Run()
+		},
+	}
+}
+
 func (t LeftFoldTransformation) Transform(in *Transformable) (*Transformable, error) {
 	if in.Kind() == reflect.Slice {
 		slice := in.Value().([]interface{})
@@ -99,6 +143,35 @@ func (t LeftFoldTransformation) Transform(in *Transformable) (*Transformable, er
 type RightFoldTransformation struct {
 	FoldFunc func(acc, v interface{}) (interface{}, error)
 }
+
+func NewExecRightFoldTransformation(path string) *RightFoldTransformation {
+	execRunnable := common.NewExecRunnable(path)
+
+	return &RightFoldTransformation{
+		func (acc, in interface{}) (interface{}, error) {
+			switch val := in.(type) {
+			case map[string]interface{}:
+				if _, ok := val["agglo:acc"]; !ok {
+					val["agglo:acc"] = acc
+				} else {
+					msg := fmt.Sprintf("reserved key 'agglo:acc' should not be set in args to fold")
+					return nil, common.NewInvalidError(msg)
+				}
+			default:
+				msg := fmt.Sprintf("expected map[string]interface{} argument to fold.  Got %v",
+					reflect.TypeOf(val))
+				return nil, common.NewInvalidError(msg)
+			}
+
+			err := execRunnable.SetArgs(in)
+			if err != nil {
+				return nil, err
+			}
+			return execRunnable.Run()
+		},
+	}
+}
+
 func (t RightFoldTransformation) Transform(in *Transformable) (*Transformable, error) {
 	if in.Kind() == reflect.Slice {
 		slice := in.Value().([]interface{})

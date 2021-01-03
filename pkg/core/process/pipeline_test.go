@@ -92,14 +92,14 @@ func TestPipelineBasic(t *testing.T) {
 	builder.Add(annotatorBuilder.Build())
 
 	// Aggregate the annotated version control maps on author
-	aggregation := core.NewAggregation(partitionID, name, core.NewFieldAggregation("author",
+	aggregation := core.NewAggregation(core.NewFieldAggregation("author",
 		core.AggDiscreteHistogram, []string{}))
 	condition, err = core.NewCondition(core.NewComparatorExpression(core.Variable("version-control"), "git-dev",
 		core.Equal))
 	builder.Add(process.NewAggregator(aggregation, condition, kvStore))
 
 	// Create a completion that joins on commit hash
-	completion := core.NewCompletion(name, partitionID, []string{"hash", "githash"}, -1)
+	completion := core.NewCompletion([]string{"hash", "githash"}, -1)
 	completer := process.NewCompleter(completion, kvStore)
 	builder.Add(completer)
 

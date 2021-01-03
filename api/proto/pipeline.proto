@@ -1,52 +1,134 @@
 syntax = "proto3";
 
+option go_package = ".;pipelineapi";
+
 package pipeline;
 
 enum ProcessType {
-    Annotator = 0;
-    Aggregator = 1;
-    Completor = 2;
-    Filter = 3;
-    Spawner = 4;
-    Tee = 5;
-    Transformer = 6;
+    UnknownProcess = 0;
+    AnnotatorProcess = 1;
+    AggregatorProcess = 2;
+    CompleterProcess = 3;
+    FilterProcess = 4;
+    SpawnerProcess = 5;
+    TeeProcess = 6;
+    TransformerProcess = 7;
 }
 
 enum ExternalType {
-    ExternalKVStore = 0;
-    ExternalObjectStore = 1;
-    ExternalPubSub = 2;
-    ExternalHttp = 3;
+    ExternalUnknown = 0;
+    ExternalKVStore = 1;
+    ExternalObjectStore = 2;
+    ExternalPubSub = 3;
+    ExternalHttp = 4;
 }
 
 enum AggregationType {
-    AggSum = 0;
-    AggMax = 1;
-    AggMin = 2;
-    AggAvg = 3;
-    AggCount = 4;
-    AggDiscreteHistogram = 5;
+    AggUnknown = 0;
+    AggSum = 1;
+    AggMax = 2;
+    AggMin = 3;
+    AggAvg = 4;
+    AggCount = 5;
+    AggDiscreteHistogram = 6;
 }
 
 enum TransformationType {
-    TransformSum = 0;
-    TransformCopy = 1;
-    TransformMapRegex = 2;
-    TransformMapAdd = 3;
-    TransformMapMult = 4;
-    TransformCount = 5;
-    TransformLeftFold = 6;
-    TransformRightFold = 7;
-    TransformMap = 8;
+    TransformUnknown = 0;
+    TransformSum = 1;
+    TransformCopy = 2;
+    TransformMapRegex = 3;
+    TransformMapAdd = 4;
+    TransformMapMult = 5;
+    TransformCount = 6;
+    TransformLeftFold = 7;
+    TransformRightFold = 8;
+    TransformMap = 9;
+}
+
+enum OperatorType {
+    UnknownType = 0;
+    UnaryType = 1;
+    BinaryType = 2;
+    LogicalType = 3;
+    ComparatorType = 4;
+    ExistsType = 5;
+}
+
+enum ExistsOperator {
+    UnknownExists = 0;
+    Exists = 1;
+    NotExists = 2;
+}
+
+enum UnaryOperator {
+    UnknownUnary = 0;
+    Negation = 3;
+    Inversion = 4;
+    LogicalNot = 5;
+}
+
+enum BinaryOperator {
+    UnknownBinary = 0;
+    Addition = 6;
+    Subtract = 7;
+    Multiply = 8;
+    Divide = 9;
+    Power = 10;
+    Modulus = 11;
+    RightShift = 12;
+    LeftShift = 13;
+    Or = 14;
+    And = 15;
+    Xor = 16;
+}
+
+enum LogicalOperator {
+    UnknownLogical = 0;
+    LogicalAnd = 17;
+    LogicalOr = 18;
+}
+
+enum ComparatorOperator {
+    UnknownComparator = 0;
+    GreaterThan = 19;
+    LessThan = 20;
+    GreaterThanOrEqual = 21;
+    LessThanOrEqual = 22;
+    Equal = 23;
+    NotEqual = 24;
+    RegexMatch = 25;
+    RegexNotMatch = 26;
+}
+
+
+message Pipelines {
+    string partitionUuid = 1;
+    repeated Pipeline pipelines = 2;
+    repeated ProcessDefinition processDefinitions = 3;
+    repeated External externalSystems = 4;
 }
 
 message Pipeline {
-    repeated PipelineProcess processes = 1;
+    string name = 1;
+    repeated PipelineProcess processes = 2;
 }
 
 message PipelineProcess {
     ProcessType processType = 1;
     string name = 2;
+}
+
+message ProcessDefinition {
+    oneof processDefinition {
+        Annotator annotator = 1;
+        Aggregator aggregator = 2;
+        Completer completer = 3;
+        Filter filter = 4;
+        Spawner spawner = 5;
+        Tee tee = 6;
+        Transformer transformer = 7;
+    }
 }
 
 message Annotator {
@@ -63,7 +145,7 @@ message Annotation {
 message Aggregator {
     string name = 1;
     Condition condition = 2;
-    External stateStore = 3;
+    string stateStore = 3;
     Aggregation aggregation = 4;
 }
 
@@ -76,7 +158,7 @@ message Aggregation {
 message Completer {
     string name = 1;
     Condition condition = 2;
-    External stateStore = 3;
+    string stateStore = 3;
     Completion completion = 4;
 }
 
@@ -113,7 +195,8 @@ message Tee {
     string name = 1;
     Condition condition = 2;
     repeated TransformerSpec transformerSpecs = 3;
-    External outputConnector = 4;
+    string outputConnector = 4;
+    ExternalType externalType = 5;
 }
 
 message Transformer {
@@ -127,13 +210,108 @@ message TransformerSpec {
     Transformation transformation = 4;
 }
 
+message MapArgs {
+    string path = 1;
+}
+
+message MapAddArgs {
+    double value = 1;
+}
+
+message MapMultArgs {
+    double value = 1;
+}
+
+message LeftFoldArgs {
+    string path = 1;
+}
+
+message RightFoldArgs {
+    string path = 1;
+}
+
+message MapRegexArgs {
+    string regex = 1;
+    string replace = 2;
+}
+
 message Transformation {
-    Condition condition = 2;
-    TransformationType transformationType = 3;
+    Condition condition = 1;
+    TransformationType transformationType = 2;
+    oneof transformArgs {
+        MapArgs mapArgs = 3;
+        MapAddArgs mapAddArgs = 4;
+        MapMultArgs mapMultArgs = 5;
+        MapRegexArgs mapRegexArgs = 6;
+        LeftFoldArgs leftFoldArgs = 7;
+        RightFoldArgs rightFoldArgs = 8;
+    }
+}
+
+message ExistsOperation {
+    string key = 1;
+    ExistsOperator op = 2;
+}
+
+message ExistsExpression {
+    repeated ExistsOperation ops = 1;
+}
+
+message BooleanExpression {
+    bool value = 1;
+}
+
+message Variable {
+    string name = 1;
+}
+
+message Operand {
+    oneof operand {
+       Expression expression = 1;
+       Variable variable = 2;
+       string literal = 3;
+       double numeric = 4;
+    }
+}
+
+message ComparatorExpression {
+    Operand lhs = 1;
+    Operand rhs = 2;
+    ComparatorOperator op = 3;
+}
+
+message LogicalExpression {
+    Operand lhs = 1;
+    Operand rhs = 2;
+    LogicalOperator op = 3;
+}
+
+message BinaryExpression {
+    Operand lhs = 1;
+    Operand rhs = 2;
+    BinaryOperator op = 3;
+}
+
+message UnaryExpression {
+    Operand rhs = 2;
+    UnaryOperator op = 3;
+}
+
+message Expression {
+    oneof expression {
+        BooleanExpression boolean = 3;
+        ComparatorExpression comparator = 4;
+        LogicalExpression logical = 5;
+        BinaryExpression binary = 6;
+        UnaryExpression unary = 7;
+    }
 }
 
 message Condition {
-
+    oneof condition {
+        Expression expression = 1;
+        ExistsExpression exists = 2;
+    }
 }
 
 message External {

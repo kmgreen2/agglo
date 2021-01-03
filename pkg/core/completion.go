@@ -11,11 +11,6 @@ import (
 )
 
 type Completion struct {
-	// Unique name for the completion
-	// Source map must have field completion: "<name>" to be considered
-	// This can be added by having an annotation process prior to the completion
-	Name string				`json:"name"`
-	PartitionID gUuid.UUID  `json:"partitionID"`
 	JoinKeys []string		`json:"joinKeys"`
 	Timeout time.Duration	`json:"timeout"`
 }
@@ -41,10 +36,8 @@ func NewCompletionFromBytes(completionBytes []byte) (*Completion, error) {
 	return completion, nil
 }
 
-func NewCompletion(name string, partitionID gUuid.UUID, joinKeys []string, timeout time.Duration) *Completion {
+func NewCompletion(joinKeys []string, timeout time.Duration) *Completion {
 	return &Completion{
-		Name: name,
-		PartitionID: partitionID,
 		JoinKeys: joinKeys,
 		Timeout: timeout,
 	}

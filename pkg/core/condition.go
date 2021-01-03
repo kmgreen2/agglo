@@ -416,10 +416,18 @@ func (expr *ComparatorExpression) VariablesExist(in map[string]interface{}) bool
 		if _, ok := flattened[rhs.name]; !ok {
 			return false
 		}
+	case Expression:
+		if !rhs.VariablesExist(in) {
+			return false
+		}
 	}
 	switch lhs := expr.lhs.(type) {
 	case variable:
 		if _, ok := flattened[lhs.name]; !ok {
+			return false
+		}
+	case Expression:
+		if !lhs.VariablesExist(in) {
 			return false
 		}
 	}

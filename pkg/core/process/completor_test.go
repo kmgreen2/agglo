@@ -26,7 +26,7 @@ func DoCompleter(numMaps, numJoined int, timeout time.Duration, missingJoinKey s
 		joinedKeys = append(joinedKeys, missingJoinKey)
 	}
 
-	completion := core.NewCompletion("foo", partitionID, joinedKeys, timeout)
+	completion := core.NewCompletion(joinedKeys, timeout)
 
 	kvStore := kvs.NewMemKVStore()
 
