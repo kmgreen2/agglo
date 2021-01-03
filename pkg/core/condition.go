@@ -476,8 +476,6 @@ func NewFalseExpression() *FalseExpression {
 	return &FalseExpression{}
 }
 
-// ToDo(KMG): Create builder
-
 type Expression interface {
 	String() string
 	OperatorType() OperatorType

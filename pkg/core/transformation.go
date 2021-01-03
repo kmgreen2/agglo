@@ -45,8 +45,8 @@ type MapTransformation struct {
 	MapFunc func(interface{}) (interface{}, error)
 }
 
-func NewExecMapTransformation(path string) *MapTransformation {
-	execRunnable := common.NewExecRunnable(path)
+func NewExecMapTransformation(path string, cmdArgs ...string) *MapTransformation {
+	execRunnable := common.NewExecRunnableWithCmdArgs(path, cmdArgs...)
 
 	return &MapTransformation{
 		func (in interface{}) (interface{}, error) {

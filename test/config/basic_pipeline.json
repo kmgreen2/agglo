@@ -1,0 +1,154 @@
+{
+  "partitionUuid": "938e16fe-a216-4fe1-92bd-dcab49646fb9",
+  "pipelines": [
+    {
+      "name": "tester-pipeline",
+      "processes": [
+        {
+          "processType": "AnnotatorProcess",
+          "name": "annotate-cicd"
+        }
+      ]
+    }
+  ],
+  "processDefinitions": [
+    {
+      "annotator": {
+        "name": "annotate-cicd",
+        "annotations": [
+          {
+            "fieldKey": "version-control",
+            "value": "git-dev",
+            "condition": {
+              "exists": {
+                "ops": [
+                  {
+                    "key": "author",
+                    "op": "Exists"
+                  },
+                  {
+                    "key": "hash",
+                    "op": "Exists"
+                  },
+                  {
+                    "key": "githash",
+                    "op": "NotExists"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "fieldKey": "deploy",
+            "value": "circleci-dev",
+            "condition": {
+              "exists": {
+                "ops": [
+                  {
+                    "key": "author",
+                    "op": "NotExists"
+                  },
+                  {
+                    "key": "hash",
+                    "op": "NotExists"
+                  },
+                  {
+                    "key": "githash",
+                    "op": "Exists"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "aggregator": {
+        "name": "aggregate-author",
+        "stateStore": "memKVStore",
+        "condition": {
+          "expression": {
+            "comparator": {
+              "lhs": {
+                "variable": "version-control"
+              },
+              "rhs": {
+                "literal": "git-dev"
+              },
+              "op": "Equal"
+            }
+          }
+        },
+        "aggregation": {
+          "key": "author",
+          "aggregationType": "AggDiscreteHistogram",
+          "groupByKeys": []
+        }
+      }
+    },
+    {
+      "completer": {
+        "name": "completion-hashjoin",
+        "stateStore": "memKVStore",
+        "completion": {
+          "joinKeys": [
+            "hash",
+            "githash"
+          ],
+          "timeoutMs": 3600000
+        }
+      }
+    },
+    {
+      "filter": {
+        "name": "filter-internal",
+        "regex": "^agglo.*",
+        "keepMatched": false
+      }
+    },
+    {
+      "tee": {
+        "name": "tee-git-transform",
+        "condition": {
+          "expression": {
+            "comparator": {
+              "lhs": {
+                "variable": "version-control"
+              },
+              "rhs": {
+                "literal": "git-dev"
+              },
+              "op": "Equal"
+            }
+          }
+        },
+        "outputConnector": "memKVStore",
+        "externalType": "ExternalKVStore",
+        "transformerSpecs": [
+          {
+            "sourceField": "author",
+            "targetField": "gitAuthor",
+            "transformation": {
+              "transformationType": "TransformationCopy"
+            }
+          },
+          {
+            "sourceField": "hash",
+            "targetField": "gitHash",
+            "transformation": {
+              "transformationType": "TransformationCopy"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "externalSystems": [
+    {
+      "externalType": "ExternalKVStore",
+      "name": "memKVStore",
+      "connectionString": "local"
+    }
+  ]
+}

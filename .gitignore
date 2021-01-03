@@ -21,3 +21,5 @@ test/mocks/
 .terraform/
 *.tfstate
 *.tfstate.backup
+
+bin/*

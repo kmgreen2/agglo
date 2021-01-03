@@ -22,7 +22,8 @@ type PartialRunnable interface {
 // and returns a JSON-encoded map on stdout
 type ExecRunnable struct {
 	path string
-	args map[string]interface{}
+	cmdArgs []string
+	args interface{}
 }
 
 func NewExecRunnable(path string) *ExecRunnable {
@@ -31,7 +32,14 @@ func NewExecRunnable(path string) *ExecRunnable {
 	}
 }
 
-func NewExecRunnableWithArgs(path string, args map[string]interface{}) *ExecRunnable {
+func NewExecRunnableWithCmdArgs(path string, cmdArgs ...string) *ExecRunnable {
+	return &ExecRunnable{
+		path: path,
+		cmdArgs: cmdArgs,
+	}
+}
+
+func NewExecRunnableWithArgs(path string, args interface{}) *ExecRunnable {
 	return &ExecRunnable{
 		path: path,
 		args: args,
@@ -40,17 +48,32 @@ func NewExecRunnableWithArgs(path string, args map[string]interface{}) *ExecRunn
 
 func (runnable *ExecRunnable) Run() (interface{}, error) {
 	var outMap map[string]interface{}
-	cmd := exec.Command(runnable.path)
+	cmd := exec.Command(runnable.path, runnable.cmdArgs...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
 	}
 
 	encodeBuffer := bytes.NewBuffer([]byte{})
-	encoder := json.NewEncoder(encodeBuffer)
-	err = encoder.Encode(runnable.args)
-	if err != nil {
-		return nil, err
+	switch val := runnable.args.(type) {
+	case map[string]interface{}:
+		encoder := json.NewEncoder(encodeBuffer)
+		err = encoder.Encode(val)
+		if err != nil {
+			return nil, err
+		}
+	case []interface{}:
+		encoder := json.NewEncoder(encodeBuffer)
+		err = encoder.Encode(val)
+		if err != nil {
+			return nil, err
+		}
+	case string:
+		encodeBuffer.Write([]byte(val))
+	default:
+		msg := fmt.Sprintf("ExecRunnable arg must be map[string]interface{}, []interface{} or string, got %v",
+			reflect.TypeOf(val))
+		return nil, NewInvalidError(msg)
 	}
 
 	go func() {
@@ -64,11 +87,23 @@ func (runnable *ExecRunnable) Run() (interface{}, error) {
 	}
 
 	decodeBuffer := bytes.NewBuffer(out)
-	decoder := json.NewDecoder(decodeBuffer)
-	err = decoder.Decode(&outMap)
-	if err != nil {
-		return nil, err
+	switch runnable.args.(type) {
+	case map[string]interface{}:
+		decoder := json.NewDecoder(decodeBuffer)
+		err = decoder.Decode(&outMap)
+		if err != nil {
+			return nil, err
+		}
+	case []interface{}:
+		decoder := json.NewDecoder(decodeBuffer)
+		err = decoder.Decode(&outMap)
+		if err != nil {
+			return nil, err
+		}
+	case string:
+		decodeBuffer.Write([]byte(out))
 	}
+
 	return outMap, err
 }
 
@@ -81,6 +116,12 @@ func (runnable *ExecRunnable) SetArgs(args ...interface{}) error {
 
 	switch val := args[0].(type) {
 	case map[string]interface{}:
+		runnable.args = val
+		return nil
+	case []interface{}:
+		runnable.args = val
+		return nil
+	case string:
 		runnable.args = val
 		return nil
 	default:

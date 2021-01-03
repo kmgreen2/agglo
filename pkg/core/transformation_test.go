@@ -257,3 +257,47 @@ func TestCopyTransformation(t *testing.T) {
 		assert.Equal(t, testSlice, v)
 	}
 }
+
+func TestNewExecMapTransformation(t *testing.T) {
+	testMap := map[string]interface{} {
+		"map" : map[string]interface{}{
+			"foo": "bizz",
+			"bar": "fizz",
+			"baz": "foo",
+		},
+		"map2" : map[string]interface{}{
+		"foo": "bizz",
+		"bar": "fuzz",
+		"baz": "fizz",
+	},
+	}
+
+	expectedMap := map[string]interface{} {
+		"map" : map[string]interface{}{
+			"foo": "bizz",
+			"bar": "hello",
+			"baz": "hello",
+		},
+		"map2" : map[string]interface{}{
+			"foo": "bizz",
+			"bar": "hello",
+			"baz": "hello",
+		},
+	}
+
+	builder := core.NewTransformationBuilder()
+	builder.AddFieldTransformation(core.NewExecMapTransformation("bin/regexmap", "^f.*",
+		"hello", "foo", "bar", "baz"))
+
+	transformation := builder.Get()
+
+	result, err := transformation.Transform(core.NewTransformable(testMap))
+	if err != nil {
+		assert.Fail(t, err.Error())
+	}
+
+	switch v := result.Value().(type) {
+	case map[string]interface{}:
+		assert.Equal(t, expectedMap, v)
+	}
+}

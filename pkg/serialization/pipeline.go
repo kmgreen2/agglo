@@ -7,7 +7,7 @@ import (
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/core"
 	"github.com/kmgreen2/agglo/pkg/core/process"
-	"github.com/kmgreen2/agglo/pkg/core/proto"
+	"github.com/kmgreen2/agglo/pkg/proto"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/pkg/streaming"
 	"net/http"

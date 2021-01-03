@@ -19,7 +19,7 @@ all: build
 
 .PHONY: build
 build: 
-	CGO_ENABLED=1 go build -o tester main.go
+	CGO_ENABLED=1 go build -o bin/regexmap cmd/regexmap/main.go
 
 .PHONY: genmocks
 genmocks:
