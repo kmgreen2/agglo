@@ -1,10 +1,12 @@
 package common
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/json"
 	"hash"
 	"time"
 )
@@ -67,5 +69,26 @@ func WaitAll(futures []Future, timeout time.Duration) {
 	}
 
 	done <- true
+}
+
+func MapToJson(in map[string]interface{}) ([]byte, error) {
+	byteBuffer := bytes.NewBuffer([]byte{})
+	encoder := json.NewEncoder(byteBuffer)
+	err := encoder.Encode(in)
+	if err != nil {
+		return nil, err
+	}
+	return byteBuffer.Bytes(), nil
+}
+
+func JsonToMap(in []byte) (map[string]interface{}, error) {
+	var out map[string]interface{}
+	byteBuffer := bytes.NewBuffer(in)
+	decoder := json.NewDecoder(byteBuffer)
+	err := decoder.Decode(&out)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 

@@ -21,6 +21,7 @@ all: build
 build: 
 	CGO_ENABLED=1 go build -o bin/regexmap cmd/regexmap/main.go
 	CGO_ENABLED=1 go build -o bin/printvals cmd/printvals/main.go
+	CGO_ENABLED=1 go build -o bin/binge cmd/binge/main.go
 
 .PHONY: genmocks
 genmocks:
