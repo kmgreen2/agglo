@@ -8,10 +8,12 @@ message RandomStringValue {
     int32 maxLen = 1;
     int32 minLen = 2;
     string alphabet = 3;
+    int32 maxRef = 4;
 }
 
 message VocabStringValue {
     repeated string vocab = 1;
+    int32 maxRef = 4;
 }
 
 message FixedStringValue {
@@ -21,6 +23,7 @@ message FixedStringValue {
 message RandomNumericValue {
     double min = 1;
     double max = 2;
+    int32 maxRef = 4;
 }
 
 message NumericSetValue {
@@ -47,8 +50,6 @@ message ListValue {
 message ReferenceValue {
     string schemaName = 1;
     string path = 2;
-    int32 minRef = 3;
-    int32 maxRef = 4;
 }
 
 message Value {
@@ -67,7 +68,8 @@ message Value {
 }
 
 message Schema {
-    DictValue root = 1;
+    string name = 1;
+    DictValue root = 2;
 }
 
 message Schemas {

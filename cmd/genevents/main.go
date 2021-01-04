@@ -2,17 +2,18 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/kmgreen2/agglo/generated/proto"
+	"github.com/kmgreen2/agglo/pkg/common"
+	"io/ioutil"
+	"math"
 	"math/rand"
+	"os"
 	"strings"
 )
-
-type ReferenceKey struct {
-	schemaName string
-	path string
-}
 
 type DependencyGraph struct {
 	vertices map[string]bool
@@ -26,6 +27,10 @@ func NewDependencyGraph() *DependencyGraph {
 		make(map[string][]string),
 		make(map[string][]string),
 	}
+}
+
+func (g *DependencyGraph) Orphaned(v string) bool {
+	return g.backwardEdges[v] == nil || len(g.backwardEdges) == 0
 }
 
 func (g *DependencyGraph) AddEdge(from, to string) {
@@ -44,11 +49,18 @@ func (g *DependencyGraph) OrphanedVertex() (string, error) {
 		if _, ok := g.backwardEdges[v]; !ok {
 			return v, nil
 		}
-		if len(g.backwardEdges) == 0 {
+		if len(g.backwardEdges[v]) == 0 {
 			return v, nil
 		}
 	}
 	return "", fmt.Errorf("Cannot find Orphaned vertex")
+}
+
+func (g *DependencyGraph) GetParents(v string) ([]string, error) {
+	if backEdges, ok := g.backwardEdges[v]; ok {
+		return backEdges, nil
+	}
+	return []string{}, nil
 }
 
 func (g *DependencyGraph) Delete(v string) error {
@@ -118,10 +130,97 @@ func TopSort(graph *DependencyGraph) ([]string, error) {
 	}
 }
 
+type ReferenceValue struct {
+	value interface{}
+	refCount int
+}
+
+type ReferenceValues struct {
+	values []*ReferenceValue
+}
+
+func (r *ReferenceValues) Add(v interface{}, refCount int) {
+	r.values = append(r.values, &ReferenceValue{v, refCount})
+}
+
+func (r *ReferenceValues) Num() int {
+	return len(r.values)
+}
+
+func (r *ReferenceValues) Pop() (interface{}, error) {
+	if r.Num() == 0 {
+		return nil, common.NewInvalidError(fmt.Sprintf("no available references"))
+	}
+	val := r.values[0].value
+	r.values[0].refCount--
+
+	if r.values[0].refCount <= 0 {
+		r.values = r.values[1:]
+	}
+	return val, nil
+}
+
+type SchemaReferences struct {
+	pathValues map[string]*ReferenceValues
+}
+
+func (r *SchemaReferences) Add(path string, v interface{}, refCount int) {
+	if _, ok := r.pathValues[path]; !ok {
+		r.pathValues[path] = &ReferenceValues{}
+	}
+	r.pathValues[path].Add(v, refCount)
+}
+
+func (r *SchemaReferences) Pop(path string) (interface{}, error) {
+	if _, ok := r.pathValues[path]; ok {
+		return r.pathValues[path].Pop()
+	}
+	return nil, common.NewInvalidError(fmt.Sprintf("references do not exist for %s", path))
+}
+
+func (r *SchemaReferences) HasPath(path string) bool {
+	if _, ok := r.pathValues[path]; ok {
+		return r.pathValues[path].Num() > 0
+	}
+	return false
+}
+
+func (r *SchemaReferences) Num(path string) int {
+	if _, ok := r.pathValues[path]; ok {
+		return r.pathValues[path].Num()
+	}
+	return 0
+}
+
+func (r *SchemaReferences) Paths() []string {
+	var paths []string
+	if r.pathValues != nil {
+		for k, _ := range r.pathValues {
+			paths = append(paths, k)
+		}
+	}
+	return paths
+}
+
 type GeneratorState struct {
-	schemas api.Schemas
-	references map[ReferenceKey]int
+	schemas *api.Schemas
+	references map[string]*SchemaReferences
 	referenceGraph *DependencyGraph
+	sortedDependencies []string
+}
+
+func NewGeneratorState(schemas *api.Schemas) (*GeneratorState, error) {
+	generatorState := &GeneratorState{
+		schemas: schemas,
+		references: make(map[string]*SchemaReferences),
+		referenceGraph: NewDependencyGraph(),
+	}
+
+	err := generatorState.validateDependencies()
+	if err != nil {
+		return nil, err
+	}
+	return generatorState, nil
 }
 
 func (g *GeneratorState) drawSchema() *api.Schema {
@@ -129,7 +228,7 @@ func (g *GeneratorState) drawSchema() *api.Schema {
 
 	curr := float64(0)
 	for i, v := range g.schemas.SchemaDistribution {
-		if schemaDraw >= curr && schemaDraw <= v {
+		if schemaDraw >= curr && schemaDraw <= (v+curr) {
 			return g.schemas.Schemas[i]
 		}
 		curr = v
@@ -186,40 +285,120 @@ func (g *GeneratorState) generateValue(value *api.Value) (interface{}, error) {
 			}
 		}
 	case *api.Value_Reference:
+		if _, ok := g.references[val.Reference.SchemaName]; !ok {
+			return nil, common.NewInvalidError(fmt.Sprintf("schema '%s' has no valid references",
+				val.Reference.SchemaName))
+		}
+		return g.references[val.Reference.SchemaName].Pop(val.Reference.Path)
 	}
 	return nil, nil
 }
 
 func (g *GeneratorState) Generate() (map[string]interface{}, error) {
 	var err error
+	var schema *api.Schema
+	var deficientSchemas []string
 	out := make(map[string]interface{})
 
 	// Use dependency graph to determine if there is enough budget for references.  If not, generate
 	// a schema that will free up budget
-	schema := g.drawSchema()
+	for {
+		if len(deficientSchemas) > 0 {
+			for _, v := range g.schemas.Schemas {
+				if strings.Compare(v.Name, deficientSchemas[0])  == 0 {
+					schema = v
+				}
+			}
+			deficientSchemas = deficientSchemas[1:]
+			break
+		} else {
+			schema = g.drawSchema()
+		}
+
+		isOrphaned := g.referenceGraph.Orphaned(schema.Name)
+		if isOrphaned {
+			break
+		}
+
+		backEdges, err := g.referenceGraph.GetParents(schema.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		// Ensure each parent has at least one available reference per path
+		// Yes, this is a bit greedy, since the source schema may not depend
+		// on all references, but it guarantees we will not get stuck
+		isDeficient := false
+		for _, parentVertex := range backEdges {
+
+			// Parent has never generated values
+			if _, ok := g.references[parentVertex]; !ok {
+				g.references[parentVertex] = &SchemaReferences{
+					make(map[string]*ReferenceValues),
+				}
+				isDeficient = true
+			}
+			for _, path := range g.references[parentVertex].Paths() {
+				if g.references[parentVertex].HasPath(path) {
+					if g.references[parentVertex].Num(path) > 0 {
+						continue
+					} else {
+						// Need to generate values for schema.Name
+						isDeficient = true
+						break
+					}
+				} else {
+					// Need to generate values for schema.Name
+					isDeficient = true
+					break
+				}
+			}
+			if len(g.references[parentVertex].Paths()) == 0 || isDeficient {
+				deficientSchemas = append(deficientSchemas, parentVertex)
+			}
+		}
+		if !isDeficient {
+			break
+		}
+	}
 
 	for k, v := range schema.Root.Kvs {
 		out[k], err = g.generateValue(v)
+		if _, ok := g.references[schema.Name]; !ok {
+			g.references[schema.Name] = &SchemaReferences{
+				make(map[string]*ReferenceValues),
+			}
+		}
+		switch valSpec := v.Values.(type) {
+		case *api.Value_RandomString:
+			g.references[schema.Name].Add(k, out[k], int(valSpec.RandomString.MaxRef))
+		case *api.Value_VocabString:
+			g.references[schema.Name].Add(k, out[k], int(valSpec.VocabString.MaxRef))
+		case *api.Value_RandomNumeric:
+			g.references[schema.Name].Add(k, out[k], int(valSpec.RandomNumeric.MaxRef))
+		default:
+			g.references[schema.Name].Add(k, out[k], math.MaxInt32)
+		}
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return nil, nil
+	return out, nil
 }
 
-func (g *GeneratorState) getDependencyGraph(thisSchema string, value *api.Value) error {
+func (g *GeneratorState) generateDependencyGraph(thisSchema string, value *api.Value) error {
 	var err error
 	switch val := value.Values.(type) {
 	case *api.Value_Dict:
 		for _, v := range val.Dict.Kvs {
-			err = g.getDependencyGraph(thisSchema, v)
+			err = g.generateDependencyGraph(thisSchema, v)
 			if err != nil {
 				return err
 			}
 		}
 	case *api.Value_List:
-		return g.getDependencyGraph(thisSchema, val.List.Value)
+		return g.generateDependencyGraph(thisSchema, val.List.Value)
 	case *api.Value_Reference:
 		g.referenceGraph.AddEdge(val.Reference.SchemaName, thisSchema)
 	}
@@ -227,10 +406,22 @@ func (g *GeneratorState) getDependencyGraph(thisSchema string, value *api.Value)
 }
 
 func (g *GeneratorState) validateDependencies() error {
-	_, err := TopSort(g.referenceGraph)
+	var err error
+
+	for _, schema := range g.schemas.Schemas	{
+		for _, v := range schema.Root.Kvs {
+			err = g.generateDependencyGraph(schema.Name, v)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	sortedDeps, err := TopSort(g.referenceGraph)
 	if err != nil {
 		return err
 	}
+	g.sortedDependencies = sortedDeps
 	return nil
 }
 
@@ -244,6 +435,62 @@ func SchemasFromJson(schemasJson []byte) (*api.Schemas, error) {
 	return &schemasPb, nil
 }
 
-func main() {
+type CommandArgs struct {
+	schemaDef *os.File
+}
 
+func usage(msg string, exitCode int) {
+	fmt.Println(msg)
+	flag.PrintDefaults()
+	os.Exit(exitCode)
+}
+
+func parseArgs() *CommandArgs {
+	var err error
+	args := &CommandArgs{}
+	schemaPtr := flag.String("schema", "", "path to config file schemas")
+	flag.Parse()
+
+	args.schemaDef, err = os.Open(*schemaPtr)
+	if err != nil {
+		usage(err.Error(), 1)
+	}
+
+	return args
+}
+
+func main() {
+	args := parseArgs()
+	schemaBytes, err :=	ioutil.ReadAll(args.schemaDef)
+	if err != nil {
+		panic(err)
+	}
+
+	schemas, err := SchemasFromJson(schemaBytes)
+	if err != nil {
+		panic(err)
+	}
+	generatorState, err := NewGeneratorState(schemas)
+	if err != nil {
+		panic(err)
+	}
+
+	for i := 0; i < 20000; i++ {
+		out, err := generatorState.Generate()
+		if err != nil {
+			panic(err)
+		}
+
+		rawJson, err := common.MapToJson(out)
+		if err != nil {
+			panic(err)
+		}
+
+		pretty := bytes.NewBuffer([]byte{})
+		err = json.Indent(pretty, rawJson, "", "\t")
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(pretty.String())
+	}
 }
