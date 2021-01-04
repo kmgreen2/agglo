@@ -16,11 +16,11 @@ import (
 	"time"
 )
 
-func protoExistsOpToInternal(in pipelineapi.ExistsOperator) core.ExistsOperator {
+func protoExistsOpToInternal(in api.ExistsOperator) core.ExistsOperator {
 	switch in {
-	case pipelineapi.ExistsOperator_Exists:
+	case api.ExistsOperator_Exists:
 		return core.Exists
-	case pipelineapi.ExistsOperator_NotExists:
+	case api.ExistsOperator_NotExists:
 		return core.NotExists
 	default:
 		// Should never reach this, but need to return something to satisfy the compiler
@@ -28,79 +28,79 @@ func protoExistsOpToInternal(in pipelineapi.ExistsOperator) core.ExistsOperator 
 	}
 }
 
-func protoAggregationTypeToInternal(in pipelineapi.AggregationType) core.AggregationType {
+func protoAggregationTypeToInternal(in api.AggregationType) core.AggregationType {
 	switch in {
-	case pipelineapi.AggregationType_AggAvg:
+	case api.AggregationType_AggAvg:
 		return core.AggAvg
-	case pipelineapi.AggregationType_AggCount:
+	case api.AggregationType_AggCount:
 		return core.AggCount
-	case pipelineapi.AggregationType_AggMin:
+	case api.AggregationType_AggMin:
 		return core.AggMin
-	case pipelineapi.AggregationType_AggMax:
+	case api.AggregationType_AggMax:
 		return core.AggMax
-	case pipelineapi.AggregationType_AggDiscreteHistogram:
+	case api.AggregationType_AggDiscreteHistogram:
 		return core.AggDiscreteHistogram
-	case pipelineapi.AggregationType_AggSum:
+	case api.AggregationType_AggSum:
 		return core.AggSum
 	default:
 		return -1
 	}
 }
 
-func buildExpression(expression *pipelineapi.Expression) (core.Expression, error) {
+func buildExpression(expression *api.Expression) (core.Expression, error) {
 	var err error
 	var lhs, rhs interface{}
 	switch e := expression.Expression.(type) {
-	case *pipelineapi.Expression_Boolean:
-	case *pipelineapi.Expression_Comparator:
+	case *api.Expression_Boolean:
+	case *api.Expression_Comparator:
 		switch lhsOperand := e.Comparator.Lhs.Operand.(type) {
-		case *pipelineapi.Operand_Literal:
+		case *api.Operand_Literal:
 			lhs = lhsOperand.Literal
-		case *pipelineapi.Operand_Numeric:
+		case *api.Operand_Numeric:
 			lhs = lhsOperand.Numeric
-		case *pipelineapi.Operand_Variable:
+		case *api.Operand_Variable:
 			lhs = core.Variable(lhsOperand.Variable.Name)
-		case *pipelineapi.Operand_Expression:
+		case *api.Operand_Expression:
 			lhs, err = buildExpression(lhsOperand.Expression)
 			if err != nil {
 				return nil, err
 			}
 		}
 		switch rhsOperand := e.Comparator.Rhs.Operand.(type) {
-		case *pipelineapi.Operand_Literal:
+		case *api.Operand_Literal:
 			rhs = rhsOperand.Literal
-		case *pipelineapi.Operand_Numeric:
+		case *api.Operand_Numeric:
 			rhs = rhsOperand.Numeric
-		case *pipelineapi.Operand_Variable:
+		case *api.Operand_Variable:
 			rhs = core.Variable(rhsOperand.Variable.Name)
-		case *pipelineapi.Operand_Expression:
+		case *api.Operand_Expression:
 			rhs, err = buildExpression(rhsOperand.Expression)
 			if err != nil {
 				return nil, err
 			}
 		}
 		switch e.Comparator.Op {
-		case pipelineapi.ComparatorOperator_Equal:
+		case api.ComparatorOperator_Equal:
 			return core.NewComparatorExpression(lhs, rhs, core.Equal), nil
-		case pipelineapi.ComparatorOperator_NotEqual:
+		case api.ComparatorOperator_NotEqual:
 			return core.NewComparatorExpression(lhs, rhs, core.NotEqual), nil
-		case pipelineapi.ComparatorOperator_GreaterThan:
+		case api.ComparatorOperator_GreaterThan:
 			return core.NewComparatorExpression(lhs, rhs, core.GreaterThan), nil
-		case pipelineapi.ComparatorOperator_GreaterThanOrEqual:
+		case api.ComparatorOperator_GreaterThanOrEqual:
 			return core.NewComparatorExpression(lhs, rhs, core.GreaterThanOrEqual), nil
-		case pipelineapi.ComparatorOperator_LessThan:
+		case api.ComparatorOperator_LessThan:
 			return core.NewComparatorExpression(lhs, rhs, core.LessThan), nil
-		case pipelineapi.ComparatorOperator_LessThanOrEqual:
+		case api.ComparatorOperator_LessThanOrEqual:
 			return core.NewComparatorExpression(lhs, rhs, core.LessThanOrEqual), nil
-		case pipelineapi.ComparatorOperator_RegexMatch:
+		case api.ComparatorOperator_RegexMatch:
 			return core.NewComparatorExpression(lhs, rhs, core.RegexMatch), nil
-		case pipelineapi.ComparatorOperator_RegexNotMatch:
+		case api.ComparatorOperator_RegexNotMatch:
 			return core.NewComparatorExpression(lhs, rhs, core.RegexNotMatch), nil
 		}
 
-	case *pipelineapi.Expression_Logical:
+	case *api.Expression_Logical:
 		switch lhsOperand := e.Logical.Lhs.Operand.(type) {
-		case *pipelineapi.Operand_Expression:
+		case *api.Operand_Expression:
 			lhs, err = buildExpression(lhsOperand.Expression)
 			if err != nil {
 				return nil, err
@@ -111,7 +111,7 @@ func buildExpression(expression *pipelineapi.Expression) (core.Expression, error
 			return nil, common.NewInvalidError(msg)
 		}
 		switch rhsOperand := e.Logical.Rhs.Operand.(type) {
-		case *pipelineapi.Operand_Expression:
+		case *api.Operand_Expression:
 			rhs, err = buildExpression(rhsOperand.Expression)
 			if err != nil {
 				return nil, err
@@ -125,16 +125,16 @@ func buildExpression(expression *pipelineapi.Expression) (core.Expression, error
 		// ToDo(KMG): Could use type assertions for lhs and rhs, but skipping it because the assertions above
 		// should guarantee that lhs and rhs are Expressions
 		switch e.Logical.Op {
-		case pipelineapi.LogicalOperator_LogicalAnd:
+		case api.LogicalOperator_LogicalAnd:
 			return core.NewLogicalExpression(lhs.(core.Expression), rhs.(core.Expression), core.LogicalAnd), nil
-		case pipelineapi.LogicalOperator_LogicalOr:
+		case api.LogicalOperator_LogicalOr:
 			return core.NewLogicalExpression(lhs.(core.Expression), rhs.(core.Expression), core.LogicalAnd), nil
 		}
-	case *pipelineapi.Expression_Binary:
+	case *api.Expression_Binary:
 		switch lhsOperand := e.Binary.Lhs.Operand.(type) {
-		case *pipelineapi.Operand_Numeric:
+		case *api.Operand_Numeric:
 			lhs = lhsOperand.Numeric
-		case *pipelineapi.Operand_Variable:
+		case *api.Operand_Variable:
 			lhs = core.Variable(lhsOperand.Variable.Name)
 		default:
 			msg := fmt.Sprintf("binary expression operands *must* be numeric or variable, not literal, " +
@@ -142,9 +142,9 @@ func buildExpression(expression *pipelineapi.Expression) (core.Expression, error
 			return nil, common.NewInvalidError(msg)
 		}
 		switch rhsOperand := e.Binary.Rhs.Operand.(type) {
-		case *pipelineapi.Operand_Numeric:
+		case *api.Operand_Numeric:
 			rhs = rhsOperand.Numeric
-		case *pipelineapi.Operand_Variable:
+		case *api.Operand_Variable:
 			rhs = core.Variable(rhsOperand.Variable.Name)
 		default:
 			msg := fmt.Sprintf("binary expression operands *must* be numeric or variable, not literal, " +
@@ -153,35 +153,35 @@ func buildExpression(expression *pipelineapi.Expression) (core.Expression, error
 		}
 
 		switch e.Binary.Op {
-		case pipelineapi.BinaryOperator_Addition:
+		case api.BinaryOperator_Addition:
 			return core.NewBinaryExpression(lhs, rhs, core.Addition), nil
-		case pipelineapi.BinaryOperator_Subtract:
+		case api.BinaryOperator_Subtract:
 			return core.NewBinaryExpression(lhs, rhs, core.Subtract), nil
-		case pipelineapi.BinaryOperator_Multiply:
+		case api.BinaryOperator_Multiply:
 			return core.NewBinaryExpression(lhs, rhs, core.Multiply), nil
-		case pipelineapi.BinaryOperator_Divide:
+		case api.BinaryOperator_Divide:
 			return core.NewBinaryExpression(lhs, rhs, core.Divide), nil
-		case pipelineapi.BinaryOperator_Power:
+		case api.BinaryOperator_Power:
 			return core.NewBinaryExpression(lhs, rhs, core.Power), nil
-		case pipelineapi.BinaryOperator_Modulus:
+		case api.BinaryOperator_Modulus:
 			return core.NewBinaryExpression(lhs, rhs, core.Modulus), nil
-		case pipelineapi.BinaryOperator_RightShift:
+		case api.BinaryOperator_RightShift:
 			return core.NewBinaryExpression(lhs, rhs, core.RightShift), nil
-		case pipelineapi.BinaryOperator_LeftShift:
+		case api.BinaryOperator_LeftShift:
 			return core.NewBinaryExpression(lhs, rhs, core.LeftShift), nil
-		case pipelineapi.BinaryOperator_Or:
+		case api.BinaryOperator_Or:
 			return core.NewBinaryExpression(lhs, rhs, core.Or), nil
-		case pipelineapi.BinaryOperator_And:
+		case api.BinaryOperator_And:
 			return core.NewBinaryExpression(lhs, rhs, core.And), nil
-		case pipelineapi.BinaryOperator_Xor:
+		case api.BinaryOperator_Xor:
 			return core.NewBinaryExpression(lhs, rhs, core.Xor), nil
 		}
 
-	case *pipelineapi.Expression_Unary:
+	case *api.Expression_Unary:
 		switch rhsOperand := e.Unary.Rhs.Operand.(type) {
-		case *pipelineapi.Operand_Numeric:
+		case *api.Operand_Numeric:
 			rhs = rhsOperand.Numeric
-		case *pipelineapi.Operand_Variable:
+		case *api.Operand_Variable:
 			rhs = core.Variable(rhsOperand.Variable.Name)
 		default:
 			msg := fmt.Sprintf("unary expression operands *must* be numeric or variable, not literal, " +
@@ -189,30 +189,30 @@ func buildExpression(expression *pipelineapi.Expression) (core.Expression, error
 			return nil, common.NewInvalidError(msg)
 		}
 		switch e.Unary.Op {
-		case pipelineapi.UnaryOperator_Negation:
+		case api.UnaryOperator_Negation:
 			return core.NewUnaryExpression(rhs, core.Negation), nil
-		case pipelineapi.UnaryOperator_Inversion:
+		case api.UnaryOperator_Inversion:
 			return core.NewUnaryExpression(rhs, core.Inversion), nil
-		case pipelineapi.UnaryOperator_LogicalNot:
+		case api.UnaryOperator_LogicalNot:
 			return core.NewUnaryExpression(rhs, core.Not), nil
 		}
 	}
 	return nil, nil
 }
 
-func buildCondition(condition *pipelineapi.Condition) (*core.Condition, error) {
+func buildCondition(condition *api.Condition) (*core.Condition, error) {
 	// If no condition is specified, then assume True
 	if condition == nil || condition.Condition == nil {
 		return core.TrueCondition, nil
 	}
 	switch c := condition.Condition.(type) {
-	case *pipelineapi.Condition_Expression:
+	case *api.Condition_Expression:
 		expression, err := buildExpression(c.Expression)
 		if err != nil {
 			return nil, err
 		}
 		return core.NewCondition(expression)
-	case *pipelineapi.Condition_Exists:
+	case *api.Condition_Exists:
 		builder := core.NewExistsExpressionBuilder()
 		for _, op := range c.Exists.Ops {
 			builder.Add(op.Key, protoExistsOpToInternal(op.Op))
@@ -224,7 +224,7 @@ func buildCondition(condition *pipelineapi.Condition) (*core.Condition, error) {
 	}
 }
 
-func buildTransformer(transformerSpecs []*pipelineapi.TransformerSpec) (*process.Transformer, error) {
+func buildTransformer(transformerSpecs []*api.TransformerSpec) (*process.Transformer, error) {
 	transformer := process.NewTransformer(nil, ".", ".")
 	for _, spec := range transformerSpecs {
 		condition, err := buildCondition(spec.Transformation.Condition)
@@ -234,41 +234,41 @@ func buildTransformer(transformerSpecs []*pipelineapi.TransformerSpec) (*process
 		builder := core.NewTransformationBuilder()
 		builder.AddCondition(condition)
 		switch spec.Transformation.TransformationType {
-		case pipelineapi.TransformationType_TransformCopy:
+		case api.TransformationType_TransformCopy:
 			builder.AddFieldTransformation(&core.CopyTransformation{})
-		case pipelineapi.TransformationType_TransformCount:
+		case api.TransformationType_TransformCount:
 			builder.AddFieldTransformation(core.LeftFoldCountAll)
-		case pipelineapi.TransformationType_TransformSum:
+		case api.TransformationType_TransformSum:
 			builder.AddFieldTransformation(&core.SumTransformation{})
-		case pipelineapi.TransformationType_TransformMapAdd:
+		case api.TransformationType_TransformMapAdd:
 			switch transformArgs := spec.Transformation.TransformArgs.(type) {
-			case *pipelineapi.Transformation_MapAddArgs:
+			case *api.Transformation_MapAddArgs:
 				builder.AddFieldTransformation(core.MapAddConstant(transformArgs.MapAddArgs.Value))
 			}
-		case pipelineapi.TransformationType_TransformMapMult:
+		case api.TransformationType_TransformMapMult:
 			switch transformArgs := spec.Transformation.TransformArgs.(type) {
-			case *pipelineapi.Transformation_MapMultArgs:
+			case *api.Transformation_MapMultArgs:
 				builder.AddFieldTransformation(core.MapMultConstant(transformArgs.MapMultArgs.Value))
 			}
-		case pipelineapi.TransformationType_TransformMapRegex:
+		case api.TransformationType_TransformMapRegex:
 			switch transformArgs := spec.Transformation.TransformArgs.(type) {
-			case *pipelineapi.Transformation_MapRegexArgs:
+			case *api.Transformation_MapRegexArgs:
 				builder.AddFieldTransformation(core.MapApplyRegex(transformArgs.MapRegexArgs.Regex,
 					transformArgs.MapRegexArgs.Replace))
 			}
-		case pipelineapi.TransformationType_TransformMap:
+		case api.TransformationType_TransformMap:
 			switch transformArgs := spec.Transformation.TransformArgs.(type) {
-			case *pipelineapi.Transformation_MapArgs:
+			case *api.Transformation_MapArgs:
 				builder.AddFieldTransformation(core.NewExecMapTransformation(transformArgs.MapArgs.Path))
 			}
-		case pipelineapi.TransformationType_TransformLeftFold:
+		case api.TransformationType_TransformLeftFold:
 			switch transformArgs := spec.Transformation.TransformArgs.(type) {
-			case *pipelineapi.Transformation_LeftFoldArgs:
+			case *api.Transformation_LeftFoldArgs:
 				builder.AddFieldTransformation(core.NewExecMapTransformation(transformArgs.LeftFoldArgs.Path))
 			}
-		case pipelineapi.TransformationType_TransformRightFold:
+		case api.TransformationType_TransformRightFold:
 			switch transformArgs := spec.Transformation.TransformArgs.(type) {
-			case *pipelineapi.Transformation_RightFoldArgs:
+			case *api.Transformation_RightFoldArgs:
 				builder.AddFieldTransformation(core.NewExecMapTransformation(transformArgs.RightFoldArgs.Path))
 			}
 		}
@@ -278,7 +278,7 @@ func buildTransformer(transformerSpecs []*pipelineapi.TransformerSpec) (*process
 }
 
 func PipelinesFromJson(pipelineJson []byte) ([]*process.Pipeline, error) {
-	var pipelinesPb pipelineapi.Pipelines
+	var pipelinesPb api.Pipelines
 	byteBuffer := bytes.NewBuffer(pipelineJson)
 	err := jsonpb.Unmarshal(byteBuffer, &pipelinesPb)
 	if err != nil {
@@ -287,7 +287,7 @@ func PipelinesFromJson(pipelineJson []byte) ([]*process.Pipeline, error) {
 	return PipelinesFromPb(&pipelinesPb)
 }
 
-func PipelinesFromPb(pipelinesPb *pipelineapi.Pipelines)  ([]*process.Pipeline, error) {
+func PipelinesFromPb(pipelinesPb *api.Pipelines)  ([]*process.Pipeline, error) {
 	var builtPipelines  []*process.Pipeline
 
 	externalKVStores := make(map[string]kvs.KVStore)
@@ -304,15 +304,15 @@ func PipelinesFromPb(pipelinesPb *pipelineapi.Pipelines)  ([]*process.Pipeline, 
 	// Get external systems
 	for _, externalSystem := range pipelinesPb.ExternalSystems {
 		switch externalSystem.ExternalType {
-		case pipelineapi.ExternalType_ExternalKVStore:
+		case api.ExternalType_ExternalKVStore:
 			externalKVStores[externalSystem.Name] = kvs.NewMemKVStore()
-		case pipelineapi.ExternalType_ExternalPubSub:
+		case api.ExternalType_ExternalPubSub:
 			externalPublisher[externalSystem.Name], err = streaming.NewMemPublisher(streaming.NewMemPubSub(),
 				externalSystem.ConnectionString)
 			if err != nil {
 				return nil, err
 			}
-		case pipelineapi.ExternalType_ExternalHttp:
+		case api.ExternalType_ExternalHttp:
 			externalHttp[externalSystem.Name] = externalSystem.ConnectionString
 		}
 	}
@@ -320,7 +320,7 @@ func PipelinesFromPb(pipelinesPb *pipelineapi.Pipelines)  ([]*process.Pipeline, 
 	// Get processes
 	for _, processDefinition := range pipelinesPb.ProcessDefinitions {
 		switch procDef := processDefinition.ProcessDefinition.(type) {
-		case *pipelineapi.ProcessDefinition_Annotator:
+		case *api.ProcessDefinition_Annotator:
 			if _, ok := processes[procDef.Annotator.Name]; ok {
 				msg := fmt.Sprintf("name conflict in process definitions: %s", procDef.Annotator.Name)
 				return nil, common.NewInvalidError(msg)
@@ -334,7 +334,7 @@ func PipelinesFromPb(pipelinesPb *pipelineapi.Pipelines)  ([]*process.Pipeline, 
 				annotatorBuilder.Add(core.NewAnnotation(annotation.FieldKey, annotation.Value, condition))
 			}
 			processes[procDef.Annotator.Name] = annotatorBuilder.Build()
-		case *pipelineapi.ProcessDefinition_Aggregator:
+		case *api.ProcessDefinition_Aggregator:
 			if _, ok := processes[procDef.Aggregator.Name]; ok {
 				msg := fmt.Sprintf("name conflict in process definitions: %s", procDef.Aggregator.Name)
 				return nil, common.NewInvalidError(msg)
@@ -352,7 +352,7 @@ func PipelinesFromPb(pipelinesPb *pipelineapi.Pipelines)  ([]*process.Pipeline, 
 				msg := fmt.Sprintf("unknown kvStore for %s: %s", procDef.Aggregator.Name, procDef.Aggregator.StateStore)
 				return nil, common.NewInvalidError(msg)
 			}
-		case *pipelineapi.ProcessDefinition_Completer:
+		case *api.ProcessDefinition_Completer:
 			if _, ok := processes[procDef.Completer.Name]; ok {
 				msg := fmt.Sprintf("name conflict in process definitions: %s", procDef.Completer.Name)
 				return nil, common.NewInvalidError(msg)
@@ -366,7 +366,7 @@ func PipelinesFromPb(pipelinesPb *pipelineapi.Pipelines)  ([]*process.Pipeline, 
 				return nil, common.NewInvalidError(msg)
 			}
 
-		case *pipelineapi.ProcessDefinition_Filter:
+		case *api.ProcessDefinition_Filter:
 			if _, ok := processes[procDef.Filter.Name]; ok {
 				msg := fmt.Sprintf("name conflict in process definitions: %s", procDef.Filter.Name)
 				return nil, common.NewInvalidError(msg)
@@ -376,7 +376,7 @@ func PipelinesFromPb(pipelinesPb *pipelineapi.Pipelines)  ([]*process.Pipeline, 
 				return nil, err
 			}
 			processes[procDef.Filter.Name] = filter
-		case *pipelineapi.ProcessDefinition_Transformer:
+		case *api.ProcessDefinition_Transformer:
 			if _, ok := processes[procDef.Transformer.Name]; ok {
 				msg := fmt.Sprintf("name conflict in process definitions: %s", procDef.Transformer.Name)
 				return nil, common.NewInvalidError(msg)
@@ -386,7 +386,7 @@ func PipelinesFromPb(pipelinesPb *pipelineapi.Pipelines)  ([]*process.Pipeline, 
 				 return nil, err
 			}
 			processes[procDef.Transformer.Name] = transformer
-		case *pipelineapi.ProcessDefinition_Tee:
+		case *api.ProcessDefinition_Tee:
 			if _, ok := processes[procDef.Tee.Name]; ok {
 				msg := fmt.Sprintf("name conflict in process definitions: %s", procDef.Tee.Name)
 				return nil, common.NewInvalidError(msg)
@@ -401,21 +401,21 @@ func PipelinesFromPb(pipelinesPb *pipelineapi.Pipelines)  ([]*process.Pipeline, 
 				return nil, err
 			}
 
-			if procDef.Tee.ExternalType == pipelineapi.ExternalType_ExternalKVStore {
+			if procDef.Tee.ExternalType == api.ExternalType_ExternalKVStore {
 				if external, ok := externalKVStores[procDef.Tee.OutputConnector]; ok {
 					processes[procDef.Tee.Name] = process.NewKVTee(external, condition, transformer)
 				} else {
 					msg := fmt.Sprintf("%s is not a valid KVStore", procDef.Tee.OutputConnector)
 					return nil, common.NewInvalidError(msg)
 				}
-			} else if procDef.Tee.ExternalType == pipelineapi.ExternalType_ExternalPubSub {
+			} else if procDef.Tee.ExternalType == api.ExternalType_ExternalPubSub {
 				if external, ok := externalPublisher[procDef.Tee.OutputConnector]; ok {
 					processes[procDef.Tee.Name] = process.NewPubSubTee(external, condition, transformer)
 				} else {
 					msg := fmt.Sprintf("%s is not a valid Publisher", procDef.Tee.OutputConnector)
 					return nil, common.NewInvalidError(msg)
 				}
-			} else if procDef.Tee.ExternalType == pipelineapi.ExternalType_ExternalHttp {
+			} else if procDef.Tee.ExternalType == api.ExternalType_ExternalHttp {
 				if external, ok := externalHttp[procDef.Tee.OutputConnector]; ok {
 					processes[procDef.Tee.Name] = process.NewHttpTee(http.DefaultClient, external, condition, transformer)
 				} else {
@@ -427,7 +427,7 @@ func PipelinesFromPb(pipelinesPb *pipelineapi.Pipelines)  ([]*process.Pipeline, 
 				return nil, common.NewInvalidError(msg)
 			}
 
-		case *pipelineapi.ProcessDefinition_Spawner:
+		case *api.ProcessDefinition_Spawner:
 			if _, ok := processes[procDef.Spawner.Name]; ok {
 				msg := fmt.Sprintf("name conflict in process definitions: %s", procDef.Spawner.Name)
 				return nil, common.NewInvalidError(msg)

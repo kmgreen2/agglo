@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = ".;pipelineapi";
+option go_package = ".;api";
 
 package pipeline;
 

@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+option go_package = ".;api";
+
+package genevents;
+
+message RandomStringValue {
+    int32 maxLen = 1;
+    int32 minLen = 2;
+    string alphabet = 3;
+}
+
+message VocabStringValue {
+    repeated string vocab = 1;
+}
+
+message FixedStringValue {
+    string value = 1;
+}
+
+message RandomNumericValue {
+    double min = 1;
+    double max = 2;
+}
+
+message NumericSetValue {
+    repeated double values = 1;
+}
+
+message FixedNumericValue {
+    double value = 1;
+}
+
+message BooleanValue {
+}
+
+message DictValue {
+    map<string, Value> kvs = 1;
+}
+
+message ListValue {
+    int32 maxLen = 1;
+    int32 minLen = 2;
+    Value value = 3;
+}
+
+message ReferenceValue {
+    string schemaName = 1;
+    string path = 2;
+    int32 minRef = 3;
+    int32 maxRef = 4;
+}
+
+message Value {
+    oneof values {
+        RandomStringValue randomString = 1;
+        VocabStringValue vocabString = 2;
+        FixedStringValue fixedString = 3;
+        RandomNumericValue randomNumeric = 4;
+        NumericSetValue numericSet = 5;
+        FixedNumericValue fixedNumeric = 6;
+        BooleanValue boolean = 7;
+        DictValue dict = 8;
+        ListValue list = 9;
+        ReferenceValue reference = 10;
+    }
+}
+
+message Schema {
+    DictValue root = 1;
+}
+
+message Schemas {
+    repeated Schema schemas = 1;
+    repeated double schemaDistribution = 2;
+}
