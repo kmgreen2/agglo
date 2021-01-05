@@ -1,0 +1,197 @@
+{
+  "stringPrefixes": {
+    "gitUrl": "https://github.com/organizationhq/",
+    "circleciUrl": "https://circleci.com/organizationhq/"
+  },
+  "stringSuffixes": {
+    "gitEmail": "@organizationhq.org",
+    "circleciEmail": "@organizationhq.org"
+  },
+  "schemaDistribution": [0.2, 0.05, 0.75],
+  "schemas": [
+    {
+      "name": "circleci-deploy",
+      "root": {
+        "kvs": {
+          "build_num": {
+            "counter": {
+              "counterName": "buildNum"
+            }
+          },
+          "branch": {
+            "vocabString": {
+              "vocab": ["master", "test", "dev", "staging"]
+            }
+          },
+          "username": {
+            "vocabString": {
+              "vocab": ["kmgreen2", "bob", "jane", "jim", "jill"]
+            }
+          },
+          "hash": {
+            "reference": {
+              "schemaName": "git-push" ,
+              "path": "after"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "git-action",
+      "root": {
+        "kvs": {
+          "action": {
+            "vocabString": {
+              "vocab": ["created", "completed", "rerequested", "requested_action"]
+            }
+          },
+          "sender": {
+            "vocabString": {
+              "vocab": ["kmgreen2", "bob", "jane", "jim", "jill"]
+            }
+          },
+          "repository": {
+            "dict": {
+              "kvs": {
+                "name": {
+                  "vocabString": {
+                    "storeStringState": "gitRepo",
+                    "vocab": [
+                      "storage",
+                      "database",
+                      "api-gateway",
+                      "webhooks",
+                      "core"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "git-push",
+      "root": {
+        "kvs": {
+          "action": {
+            "fixedString": {
+              "value": "created"
+            }
+          },
+          "sender": {
+            "vocabString": {
+              "vocab": ["kmgreen2", "bob", "jane", "jim", "jill"],
+              "sharedName": "thisAuthor"
+            }
+          },
+          "repository": {
+            "dict": {
+              "kvs": {
+                "name": {
+                  "vocabString": {
+                    "vocab": [
+                      "storage",
+                      "database",
+                      "api-gateway",
+                      "webhooks",
+                      "core"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "before": {
+            "randomString" : {
+              "maxLen": 40,
+              "minLen": 40,
+              "alphabet": "abcdef1234567890",
+              "maxRef": 1,
+              "sharedName": "prevCommit",
+              "readStringState": "headCommit"
+            }
+          },
+          "after": {
+            "randomString" : {
+              "maxLen": 40,
+              "minLen": 40,
+              "alphabet": "abcdef1234567890",
+              "maxRef": 1,
+              "sharedName": "thisCommit",
+              "storeStringState": "headCommit"
+            }
+          },
+          "pusher": {
+            "vocabString": {
+              "vocab": ["kmgreen2", "bob", "jane", "jim", "jill"],
+              "sharedName": "thisAuthor"
+            }
+          },
+          "commits": {
+            "list": {
+              "minLen": 1,
+              "maxLen": 1,
+              "value": {
+                "dict": {
+                  "kvs": {
+                    "commit": {
+                      "dict": {
+                        "kvs": {
+                          "url": {
+                            "randomString": {
+                              "maxLen": 40,
+                              "minLen": 40,
+                              "alphabet": "abcdef1234567890",
+                              "prefixName": "gitUrl",
+                              "sharedName": "thisCommit"
+                            }
+                          },
+                          "author": {
+                            "vocabString": {
+                              "vocab": ["kmgreen2", "bob", "jane", "jim", "jill"],
+                              "sharedName": "thisAuthor"
+                            }
+                          },
+                          "email": {
+                            "vocabString": {
+                              "vocab": ["kmgreen2", "bob", "jane", "jim", "jill"],
+                              "suffixName": "gitEmail",
+                              "sharedName": "thisAuthor"
+                            }
+                          },
+                          "committer": {
+                            "vocabString": {
+                              "vocab": ["kmgreen2", "bob", "jane", "jim", "jill"]
+                            }
+                          },
+                          "parents": {
+                            "list": {
+                              "minLen": 1,
+                              "maxLen": 1,
+                              "value": {
+                                "randomString" : {
+                                  "maxLen": 40,
+                                  "minLen": 40,
+                                  "alphabet": "abcdef1234567890",
+                                  "maxRef": 1,
+                                  "sharedName": "prevCommit"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

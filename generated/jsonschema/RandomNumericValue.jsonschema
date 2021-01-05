@@ -1,0 +1,16 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "properties": {
+        "min": {
+            "type": "number"
+        },
+        "max": {
+            "type": "number"
+        },
+        "maxRef": {
+            "type": "integer"
+        }
+    },
+    "additionalProperties": true,
+    "type": "object"
+}

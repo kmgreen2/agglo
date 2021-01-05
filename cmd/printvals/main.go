@@ -53,6 +53,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer fp.Close()
 	_, err = io.WriteString(fp, outStr)
 	if err != nil {
 		panic(err)

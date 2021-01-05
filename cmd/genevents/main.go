@@ -11,7 +11,9 @@ import (
 	"io/ioutil"
 	"math"
 	"math/rand"
+	"net/http"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -207,6 +209,8 @@ type GeneratorState struct {
 	references map[string]*SchemaReferences
 	referenceGraph *DependencyGraph
 	sortedDependencies []string
+	globalStrings map[string]string
+	globalCounter map[string]int32
 }
 
 func NewGeneratorState(schemas *api.Schemas) (*GeneratorState, error) {
@@ -214,6 +218,8 @@ func NewGeneratorState(schemas *api.Schemas) (*GeneratorState, error) {
 		schemas: schemas,
 		references: make(map[string]*SchemaReferences),
 		referenceGraph: NewDependencyGraph(),
+		globalStrings: make(map[string]string),
+		globalCounter: make(map[string]int32),
 	}
 
 	err := generatorState.validateDependencies()
@@ -228,28 +234,110 @@ func (g *GeneratorState) drawSchema() *api.Schema {
 
 	curr := float64(0)
 	for i, v := range g.schemas.SchemaDistribution {
-		if schemaDraw >= curr && schemaDraw <= (v+curr) {
+		if schemaDraw >= curr && schemaDraw < (v+curr) {
 			return g.schemas.Schemas[i]
 		}
-		curr = v
+		curr += v
 	}
 	return nil
 }
 
-func (g *GeneratorState) generateValue(value *api.Value) (interface{}, error) {
+func (g *GeneratorState) generateValue(value *api.Value, eventLocalstate map[string]string,
+	eventGlobalState map[string]string) (interface{}, error) {
 	var err error
 	switch val := value.Values.(type) {
 	case *api.Value_RandomString:
-		s := ""
-		length := int32(rand.Float64() * float64(val.RandomString.MaxLen - val.RandomString.MinLen)) + val.RandomString.MinLen
-		for i := int32(0); i < length; i++ {
-			idx := rand.Int() % len(val.RandomString.Alphabet)
-			s += string(val.RandomString.Alphabet[idx])
+		var length int32
+		var s string
+		if len(val.RandomString.SharedName) > 0 {
+			if _, ok := eventLocalstate[val.RandomString.SharedName]; ok {
+				s = eventLocalstate[val.RandomString.SharedName]
+			}
+		}
+
+		if len(val.RandomString.ReadStringState) > 0 {
+			if state, ok := g.globalStrings[val.RandomString.ReadStringState]; ok {
+				s = state
+			}
+		}
+
+		if len(s) == 0 {
+			length = int32(rand.Float64() * float64(val.RandomString.MaxLen - val.RandomString.MinLen)) + val.RandomString.MinLen
+			for i := int32(0); i < length; i++ {
+				idx := rand.Int() % len(val.RandomString.Alphabet)
+				s += string(val.RandomString.Alphabet[idx])
+			}
+		}
+		if val.RandomString.MaxLen == val.RandomString.MinLen {
+			length = val.RandomString.MaxLen
+		}
+
+		if len(val.RandomString.SharedName) > 0 {
+			eventLocalstate[val.RandomString.SharedName] = s
+		}
+
+		if len(val.RandomString.StoreStringState) > 0 {
+			eventGlobalState[val.RandomString.StoreStringState] = s
+		}
+
+		if len(val.RandomString.PrefixName) > 0 {
+			if prefix, ok := g.schemas.StringPrefixes[val.RandomString.PrefixName]; ok {
+				s = prefix+s
+			} else {
+				return nil, common.NewInvalidError(fmt.Sprintf("prefix does not exist: %s",
+					val.RandomString.PrefixName))
+			}
+		}
+		if len(val.RandomString.SuffixName) > 0 {
+			if suffix, ok := g.schemas.StringSuffixes[val.RandomString.SuffixName]; ok {
+				s += suffix
+			} else {
+				return nil, common.NewInvalidError(fmt.Sprintf("suffix does not exist: %s",
+					val.RandomString.SuffixName))
+			}
 		}
 		return s, nil
 	case *api.Value_VocabString:
-		idx := rand.Int() % len(val.VocabString.Vocab)
-		return val.VocabString.Vocab[idx], nil
+		var s string
+		if len(val.VocabString.SharedName) > 0 {
+			if _, ok := eventLocalstate[val.VocabString.SharedName]; ok {
+				s = eventLocalstate[val.VocabString.SharedName]
+			}
+		}
+
+		if len(val.VocabString.ReadStringState) > 0 {
+			if state, ok := g.globalStrings[val.VocabString.ReadStringState]; ok {
+				s = state
+			}
+		}
+
+		if len(s) == 0 {
+			idx := rand.Int() % len(val.VocabString.Vocab)
+			s = val.VocabString.Vocab[idx]
+		}
+		if len(val.VocabString.SharedName) > 0 {
+			eventLocalstate[val.VocabString.SharedName] = s
+		}
+		if len(val.VocabString.StoreStringState) > 0 {
+			eventGlobalState[val.VocabString.StoreStringState] = s
+		}
+		if len(val.VocabString.PrefixName) > 0 {
+			if prefix, ok := g.schemas.StringPrefixes[val.VocabString.PrefixName]; ok {
+				s = prefix+s
+			} else {
+				return nil, common.NewInvalidError(fmt.Sprintf("prefix does not exist: %s",
+					val.VocabString.PrefixName))
+			}
+		}
+		if len(val.VocabString.SuffixName) > 0 {
+			if suffix, ok := g.schemas.StringSuffixes[val.VocabString.SuffixName]; ok {
+				s += suffix
+			} else {
+				return nil, common.NewInvalidError(fmt.Sprintf("suffix does not exist: %s",
+					val.VocabString.SuffixName))
+			}
+		}
+		return s, nil
 	case *api.Value_FixedString:
 		return val.FixedString.Value, nil
 	case *api.Value_RandomNumeric:
@@ -260,6 +348,10 @@ func (g *GeneratorState) generateValue(value *api.Value) (interface{}, error) {
 		return val.NumericSet.Values[idx], nil
 	case *api.Value_FixedNumeric:
 		return val.FixedNumeric.Value, nil
+	case *api.Value_Counter:
+		v := g.globalCounter[val.Counter.CounterName]
+		g.globalCounter[val.Counter.CounterName]++
+		return v, nil
 	case *api.Value_Boolean:
 		if rand.Float64() >= float64(0.5) {
 			return true, nil
@@ -269,21 +361,27 @@ func (g *GeneratorState) generateValue(value *api.Value) (interface{}, error) {
 	case *api.Value_Dict:
 		out := make(map[string]interface{})
 		for k, v := range val.Dict.Kvs {
-			out[k], err = g.generateValue(v)
+			out[k], err = g.generateValue(v, eventLocalstate, eventGlobalState)
 			if err != nil {
 				return nil, err
 			}
 		}
 		return out, nil
 	case *api.Value_List:
-		length := int32(rand.Float64() * float64(val.List.MaxLen - val.List.MinLen)) + val.List.MinLen
+		var length int32
+		if val.List.MaxLen == val.List.MinLen {
+			length = 1
+		} else {
+			length = int32(rand.Float64() * float64(val.List.MaxLen - val.List.MinLen)) + val.List.MinLen
+		}
 		slice := make([]interface{}, length)
 		for i := int32(0); i < length; i++ {
-			slice[i], err = g.generateValue(val.List.Value)
+			slice[i], err = g.generateValue(val.List.Value, eventLocalstate, eventGlobalState)
 			if err != nil {
 				return nil, err
 			}
 		}
+		return slice, nil
 	case *api.Value_Reference:
 		if _, ok := g.references[val.Reference.SchemaName]; !ok {
 			return nil, common.NewInvalidError(fmt.Sprintf("schema '%s' has no valid references",
@@ -362,8 +460,10 @@ func (g *GeneratorState) Generate() (map[string]interface{}, error) {
 		}
 	}
 
+	eventLocalState := make(map[string]string)
+	eventGlobalState := make(map[string]string)
 	for k, v := range schema.Root.Kvs {
-		out[k], err = g.generateValue(v)
+		out[k], err = g.generateValue(v, eventLocalState, eventGlobalState)
 		if _, ok := g.references[schema.Name]; !ok {
 			g.references[schema.Name] = &SchemaReferences{
 				make(map[string]*ReferenceValues),
@@ -382,6 +482,10 @@ func (g *GeneratorState) Generate() (map[string]interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	for k,v := range eventGlobalState {
+		g.globalStrings[k] = v
 	}
 
 	return out, nil
@@ -437,6 +541,8 @@ func SchemasFromJson(schemasJson []byte) (*api.Schemas, error) {
 
 type CommandArgs struct {
 	schemaDef *os.File
+	sender Sender
+	numEvents int
 }
 
 func usage(msg string, exitCode int) {
@@ -445,15 +551,100 @@ func usage(msg string, exitCode int) {
 	os.Exit(exitCode)
 }
 
+type Sender interface {
+	Send([]byte) error
+}
+
+type FileSender struct {
+	file *os.File
+}
+
+func NewFileSender(filename string) (*FileSender, error) {
+	var err error
+	var fp *os.File
+	if len(filename) == 0 {
+		fp = os.Stdout
+	} else {
+		fp, err = os.OpenFile(filename, os.O_CREATE | os.O_RDWR, os.ModePerm | 0644)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &FileSender{
+		fp,
+	}, nil
+}
+
+func (s *FileSender) Send(rawJson []byte) error {
+	pretty := bytes.NewBuffer([]byte{})
+	err := json.Indent(pretty, rawJson, "", "\t")
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(s.file, pretty.String())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func isUrl(url string) bool {
+	reStr := "^(https?:\\/\\/)?[0-9a-zA-Z.]+"
+	re, _ := regexp.Compile(reStr)
+	return re.Match([]byte(url))
+}
+
+func NewHttpSender(url string) (*HttpSender, error) {
+	if !isUrl(url) {
+		return nil, common.NewInvalidError(fmt.Sprintf("'%s' is not a valid URL", url))
+	}
+
+	return &HttpSender{
+		url,
+	}, nil
+}
+
+type HttpSender struct {
+	url string
+}
+
+func (s *HttpSender) Send(rawJson []byte) error {
+	resp, err := http.DefaultClient.Post(s.url, "application/json", bytes.NewBuffer(rawJson))
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}
+
 func parseArgs() *CommandArgs {
 	var err error
 	args := &CommandArgs{}
 	schemaPtr := flag.String("schema", "", "path to config file schemas")
+	numEventsPtr := flag.Int("numEvents", 100, "number of events to generate")
+	outputUsage := `destination to send the events:
+- File: a '/' delimited path ("" will go to stdout)
+- Endpoint: a http://host:port/path endpoint
+`
+	outputPtr := flag.String("output", "", outputUsage)
 	flag.Parse()
+	args.numEvents = *numEventsPtr
 
 	args.schemaDef, err = os.Open(*schemaPtr)
 	if err != nil {
 		usage(err.Error(), 1)
+	}
+
+	if isUrl(*outputPtr) {
+		args.sender, err = NewHttpSender(*outputPtr)
+		if err != nil {
+			usage(err.Error(), 1)
+		}
+	} else {
+		args.sender, err = NewFileSender(*outputPtr)
+		if err != nil {
+			usage(err.Error(), 1)
+		}
 	}
 
 	return args
@@ -475,7 +666,7 @@ func main() {
 		panic(err)
 	}
 
-	for i := 0; i < 20000; i++ {
+	for i := 0; i < args.numEvents; i++ {
 		out, err := generatorState.Generate()
 		if err != nil {
 			panic(err)
@@ -486,11 +677,10 @@ func main() {
 			panic(err)
 		}
 
-		pretty := bytes.NewBuffer([]byte{})
-		err = json.Indent(pretty, rawJson, "", "\t")
+		err = args.sender.Send(rawJson)
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println(pretty.String())
+		fmt.Printf("%d\n", i)
 	}
 }

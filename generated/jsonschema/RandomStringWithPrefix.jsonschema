@@ -1,0 +1,22 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "properties": {
+        "maxLen": {
+            "type": "integer"
+        },
+        "minLen": {
+            "type": "integer"
+        },
+        "alphabet": {
+            "type": "string"
+        },
+        "maxRef": {
+            "type": "integer"
+        },
+        "prefixName": {
+            "type": "string"
+        }
+    },
+    "additionalProperties": true,
+    "type": "object"
+}

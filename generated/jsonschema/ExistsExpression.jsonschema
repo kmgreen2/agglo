@@ -1,0 +1,38 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "properties": {
+        "ops": {
+            "items": {
+                "$schema": "http://json-schema.org/draft-04/schema#",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "op": {
+                        "enum": [
+                            "UnknownExists",
+                            0,
+                            "Exists",
+                            1,
+                            "NotExists",
+                            2
+                        ],
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                },
+                "additionalProperties": true,
+                "type": "object"
+            },
+            "type": "array"
+        }
+    },
+    "additionalProperties": true,
+    "type": "object"
+}

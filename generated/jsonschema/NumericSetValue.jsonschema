@@ -1,0 +1,13 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "properties": {
+        "values": {
+            "items": {
+                "type": "number"
+            },
+            "type": "array"
+        }
+    },
+    "additionalProperties": true,
+    "type": "object"
+}

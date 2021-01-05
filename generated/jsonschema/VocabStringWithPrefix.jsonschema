@@ -1,0 +1,19 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "properties": {
+        "vocab": {
+            "items": {
+                "type": "string"
+            },
+            "type": "array"
+        },
+        "maxRef": {
+            "type": "integer"
+        },
+        "prefixName": {
+            "type": "string"
+        }
+    },
+    "additionalProperties": true,
+    "type": "object"
+}

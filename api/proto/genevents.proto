@@ -8,12 +8,22 @@ message RandomStringValue {
     int32 maxLen = 1;
     int32 minLen = 2;
     string alphabet = 3;
-    int32 maxRef = 4;
+    string prefixName = 4;
+    string suffixName = 5;
+    string sharedName = 6;
+    string storeStringState = 7;
+    string readStringState = 8;
+    int32 maxRef = 9;
 }
 
 message VocabStringValue {
     repeated string vocab = 1;
-    int32 maxRef = 4;
+    string prefixName = 2;
+    string suffixName = 3;
+    string sharedName = 4;
+    string storeStringState = 5;
+    string readStringState = 6;
+    int32 maxRef = 7;
 }
 
 message FixedStringValue {
@@ -32,6 +42,10 @@ message NumericSetValue {
 
 message FixedNumericValue {
     double value = 1;
+}
+
+message CounterValue {
+    string counterName = 1;
 }
 
 message BooleanValue {
@@ -55,15 +69,16 @@ message ReferenceValue {
 message Value {
     oneof values {
         RandomStringValue randomString = 1;
-        VocabStringValue vocabString = 2;
-        FixedStringValue fixedString = 3;
-        RandomNumericValue randomNumeric = 4;
-        NumericSetValue numericSet = 5;
-        FixedNumericValue fixedNumeric = 6;
-        BooleanValue boolean = 7;
-        DictValue dict = 8;
-        ListValue list = 9;
-        ReferenceValue reference = 10;
+        VocabStringValue vocabString = 3;
+        FixedStringValue fixedString = 5;
+        RandomNumericValue randomNumeric = 7;
+        NumericSetValue numericSet = 8;
+        FixedNumericValue fixedNumeric = 9;
+        BooleanValue boolean = 10;
+        DictValue dict = 11;
+        ListValue list = 12;
+        ReferenceValue reference = 13;
+        CounterValue counter = 14;
     }
 }
 
@@ -75,4 +90,6 @@ message Schema {
 message Schemas {
     repeated Schema schemas = 1;
     repeated double schemaDistribution = 2;
+    map<string, string> stringPrefixes = 3;
+    map<string, string> stringSuffixes = 4;
 }

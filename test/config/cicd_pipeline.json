@@ -1,0 +1,169 @@
+{
+  "partitionUuid": "938e16fe-a216-4fe1-92bd-dcab49646fb9",
+  "pipelines": [
+    {
+      "name": "tester-pipeline",
+      "processes": [
+        {
+          "name": "annotate-cicd"
+        },
+        {
+          "name": "aggregate-author"
+        },
+        {
+          "name": "completion-hashjoin"
+        },
+        {
+          "name": "tee-git-transform"
+        },
+        {
+          "name": "filter-internal"
+        }
+      ]
+    }
+  ],
+  "processDefinitions": [
+    {
+      "annotator": {
+        "name": "annotate-cicd",
+        "annotations": [
+          {
+            "fieldKey": "version-control",
+            "value": "git-dev",
+            "condition": {
+              "exists": {
+                "ops": [
+                  {
+                    "key": "sender",
+                    "op": "Exists"
+                  },
+                  {
+                    "key": "before",
+                    "op": "Exists"
+                  },
+                  {
+                    "key": "after",
+                    "op": "Exists"
+                  },
+                  {
+                    "key": "hash",
+                    "op": "NotExists"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "fieldKey": "deploy",
+            "value": "circleci-dev",
+            "condition": {
+              "exists": {
+                "ops": [
+                  {
+                    "key": "sender",
+                    "op": "NotExists"
+                  },
+                  {
+                    "key": "hash",
+                    "op": "Exists"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "aggregator": {
+        "name": "aggregate-author",
+        "stateStore": "memKVStore",
+        "condition": {
+          "expression": {
+            "comparator": {
+              "lhs": {
+                "variable": {
+                  "name": "version-control"
+                }
+              },
+              "rhs": {
+                "literal": "git-dev"
+              },
+              "op": "Equal"
+            }
+          }
+        },
+        "aggregation": {
+          "key": "sender",
+          "aggregationType": "AggDiscreteHistogram",
+          "groupByKeys": []
+        }
+      }
+    },
+    {
+      "completer": {
+        "name": "completion-hashjoin",
+        "stateStore": "memKVStore",
+        "completion": {
+          "joinKeys": [
+            "hash",
+            "after"
+          ],
+          "timeoutMs": 3600000
+        }
+      }
+    },
+    {
+      "filter": {
+        "name": "filter-internal",
+        "regex": "^agglo.*",
+        "keepMatched": false
+      }
+    },
+    {
+      "tee": {
+        "name": "tee-git-transform",
+        "condition": {
+          "expression": {
+            "comparator": {
+              "lhs": {
+                "variable": {
+                  "name": "version-control"
+                }
+              },
+              "rhs": {
+                "literal": "git-dev"
+              },
+              "op": "Equal"
+            }
+          }
+        },
+        "outputConnector": "memKVStore",
+        "externalType": "ExternalKVStore",
+        "transformerSpecs": [
+          {
+            "sourceField": "sender",
+            "targetField": "gitAuthor",
+            "transformation": {
+              "transformationType": "TransformCopy"
+            }
+          },
+          {
+            "sourceField": "after",
+            "targetField": "gitHash",
+            "transformation": {
+              "transformationType": "TransformCopy"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "externalSystems": [
+    {
+      "externalType": "ExternalKVStore",
+      "name": "memKVStore",
+      "connectionString": "local"
+    }
+  ]
+}

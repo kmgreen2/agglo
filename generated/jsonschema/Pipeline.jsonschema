@@ -1,0 +1,23 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "processes": {
+            "items": {
+                "$schema": "http://json-schema.org/draft-04/schema#",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": true,
+                "type": "object"
+            },
+            "type": "array"
+        }
+    },
+    "additionalProperties": true,
+    "type": "object"
+}

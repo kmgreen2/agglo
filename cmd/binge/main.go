@@ -7,8 +7,10 @@ import (
 	"github.com/kmgreen2/agglo/pkg/core/process"
 	"github.com/kmgreen2/agglo/pkg/serialization"
 	"go.uber.org/zap"
+	"golang.org/x/net/netutil"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -27,6 +29,7 @@ type CommandArgs struct {
 	runType RunType
 	daemonPort int
 	daemonPath string
+	maxConnections int
 }
 
 func usage(msg string, exitCode int) {
@@ -44,6 +47,7 @@ func parseArgs() *CommandArgs {
 		"run type for the process: standalone (default) or daemon")
 	daemonPortPtr := flag.Int("daemonPort", 8080, "daemon listening port (default 8080)")
 	daemonPathPtr := flag.String("daemonPath", "/binge", "daemon processing path (default /binge)")
+	maxConnectionsPtr := flag.Int("maxConnections", 64, "maximum number of connections")
 
 	flag.Parse()
 
@@ -54,6 +58,8 @@ func parseArgs() *CommandArgs {
 	} else {
 		panic(fmt.Sprintf("invalid runType '%s'", *runTypePtr))
 	}
+
+	args.maxConnections = *maxConnectionsPtr
 
 	if len(*configPtr) == 0 {
 		usage("must specify -config", 1)
@@ -86,9 +92,10 @@ type Daemon struct {
 	logger *zap.Logger
 	daemonPort int
 	daemonPath string
+	maxConnections int
 }
 
-func NewDaemon(daemonPort int, daemonPath string, pipelines []*process.Pipeline) (*Daemon, error) {
+func NewDaemon(daemonPort int, daemonPath string, maxConnections int, pipelines []*process.Pipeline) (*Daemon, error) {
 	logger, err := zap.NewProduction()
 	if err != nil {
 		return nil, err
@@ -98,10 +105,20 @@ func NewDaemon(daemonPort int, daemonPath string, pipelines []*process.Pipeline)
 		logger: logger,
 		daemonPath: daemonPath,
 		daemonPort: daemonPort,
+		maxConnections: maxConnections,
 	}, nil
 }
 
 func (d *Daemon) Run() error {
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", d.daemonPort))
+	if err != nil {
+		return err
+	}
+
+	defer l.Close()
+
+	l = netutil.LimitListener(l, d.maxConnections)
+
 	http.HandleFunc(d.daemonPath, func(resp http.ResponseWriter, req *http.Request) {
 		bodyBytes, err := ioutil.ReadAll(req.Body)
 		if err != nil {
@@ -132,7 +149,7 @@ func (d *Daemon) Run() error {
 		return
 	})
 
-	return http.ListenAndServe(fmt.Sprintf(":%d", d.daemonPort), nil)
+	return http.Serve(l, nil)
 }
 
 func main() {
@@ -174,7 +191,7 @@ func main() {
 			}
 		}
 	} else if args.runType == RunDaemon {
-		daemon, err := NewDaemon(args.daemonPort, args.daemonPath, pipelines)
+		daemon, err := NewDaemon(args.daemonPort, args.daemonPath, args.maxConnections, pipelines)
 		if err != nil {
 			panic(err)
 		}

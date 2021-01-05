@@ -1,0 +1,405 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "condition": {
+            "$ref": "pipeline.Condition",
+            "additionalProperties": true
+        },
+        "transformerSpecs": {
+            "items": {
+                "$schema": "http://json-schema.org/draft-04/schema#",
+                "properties": {
+                    "sourceField": {
+                        "type": "string"
+                    },
+                    "targetField": {
+                        "type": "string"
+                    },
+                    "transformation": {
+                        "properties": {
+                            "condition": {
+                                "$ref": "pipeline.Condition",
+                                "additionalProperties": true
+                            },
+                            "transformationType": {
+                                "enum": [
+                                    "TransformUnknown",
+                                    0,
+                                    "TransformSum",
+                                    1,
+                                    "TransformCopy",
+                                    2,
+                                    "TransformMapRegex",
+                                    3,
+                                    "TransformMapAdd",
+                                    4,
+                                    "TransformMapMult",
+                                    5,
+                                    "TransformCount",
+                                    6,
+                                    "TransformLeftFold",
+                                    7,
+                                    "TransformRightFold",
+                                    8,
+                                    "TransformMap",
+                                    9
+                                ],
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "integer"
+                                    }
+                                ]
+                            },
+                            "mapArgs": {
+                                "properties": {
+                                    "path": {
+                                        "type": "string"
+                                    }
+                                },
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            "mapAddArgs": {
+                                "properties": {
+                                    "value": {
+                                        "type": "number"
+                                    }
+                                },
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            "mapMultArgs": {
+                                "properties": {
+                                    "value": {
+                                        "type": "number"
+                                    }
+                                },
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            "mapRegexArgs": {
+                                "properties": {
+                                    "regex": {
+                                        "type": "string"
+                                    },
+                                    "replace": {
+                                        "type": "string"
+                                    }
+                                },
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            "leftFoldArgs": {
+                                "properties": {
+                                    "path": {
+                                        "type": "string"
+                                    }
+                                },
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            "rightFoldArgs": {
+                                "properties": {
+                                    "path": {
+                                        "type": "string"
+                                    }
+                                },
+                                "additionalProperties": true,
+                                "type": "object"
+                            }
+                        },
+                        "additionalProperties": true,
+                        "type": "object"
+                    }
+                },
+                "additionalProperties": true,
+                "type": "object"
+            },
+            "type": "array"
+        },
+        "outputConnector": {
+            "type": "string"
+        },
+        "externalType": {
+            "enum": [
+                "ExternalUnknown",
+                0,
+                "ExternalKVStore",
+                1,
+                "ExternalObjectStore",
+                2,
+                "ExternalPubSub",
+                3,
+                "ExternalHttp",
+                4
+            ],
+            "oneOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "integer"
+                }
+            ]
+        }
+    },
+    "additionalProperties": true,
+    "type": "object",
+    "definitions": {
+        "pipeline.Condition": {
+            "$schema": "http://json-schema.org/draft-04/schema#",
+            "properties": {
+                "expression": {
+                    "$ref": "pipeline.Expression",
+                    "additionalProperties": true
+                },
+                "exists": {
+                    "properties": {
+                        "ops": {
+                            "items": {
+                                "$schema": "http://json-schema.org/draft-04/schema#",
+                                "properties": {
+                                    "key": {
+                                        "type": "string"
+                                    },
+                                    "op": {
+                                        "enum": [
+                                            "UnknownExists",
+                                            0,
+                                            "Exists",
+                                            1,
+                                            "NotExists",
+                                            2
+                                        ],
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "integer"
+                                            }
+                                        ]
+                                    }
+                                },
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "additionalProperties": true,
+                    "type": "object"
+                }
+            },
+            "additionalProperties": true,
+            "type": "object",
+            "id": "pipeline.Condition"
+        },
+        "pipeline.Expression": {
+            "$schema": "http://json-schema.org/draft-04/schema#",
+            "properties": {
+                "boolean": {
+                    "properties": {
+                        "value": {
+                            "type": "boolean"
+                        }
+                    },
+                    "additionalProperties": true,
+                    "type": "object"
+                },
+                "comparator": {
+                    "properties": {
+                        "lhs": {
+                            "$ref": "pipeline.Operand",
+                            "additionalProperties": true
+                        },
+                        "rhs": {
+                            "$ref": "pipeline.Operand",
+                            "additionalProperties": true
+                        },
+                        "op": {
+                            "enum": [
+                                "UnknownComparator",
+                                0,
+                                "GreaterThan",
+                                19,
+                                "LessThan",
+                                20,
+                                "GreaterThanOrEqual",
+                                21,
+                                "LessThanOrEqual",
+                                22,
+                                "Equal",
+                                23,
+                                "NotEqual",
+                                24,
+                                "RegexMatch",
+                                25,
+                                "RegexNotMatch",
+                                26
+                            ],
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        }
+                    },
+                    "additionalProperties": true,
+                    "type": "object"
+                },
+                "logical": {
+                    "properties": {
+                        "lhs": {
+                            "$ref": "pipeline.Operand",
+                            "additionalProperties": true
+                        },
+                        "rhs": {
+                            "$ref": "pipeline.Operand",
+                            "additionalProperties": true
+                        },
+                        "op": {
+                            "enum": [
+                                "UnknownLogical",
+                                0,
+                                "LogicalAnd",
+                                17,
+                                "LogicalOr",
+                                18
+                            ],
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        }
+                    },
+                    "additionalProperties": true,
+                    "type": "object"
+                },
+                "binary": {
+                    "properties": {
+                        "lhs": {
+                            "$ref": "pipeline.Operand",
+                            "additionalProperties": true
+                        },
+                        "rhs": {
+                            "$ref": "pipeline.Operand",
+                            "additionalProperties": true
+                        },
+                        "op": {
+                            "enum": [
+                                "UnknownBinary",
+                                0,
+                                "Addition",
+                                6,
+                                "Subtract",
+                                7,
+                                "Multiply",
+                                8,
+                                "Divide",
+                                9,
+                                "Power",
+                                10,
+                                "Modulus",
+                                11,
+                                "RightShift",
+                                12,
+                                "LeftShift",
+                                13,
+                                "Or",
+                                14,
+                                "And",
+                                15,
+                                "Xor",
+                                16
+                            ],
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        }
+                    },
+                    "additionalProperties": true,
+                    "type": "object"
+                },
+                "unary": {
+                    "properties": {
+                        "rhs": {
+                            "$ref": "pipeline.Operand",
+                            "additionalProperties": true
+                        },
+                        "op": {
+                            "enum": [
+                                "UnknownUnary",
+                                0,
+                                "Negation",
+                                3,
+                                "Inversion",
+                                4,
+                                "LogicalNot",
+                                5
+                            ],
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        }
+                    },
+                    "additionalProperties": true,
+                    "type": "object"
+                }
+            },
+            "additionalProperties": true,
+            "type": "object",
+            "id": "pipeline.Expression"
+        },
+        "pipeline.Operand": {
+            "$schema": "http://json-schema.org/draft-04/schema#",
+            "properties": {
+                "expression": {
+                    "$ref": "pipeline.Expression",
+                    "additionalProperties": true
+                },
+                "variable": {
+                    "properties": {
+                        "name": {
+                            "type": "string"
+                        }
+                    },
+                    "additionalProperties": true,
+                    "type": "object"
+                },
+                "literal": {
+                    "type": "string"
+                },
+                "numeric": {
+                    "type": "number"
+                }
+            },
+            "additionalProperties": true,
+            "type": "object",
+            "id": "pipeline.Operand"
+        }
+    }
+}
