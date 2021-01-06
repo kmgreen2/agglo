@@ -62,7 +62,7 @@ func TestPipelineBasic(t *testing.T) {
 
 	// Create a completion that joins on commit hash
 	completion := core.NewCompletion([]string{"hash", "githash"}, -1)
-	completer := process.NewCompleter(completion, kvStore)
+	completer := process.NewCompleter("default", completion, kvStore)
 	builder.Add(completer)
 
 	// Create transformations that set fields to be stored and tee them out to the kvstore

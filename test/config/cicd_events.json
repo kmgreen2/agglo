@@ -28,7 +28,7 @@
               "vocab": ["kmgreen2", "bob", "jane", "jim", "jill"]
             }
           },
-          "hash": {
+          "vcs_revision": {
             "reference": {
               "schemaName": "git-push" ,
               "path": "after"

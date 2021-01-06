@@ -14,10 +14,13 @@
           "name": "completion-hashjoin"
         },
         {
-          "name": "tee-git-transform"
+          "name": "tee-out-to-file"
         },
         {
-          "name": "filter-internal"
+          "name": "tee-git-events"
+        },
+        {
+          "name": "tee-cicd-completion"
         }
       ]
     }
@@ -34,7 +37,7 @@
               "exists": {
                 "ops": [
                   {
-                    "key": "sender",
+                    "key": "pusher.name",
                     "op": "Exists"
                   },
                   {
@@ -46,7 +49,7 @@
                     "op": "Exists"
                   },
                   {
-                    "key": "hash",
+                    "key": "vcs_revision",
                     "op": "NotExists"
                   }
                 ]
@@ -60,15 +63,29 @@
               "exists": {
                 "ops": [
                   {
-                    "key": "sender",
+                    "key": "pusher.name",
                     "op": "NotExists"
                   },
                   {
-                    "key": "hash",
+                    "key": "vcs_revision",
                     "op": "Exists"
                   }
                 ]
               }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "tee": {
+        "name": "tee-out-to-file",
+        "outputConnector": "/tmp/cicd-events",
+        "externalType": "ExternalLocalFile",
+        "transformerSpecs": [
+          {
+            "transformation": {
+              "transformationType": "TransformCopy"
             }
           }
         ]
@@ -94,7 +111,7 @@
           }
         },
         "aggregation": {
-          "key": "sender",
+          "key": "pusher.name",
           "aggregationType": "AggDiscreteHistogram",
           "groupByKeys": []
         }
@@ -106,7 +123,7 @@
         "stateStore": "memKVStore",
         "completion": {
           "joinKeys": [
-            "hash",
+            "vcs_revision",
             "after"
           ],
           "timeoutMs": 3600000
@@ -122,7 +139,7 @@
     },
     {
       "tee": {
-        "name": "tee-git-transform",
+        "name": "tee-git-events",
         "condition": {
           "expression": {
             "comparator": {
@@ -138,19 +155,39 @@
             }
           }
         },
-        "outputConnector": "memKVStore",
-        "externalType": "ExternalKVStore",
+        "outputConnector": "/tmp/git-events",
+        "externalType": "ExternalLocalFile",
         "transformerSpecs": [
           {
-            "sourceField": "sender",
-            "targetField": "gitAuthor",
             "transformation": {
               "transformationType": "TransformCopy"
             }
-          },
+          }
+        ]
+      }
+    },
+    {
+      "tee": {
+        "name": "tee-cicd-completion",
+        "condition": {
+          "expression": {
+            "comparator": {
+              "lhs": {
+                "variable": {
+                  "name": "agglo:completion:completion-hashjoin"
+                }
+              },
+              "rhs": {
+                "literal": "complete"
+              },
+              "op": "Equal"
+            }
+          }
+        },
+        "outputConnector": "/tmp/cicd-completion",
+        "externalType": "ExternalLocalFile",
+        "transformerSpecs": [
           {
-            "sourceField": "after",
-            "targetField": "gitHash",
             "transformation": {
               "transformationType": "TransformCopy"
             }

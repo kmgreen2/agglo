@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/core/process"
 	"github.com/kmgreen2/agglo/pkg/serialization"
@@ -133,6 +134,25 @@ func (d *Daemon) Run() error {
 			_, _ = resp.Write([]byte(err.Error()))
 			d.logger.Error(err.Error())
 			return
+		}
+
+		// ToDo(KMG): This will eventually be de-queuing from a persistent queue,
+		// so we inject checkpoint state to be used in the pipeline.  The main use case
+		// is to figure out where to start when replaying a message from the durable queue.
+		// ToDo(KMG): This UUID must be defined by the process queuing the events, which
+		// will allow the re-player to fetch the checkpoint state, prior to replaying
+		// ToDo(KMG): Each pipeline will also have to mix in its own name to ensure the
+		// there are no conflicts
+		messageID, err := gUuid.NewRandom()
+		if err != nil {
+			resp.WriteHeader(500)
+			_, _ = resp.Write([]byte(err.Error()))
+			d.logger.Error(err.Error())
+			return
+		}
+		in["agglo:checkpoint:state"] = map[string]interface{} {
+			"messageID": messageID.String(),
+			"idx": 0,
 		}
 		for _, pipeline := range d.pipelines {
 			future := pipeline.RunAsync(in)

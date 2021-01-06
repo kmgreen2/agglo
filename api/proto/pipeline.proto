@@ -21,6 +21,7 @@ enum ExternalType {
     ExternalObjectStore = 2;
     ExternalPubSub = 3;
     ExternalHttp = 4;
+    ExternalLocalFile = 5;
 }
 
 enum AggregationType {

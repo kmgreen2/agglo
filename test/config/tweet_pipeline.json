@@ -1,0 +1,65 @@
+{
+  "partitionUuid": "938e16fe-a216-4fe1-92bd-dcab49646fb9",
+  "pipelines": [
+    {
+      "name": "tweet-pipeline",
+      "processes": [
+        {
+          "name": "aggregate-author"
+        },
+        {
+          "name": "tee-out-to-file"
+        }
+      ]
+    }
+  ],
+  "processDefinitions": [
+    {
+      "tee": {
+        "name": "tee-out-to-file",
+        "outputConnector": "/tmp/tweet",
+        "externalType": "ExternalLocalFile",
+        "transformerSpecs": [
+          {
+            "transformation": {
+              "transformationType": "TransformCopy"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "aggregator": {
+        "name": "aggregate-author",
+        "stateStore": "memKVStore",
+        "condition": {
+          "expression": {
+            "comparator": {
+              "lhs": {
+                "variable": {
+                  "name": "user"
+                }
+              },
+              "rhs": {
+                "literal": "Kevin50318471"
+              },
+              "op": "Equal"
+            }
+          }
+        },
+        "aggregation": {
+          "key": "user",
+          "aggregationType": "AggDiscreteHistogram",
+          "groupByKeys": []
+        }
+      }
+    }
+  ],
+  "externalSystems": [
+    {
+      "externalType": "ExternalKVStore",
+      "name": "memKVStore",
+      "connectionString": "local"
+    }
+  ]
+}

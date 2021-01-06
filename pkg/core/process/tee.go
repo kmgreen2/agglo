@@ -10,7 +10,9 @@ import (
 	"github.com/kmgreen2/agglo/pkg/core"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/pkg/streaming"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 )
 
@@ -53,6 +55,38 @@ func NewKVTee(kvStore kvs.KVStore, condition *core.Condition, transformer *Trans
 		"kvstore",
 		kvStore.ConnectionString(),
 	}
+}
+
+// NewLocalfileTee will create a Tee processor that writes maps to a local file system
+func NewLocalFileTee(path string, condition *core.Condition, transformer *Transformer) (*Tee, error) {
+	if d, err := os.Stat(path); err != nil || !d.IsDir() {
+		msg := fmt.Sprintf("'%s is not a valid path", path)
+		return nil, common.NewInvalidError(msg)
+	}
+	outputFunc := func(key string, in map[string]interface{}) error {
+		byteBuffer := bytes.NewBuffer([]byte{})
+		encoder := json.NewEncoder(byteBuffer)
+		err := encoder.Encode(in)
+		if err != nil {
+			return err
+		}
+		return ioutil.WriteFile(fmt.Sprintf("%s/%s.json", path, key), byteBuffer.Bytes(), 0644)
+	}
+
+	if transformer == nil {
+		transformation := core.NewTransformation(
+			[]core.FieldTransformation{&core.CopyTransformation{}},
+			core.TrueCondition)
+		transformer = DefaultTransformer()
+		transformer.AddSpec("", "", transformation)
+	}
+	return &Tee{
+		outputFunc,
+		condition,
+		transformer,
+		"localfile",
+		path,
+	}, nil
 }
 
 // NewPubSubTee will create a Tee processor that publishes maps using the provided

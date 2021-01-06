@@ -30,7 +30,7 @@ func DoCompleter(numMaps, numJoined int, timeout time.Duration, missingJoinKey s
 
 	kvStore := kvs.NewMemKVStore()
 
-	completer := process.NewCompleter(completion, kvStore)
+	completer := process.NewCompleter("foo", completion, kvStore)
 
 	numTriggered := 0
 	numComplete := 0

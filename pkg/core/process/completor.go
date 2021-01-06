@@ -12,12 +12,14 @@ import (
 )
 
 type Completer struct {
+	name string
 	completion *core.Completion
 	completionStateStore kvs.KVStore
 }
 
-func NewCompleter(completion *core.Completion, kvStore kvs.KVStore) *Completer {
+func NewCompleter(name string, completion *core.Completion, kvStore kvs.KVStore) *Completer {
 	return &Completer{
+		name: name,
 		completion: completion,
 		completionStateStore: kvStore,
 	}
@@ -48,10 +50,12 @@ func (c Completer) Process(in map[string]interface{}) (map[string]interface{}, e
 	if err != nil {
 		return out, err
 	}
-	name, err := core.GetName(in)
+	/*name, err := core.GetName(in)
 	if err != nil {
 		return out, err
 	}
+	*/
+	name := c.name
 
 	matchedKey, matchedVal, err := c.completion.Match(in)
 	if err != nil {
@@ -103,6 +107,11 @@ func (c Completer) Process(in map[string]interface{}) (map[string]interface{}, e
 			return out, err
 		}
 		out[fmt.Sprintf("agglo:completion:%s", name)] = "complete"
+		stateMap, err := common.JsonToMap(newCompletionBytes)
+		if err != nil {
+			return out, err
+		}
+		out[fmt.Sprintf("agglo:completion:state:%s", name)] = stateMap
 	} else if completionState.CompletionDeadline > 0 && time.Now().UnixNano() > completionState.CompletionDeadline {
 			out[fmt.Sprintf("agglo:completion:%s", name)] = "timedout"
 	} else {

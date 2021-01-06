@@ -360,7 +360,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  ([]*process.Pipeline, error) {
 			if kvStore, ok := externalKVStores[procDef.Completer.StateStore]; ok {
 				completion := core.NewCompletion(procDef.Completer.Completion.JoinKeys,
 					time.Millisecond*time.Duration(procDef.Completer.Completion.TimeoutMs))
-				processes[procDef.Completer.Name] = process.NewCompleter(completion, kvStore)
+				processes[procDef.Completer.Name] = process.NewCompleter(procDef.Completer.Name, completion, kvStore)
 			} else {
 				msg := fmt.Sprintf("unknown kvStore for %s: %s", procDef.Completer.Name, procDef.Completer.StateStore)
 				return nil, common.NewInvalidError(msg)
@@ -419,7 +419,13 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  ([]*process.Pipeline, error) {
 				if external, ok := externalHttp[procDef.Tee.OutputConnector]; ok {
 					processes[procDef.Tee.Name] = process.NewHttpTee(http.DefaultClient, external, condition, transformer)
 				} else {
-					msg := fmt.Sprintf("%s is not a valid Publisher", procDef.Tee.OutputConnector)
+					msg := fmt.Sprintf("%s is not a valid HTTP endpoint", procDef.Tee.OutputConnector)
+					return nil, common.NewInvalidError(msg)
+				}
+			} else if procDef.Tee.ExternalType == api.ExternalType_ExternalLocalFile {
+				if processes[procDef.Tee.Name], err = process.NewLocalFileTee(procDef.Tee.OutputConnector, condition,
+					transformer); err != nil {
+					msg := fmt.Sprintf("%s is not a valid path", procDef.Tee.OutputConnector)
 					return nil, common.NewInvalidError(msg)
 				}
 			} else {

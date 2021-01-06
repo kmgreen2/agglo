@@ -203,7 +203,9 @@
                         "ExternalPubSub",
                         3,
                         "ExternalHttp",
-                        4
+                        4,
+                        "ExternalLocalFile",
+                        5
                     ],
                     "oneOf": [
                         {
