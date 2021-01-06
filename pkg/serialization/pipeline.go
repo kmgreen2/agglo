@@ -467,6 +467,24 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  ([]*process.Pipeline, error) {
 			}
 		}
 
+		if pipeline.Checkpoint != nil {
+			var checkPointer *process.CheckPointer
+			if pipeline.Checkpoint.ExternalType == api.ExternalType_ExternalKVStore {
+				if external, ok := externalKVStores[pipeline.Checkpoint.OutputConnector]; ok {
+					checkPointer = process.NewKVCheckPointer(external)
+				} else {
+					msg := fmt.Sprintf("%s is not a valid KVStore", pipeline.Checkpoint.OutputConnector)
+					return nil, common.NewInvalidError(msg)
+				}
+			} else if pipeline.Checkpoint.ExternalType == api.ExternalType_ExternalLocalFile {
+				checkPointer, err = process.NewLocalFileCheckPointer(pipeline.Checkpoint.OutputConnector)
+				if err != nil {
+					return nil, common.NewInvalidError(err.Error())
+				}
+			}
+			pipelineBuilder.Checkpoint(checkPointer)
+		}
+
 		builtPipelines = append(builtPipelines, pipelineBuilder.Get())
 	}
 	return builtPipelines, nil

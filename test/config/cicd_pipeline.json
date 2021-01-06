@@ -3,6 +3,10 @@
   "pipelines": [
     {
       "name": "tester-pipeline",
+      "checkpoint": {
+        "outputConnector": "/tmp/checkpoints",
+        "externalType": "ExternalLocalFile"
+      },
       "processes": [
         {
           "name": "annotate-cicd"

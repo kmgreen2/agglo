@@ -1,0 +1,34 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "properties": {
+        "outputConnector": {
+            "type": "string"
+        },
+        "externalType": {
+            "enum": [
+                "ExternalUnknown",
+                0,
+                "ExternalKVStore",
+                1,
+                "ExternalObjectStore",
+                2,
+                "ExternalPubSub",
+                3,
+                "ExternalHttp",
+                4,
+                "ExternalLocalFile",
+                5
+            ],
+            "oneOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "integer"
+                }
+            ]
+        }
+    },
+    "additionalProperties": true,
+    "type": "object"
+}

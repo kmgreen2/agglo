@@ -150,10 +150,7 @@ func (d *Daemon) Run() error {
 			d.logger.Error(err.Error())
 			return
 		}
-		in["agglo:checkpoint:state"] = map[string]interface{} {
-			"messageID": messageID.String(),
-			"idx": 0,
-		}
+		in["agglo:messageID"] = messageID.String()
 		for _, pipeline := range d.pipelines {
 			future := pipeline.RunAsync(in)
 			_, err = future.Get()

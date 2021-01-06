@@ -105,6 +105,7 @@ enum ComparatorOperator {
 
 message Pipelines {
     string partitionUuid = 1;
+
     repeated Pipeline pipelines = 2;
     repeated ProcessDefinition processDefinitions = 3;
     repeated External externalSystems = 4;
@@ -113,6 +114,7 @@ message Pipelines {
 message Pipeline {
     string name = 1;
     repeated PipelineProcess processes = 2;
+    Checkpoint checkpoint = 3;
 }
 
 message PipelineProcess {
@@ -171,6 +173,11 @@ message Filter {
     string name = 1;
     string regex = 2;
     bool keepMatched = 3;
+}
+
+message Checkpoint {
+    string outputConnector = 1;
+    ExternalType externalType = 2;
 }
 
 message Spawner {
