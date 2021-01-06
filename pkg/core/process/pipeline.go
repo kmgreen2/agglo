@@ -127,7 +127,7 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 	}
 
 	if pipeline.checkPointer != nil {
-		// Call checkPointer.Clean() to remove the checkpoint
+		// Call checkPointer.Finalize() to remove the checkpoint
 		f = f.Then(NewRunnablePartialFinalizer(pipeline.checkPointer))
 	}
 

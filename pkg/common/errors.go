@@ -31,7 +31,7 @@ func Wrap(err error, msg string) error {
 	return errors.Wrap(err, msg)
 }
 
-// ConflictError represents a conflict in a data, kv or object store
+// ConflictError represents a conflict in a Data, kv or object store
 type ConflictError struct {
 	msg string
 }
@@ -48,7 +48,7 @@ func NewConflictError(msg string) *ConflictError {
 	}
 }
 
-// InternalError represents an internal error in a data, kv or object store
+// InternalError represents an internal error in a Data, kv or object store
 type InternalError struct {
 	msg string
 }
@@ -65,7 +65,7 @@ func NewInternalError(msg string) *InternalError {
 	}
 }
 
-// NotFoundError represents a 404 error in a data, kv or object store
+// NotFoundError represents a 404 error in a Data, kv or object store
 type NotFoundError struct {
 	msg string
 }
@@ -88,7 +88,7 @@ func NewNotFoundError(msg string) *NotFoundError {
 	}
 }
 
-// InvalidError represents a 4xx error in a data, kv or object store
+// InvalidError represents a 4xx error in a Data, kv or object store
 type InvalidError struct {
 	msg string
 }
@@ -105,7 +105,7 @@ func NewInvalidError(msg string) *InvalidError {
 	}
 }
 
-// OutOfBoundsError represents a out-of-bounds error in a data, kv or object store
+// OutOfBoundsError represents a out-of-bounds error in a Data, kv or object store
 type OutOfBoundsError struct {
 	msg string
 }
@@ -122,7 +122,7 @@ func NewOutOfBoundsError(msg string) *OutOfBoundsError {
 	}
 }
 
-// EndOfStreamError represents a end-of-stream error in a data, kv or object store
+// EndOfStreamError represents a end-of-stream error in a Data, kv or object store
 type EndOfStreamError struct {
 	msg string
 }
@@ -139,7 +139,7 @@ func NewEndOfStreamError(msg string) *EndOfStreamError {
 	}
 }
 
-// SignatureError represents a end-of-stream error in a data, kv or object store
+// SignatureError represents a end-of-stream error in a Data, kv or object store
 type SignatureError struct {
 	msg string
 }
@@ -232,6 +232,51 @@ func NewInconsistentStateError(msg string) *InconsistentStateError {
 
 // Error returns the string representation of the InconsistentStateError
 func (e *InconsistentStateError) Error() string {
+	return e.msg
+}
+
+// AlreadyOpenedError represents an error condition when a persistent resource is already opened by another process
+type AlreadyOpenedError struct {
+	msg string
+}
+
+// NewAlreadyOpenedError is the constructor for AlreadyOpenedError
+func NewAlreadyOpenedError(msg string) *AlreadyOpenedError {
+	return &AlreadyOpenedError{msg}
+}
+
+// Error returns the string representation of the AlreadyOpenedError
+func (e *AlreadyOpenedError) Error() string {
+	return e.msg
+}
+
+// ClosedError represents an error condition when a persistent resource is closed
+type ClosedError struct {
+	msg string
+}
+
+// NewClosedError is the constructor for ClosedError
+func NewClosedError(msg string) *ClosedError {
+	return &ClosedError{msg}
+}
+
+// Error returns the string representation of the ClosedError
+func (e *ClosedError) Error() string {
+	return e.msg
+}
+
+// EmptyQueue represents a condition when a queue is empty
+type EmptyQueue struct {
+	msg string
+}
+
+// NewEmptyQueue is the constructor for EmptyQueue
+func NewEmptyQueue(msg string) *EmptyQueue {
+	return &EmptyQueue{msg}
+}
+
+// Error returns the string representation of the EmptyQueue
+func (e *EmptyQueue) Error() string {
 	return e.msg
 }
 
