@@ -19,6 +19,7 @@ type Future interface {
 	Get() (interface{}, error)
 	GetWithTimeout(duration time.Duration) (interface{}, error)
 	Then(runnable PartialRunnable) Future
+	ThenWithRetry(numRetries int, initialDelay time.Duration, runnable PartialRunnable) Future
 	Cancel() error
 	IsCancelled() bool
 	IsCompleted() bool
@@ -143,6 +144,41 @@ func (f *future) GetWithTimeout(timeout time.Duration) (interface{}, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	return f.getWithContext(ctx)
+}
+
+func (f *future) ThenWithRetry(numRetries int, initialDelay time.Duration, runnable PartialRunnable) Future {
+	next := NewCompletable()
+
+	go func() {
+		var err error
+		var result interface{}
+		defer next.Close()
+
+		delay := initialDelay
+		result, err = f.Get()
+		if err != nil {
+			_ = next.Fail(err)
+			return
+		}
+		err = runnable.SetArgs(result)
+		if err != nil {
+			_ = next.Fail(err)
+			return
+		}
+		for i := 0; i < numRetries; i++ {
+			result, err = runnable.Run()
+			if err != nil {
+				time.Sleep(delay)
+				delay <<= 1
+				continue
+			} else {
+				_ = next.Success(result)
+				return
+			}
+		}
+		_ = next.Fail(err)
+	}()
+	return next.Future()
 }
 
 func (f *future) Then(runnable PartialRunnable) Future {

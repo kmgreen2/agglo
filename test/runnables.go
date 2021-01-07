@@ -114,12 +114,16 @@ func NewFailThenSucceedRunnable(numFails int) *FailThenSucceedRunnable {
 	}
 }
 
-func (r FailThenSucceedRunnable) Run() (interface{}, error) {
+func (r *FailThenSucceedRunnable) Run() (interface{}, error) {
 	r.currCalls++
-	if r.currCalls == r.numFails {
+	if r.currCalls <= r.numFails {
 		return nil, common.NewInvalidError("Failed")
 	}
 	return r.numFails, nil
+}
+
+func (r *FailThenSucceedRunnable) SetArgs(args ...interface{}) error {
+	return nil
 }
 
 type FuncRunnable struct {

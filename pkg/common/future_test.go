@@ -147,13 +147,15 @@ func TestCreateFutureThen(t *testing.T) {
 	testThenFailure := false
 	testThenCancel := false
 	runnable := test.NewSquareRunnable(10)
-	f := common.CreateFuture(runnable).OnSuccess(func (x interface{}) {
+	f1 := common.CreateFuture(runnable).OnSuccess(func (x interface{}) {
 		testSuccess = true
 	}).OnFail(func (err error) {
 		testFailure = true
 	}).OnCancel(func () {
 		testCancel = true
-	}).Then(runnable).OnSuccess(func (x interface{}) {
+	})
+
+	f2 := f1.Then(runnable).OnSuccess(func (x interface{}) {
 		testThenSuccess = true
 	}).OnFail(func (err error) {
 		testThenFailure = true
@@ -161,18 +163,20 @@ func TestCreateFutureThen(t *testing.T) {
 		testThenCancel = true
 	})
 
-	result, err := f.Get()
+	result, err := f2.Get()
 	assert.Nil(t, err)
 	assert.Equal(t, 10000, result)
 
-	waitForCallbacks(f)
+	waitForCallbacks(f1)
+	waitForCallbacks(f2)
 	assert.True(t, testSuccess)
 	assert.False(t, testFailure)
 	assert.False(t, testCancel)
 	assert.True(t, testThenSuccess)
 	assert.False(t, testThenFailure)
 	assert.False(t, testThenCancel)
-	assert.True(t, f.IsCompleted())
+	assert.True(t, f1.IsCompleted())
+	assert.True(t, f2.IsCompleted())
 }
 
 func TestCreateFutureThenWithFailure(t *testing.T) {
@@ -225,5 +229,63 @@ func TestRetryableFuture(t *testing.T) {
 	assert.True(t, testSuccess)
 	assert.False(t, testCancel)
 	assert.False(t, testFailure)
+}
+
+func TestThenRetryableFuture(t *testing.T) {
+	testSuccess := false
+	testFailure := false
+	testCancel := false
+	runnable := test.NewSquareRunnable(2)
+	thenRunnable := test.NewFailThenSucceedRunnable(2)
+
+
+	f := common.CreateFuture(runnable).ThenWithRetry(3, 100 * time.Millisecond, thenRunnable).
+	OnSuccess(func (x interface{}) {
+		testSuccess = true
+	}).OnFail(func (err error) {
+		testFailure = true
+	}).OnCancel(func () {
+		testCancel = true
+	})
+
+
+	result, err := f.Get()
+	assert.Nil(t, err)
+	assert.Equal(t, 2, result)
+	assert.True(t, f.IsCompleted())
+
+	waitForCallbacks(f)
+	assert.True(t, testSuccess)
+	assert.False(t, testCancel)
+	assert.False(t, testFailure)
+}
+
+func TestThenRetryableFutureFailed(t *testing.T) {
+	testSuccess := false
+	testFailure := false
+	testCancel := false
+	runnable := test.NewSquareRunnable(2)
+	thenRunnable := test.NewFailThenSucceedRunnable(3)
+
+
+	f := common.CreateFuture(runnable).ThenWithRetry(3, 100 * time.Millisecond, thenRunnable).
+		OnSuccess(func (x interface{}) {
+			testSuccess = true
+		}).OnFail(func (err error) {
+		testFailure = true
+	}).OnCancel(func () {
+		testCancel = true
+	})
+
+
+	result, err := f.Get()
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.True(t, f.IsCompleted())
+
+	waitForCallbacks(f)
+	assert.False(t, testSuccess)
+	assert.False(t, testCancel)
+	assert.True(t, testFailure)
 }
 
