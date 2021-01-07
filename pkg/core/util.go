@@ -114,11 +114,10 @@ func updateMap(in interface{}, path []string, value interface{}) error {
 			inVal[path[0]] = value
 			return nil
 		} else if len(path) > 1 {
-			if v, ok := inVal[path[0]]; ok {
-				return updateMap(v, path[1:], value)
-			} else {
-				return &common.NotFoundError{}
+			if _, ok := inVal[path[0]]; !ok {
+				inVal[path[0]] = make(map[string]interface{})
 			}
+			return updateMap(inVal[path[0]], path[1:], value)
 		}
 	}
 	return &common.InvalidError{}

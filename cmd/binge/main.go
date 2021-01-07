@@ -16,7 +16,8 @@ type RunType int
 
 const (
 	RunStandalone RunType = iota
-	RunDaemon
+	RunStatelessDaemon
+	RunPersistentDaemon
 )
 
 type CommandArgs struct {
@@ -43,7 +44,7 @@ func parseArgs() *CommandArgs {
 	configPtr := flag.String("config", "", "path to config file for binge")
 	outfilePtr := flag.String("outfile", "/dev/stdout", "path to file to store output")
 	runTypePtr := flag.String("runType", "standalone",
-		"run type for the process: standalone (default) or daemon")
+		"run type for the process: standalone (default), stateless-daemon, persistent-daemon")
 	daemonPortPtr := flag.Int("daemonPort", 8080, "daemon listening port (default 8080)")
 	daemonPathPtr := flag.String("daemonPath", "/binge", "daemon processing path (default /binge)")
 	maxConnectionsPtr := flag.Int("maxConnections", 64, "maximum number of connections")
@@ -55,8 +56,10 @@ func parseArgs() *CommandArgs {
 
 	if strings.Compare(*runTypePtr, "standalone") == 0 {
 		args.runType = RunStandalone
-	} else if strings.Compare(*runTypePtr, "daemon") == 0 {
-		args.runType = RunDaemon
+	} else if strings.Compare(*runTypePtr, "persistent-daemon") == 0 {
+		args.runType = RunPersistentDaemon
+	} else if strings.Compare(*runTypePtr, "stateless-daemon") == 0 {
+		args.runType = RunStatelessDaemon
 	} else {
 		panic(fmt.Sprintf("invalid runType '%s'", *runTypePtr))
 	}
@@ -84,7 +87,7 @@ func parseArgs() *CommandArgs {
 				usage(err.Error(), 1)
 			}
 		}
-	} else if args.runType == RunDaemon {
+	} else if args.runType == RunStatelessDaemon || args.runType == RunPersistentDaemon {
 		args.daemonPath = *daemonPathPtr
 		args.daemonPort = *daemonPortPtr
 	}
@@ -130,7 +133,7 @@ func main() {
 				panic(err)
 			}
 		}
-	} else if args.runType == RunDaemon {
+	} else if args.runType == RunPersistentDaemon {
 		recoverFunc := func(inBytes []byte) error {
 			in, err := common.JsonToMap(inBytes)
 			if err != nil {
@@ -144,7 +147,7 @@ func main() {
 			panic(err)
 		}
 
-		daemon, err := server.NewDaemon(args.daemonPort, args.daemonPath, args.maxConnections, args.numThreads,
+		daemon, err := server.NewDurableDaemon(args.daemonPort, args.daemonPath, args.maxConnections, args.numThreads,
 			dQueue, pipelines)
 		if err != nil {
 			panic(err)
@@ -153,5 +156,15 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+	} else if args.runType == RunStatelessDaemon {
+		daemon, err := server.NewStatelessDaemon(args.daemonPort, args.daemonPath, args.maxConnections, pipelines)
+		if err != nil {
+			panic(err)
+		}
+		err = daemon.Run()
+		if err != nil {
+			panic(err)
+		}
 	}
+
 }

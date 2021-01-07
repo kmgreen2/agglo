@@ -457,7 +457,10 @@ func (s *AggregationState) Get(path []string) (map[string]interface{}, error) {
 	if mapVal, ok := val.(map[string]interface{}); ok {
 		return mapVal, nil
 	}
-	msg := fmt.Sprintf("could not find path ('%v') in state map", path)
+	if stateVal, ok := val.(FieldAggregationState); ok {
+		return stateVal.ToMap(), nil
+	}
+	msg := fmt.Sprintf("value at path '%v' should be a map[string]interface, got %v", path, reflect.TypeOf(val))
 	return nil, common.NewInvalidError(msg)
 }
 

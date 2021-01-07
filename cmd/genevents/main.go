@@ -15,6 +15,9 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 type DependencyGraph struct {
@@ -539,10 +542,95 @@ func SchemasFromJson(schemasJson []byte) (*api.Schemas, error) {
 	return &schemasPb, nil
 }
 
-type CommandArgs struct {
-	schemaDef *os.File
+type ThreadStats struct {
+	min time.Duration
+	max time.Duration
+	sum time.Duration
+	num int
+}
+
+func NewThreadStats() *ThreadStats {
+	return &ThreadStats{
+		min: math.MaxInt64,
+		max: -1,
+	}
+}
+
+func (t *ThreadStats) Update(elapsed time.Duration) {
+	t.num++
+	t.sum += elapsed
+	if t.min > elapsed {
+		t.min = elapsed
+	}
+	if t.max < elapsed {
+		t.max = elapsed
+	}
+}
+
+func (t *ThreadStats) MinMs() float64 {
+	return float64(t.min.Milliseconds())
+}
+
+func (t *ThreadStats) MaxMs() float64 {
+	return float64(t.max.Milliseconds())
+}
+
+func (t *ThreadStats) AvgMs() float64 {
+	return float64(t.sum.Milliseconds()) / float64(t.num)
+}
+
+func (t *ThreadStats) Num() int {
+	return t.num
+}
+
+func (t *ThreadStats) String() string {
+	return fmt.Sprintf("min: %f ms, max: %f ms, avg: %f ms", t.MinMs(), t.MaxMs(), t.AvgMs())
+}
+
+type Stats struct {
+	threadStats []*ThreadStats
+	startTime time.Time
+	endTime time.Time
+	num int
+}
+
+func NewStats(numThreads int) *Stats {
+	threadStats := make([]*ThreadStats, numThreads)
+	for i := 0; i < numThreads; i++ {
+		threadStats[i] = NewThreadStats()
+	}
+	return &Stats{
+		threadStats: threadStats,
+	}
+}
+
+func (s *Stats) AddLatency(threadNum int, elapsed time.Duration) {
+	s.num++
+	s.threadStats[threadNum].Update(elapsed)
+}
+
+func (s *Stats) Start() {
+	s.startTime = time.Now()
+}
+
+func (s *Stats) Finish() string {
+	str := ""
+	s.endTime = time.Now()
+
+	str += fmt.Sprintf("Total duration: %d ms\n", s.endTime.Sub(s.startTime).Milliseconds())
+	str += fmt.Sprintf("Avg duration: %f ms\n", float64(s.endTime.Sub(s.startTime).Milliseconds()) / float64(s.num))
+	for i, threadStat := range s.threadStats {
+		str += fmt.Sprintf("Thread %d: %s\n", i, threadStat.String())
+	}
+	return str
+}
+
+type CommandState struct {
+	schemas *api.Schemas
 	sender Sender
-	numEvents int
+	numEvents int32
+	numThreads int
+	stats *Stats
 }
 
 func usage(msg string, exitCode int) {
@@ -557,9 +645,10 @@ type Sender interface {
 
 type FileSender struct {
 	file *os.File
+	lock *sync.Mutex
 }
 
-func NewFileSender(filename string) (*FileSender, error) {
+func NewFileSender(filename string, lock *sync.Mutex) (*FileSender, error) {
 	var err error
 	var fp *os.File
 	if len(filename) == 0 {
@@ -572,6 +661,8 @@ func NewFileSender(filename string) (*FileSender, error) {
 	}
 	return &FileSender{
 		fp,
+		lock,
+
 	}, nil
 }
 
@@ -581,6 +672,8 @@ func (s *FileSender) Send(rawJson []byte) error {
 	if err != nil {
 		return err
 	}
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	_, err = fmt.Fprintln(s.file, pretty.String())
 	if err != nil {
 		return err
@@ -617,23 +710,37 @@ func (s *HttpSender) Send(rawJson []byte) error {
 	return nil
 }
 
-func parseArgs() *CommandArgs {
+func parseArgs() *CommandState {
 	var err error
-	args := &CommandArgs{}
+	args := &CommandState{}
 	schemaPtr := flag.String("schema", "", "path to config file schemas")
 	numEventsPtr := flag.Int("numEvents", 100, "number of events to generate")
+	numThreadsPtr := flag.Int("numThreads", 1, "number of threads used to generate events")
 	outputUsage := `destination to send the events:
 - File: a '/' delimited path ("" will go to stdout)
 - Endpoint: a http://host:port/path endpoint
 `
 	outputPtr := flag.String("output", "", outputUsage)
 	flag.Parse()
-	args.numEvents = *numEventsPtr
-
-	args.schemaDef, err = os.Open(*schemaPtr)
+	args.numEvents = int32(*numEventsPtr)
+	schemaDef, err := os.Open(*schemaPtr)
 	if err != nil {
 		usage(err.Error(), 1)
 	}
+
+	schemaDefBytes, err := ioutil.ReadAll(schemaDef)
+	if err != nil {
+		usage(err.Error(), 1)
+	}
+
+	args.schemas, err = SchemasFromJson(schemaDefBytes)
+	if err != nil {
+		usage(err.Error(), 1)
+	}
+
+	args.numThreads = *numThreadsPtr
+
+	args.stats = NewStats(args.numThreads)
 
 	if isUrl(*outputPtr) {
 		args.sender, err = NewHttpSender(*outputPtr)
@@ -641,7 +748,7 @@ func parseArgs() *CommandArgs {
 			usage(err.Error(), 1)
 		}
 	} else {
-		args.sender, err = NewFileSender(*outputPtr)
+		args.sender, err = NewFileSender(*outputPtr, &sync.Mutex{})
 		if err != nil {
 			usage(err.Error(), 1)
 		}
@@ -650,37 +757,49 @@ func parseArgs() *CommandArgs {
 	return args
 }
 
-func main() {
-	args := parseArgs()
-	schemaBytes, err :=	ioutil.ReadAll(args.schemaDef)
+func generator(threadNum int, args *CommandState) error {
+	generatorState, err := NewGeneratorState(args.schemas)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	schemas, err := SchemasFromJson(schemaBytes)
-	if err != nil {
-		panic(err)
-	}
-	generatorState, err := NewGeneratorState(schemas)
-	if err != nil {
-		panic(err)
-	}
+	atomic.AddInt32(&args.numEvents, -1)
 
-	for i := 0; i < args.numEvents; i++ {
+	for args.numEvents >= 0 {
 		out, err := generatorState.Generate()
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		rawJson, err := common.MapToJson(out)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
+		start := time.Now()
 		err = args.sender.Send(rawJson)
 		if err != nil {
-			panic(err)
+			return err
 		}
-		fmt.Printf("%d\n", i)
+		elapsed := time.Now().Sub(start)
+		args.stats.AddLatency(threadNum, elapsed)
+		atomic.AddInt32(&args.numEvents, -1)
 	}
+	return nil
+}
+
+func main() {
+	args := parseArgs()
+	wg := sync.WaitGroup{}
+	wg.Add(args.numThreads)
+
+	args.stats.Start()
+	for i := 0; i < args.numThreads; i++ {
+		go func(threadNum int) {
+			_ = generator(threadNum, args)
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+	fmt.Println(args.stats.Finish())
 }

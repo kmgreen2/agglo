@@ -117,8 +117,14 @@ message Pipeline {
     Checkpoint checkpoint = 3;
 }
 
+message RetryStrategy {
+    int32 numRetries = 1;
+    int64 initialBackOffMs = 2;
+}
+
 message PipelineProcess {
     string name = 1;
+    RetryStrategy retryStrategy = 2;
 }
 
 message ProcessDefinition {

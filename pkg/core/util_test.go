@@ -112,7 +112,8 @@ func TestUpdateMap(t *testing.T) {
 	assert.Equal(t, []int{1,2}, jsonMap["b"].(map[string]interface{})["d"])
 
 	err = core.UpdateMap(jsonMap, []string{"b", "e", "f"}, []int{1,2})
-	assert.Error(t, err)
+	assert.Nil(t, err)
+	assert.Equal(t, []int{1,2}, jsonMap["b"].(map[string]interface{})["e"].(map[string]interface{})["f"])
 
 	err = core.UpdateMap(jsonMap, []string{"i", "0", "j"}, []int{1,2})
 	assert.Error(t, err)

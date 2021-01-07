@@ -10,6 +10,18 @@
                 "properties": {
                     "name": {
                         "type": "string"
+                    },
+                    "retryStrategy": {
+                        "properties": {
+                            "numRetries": {
+                                "type": "integer"
+                            },
+                            "initialBackOffMs": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": true,
+                        "type": "object"
                     }
                 },
                 "additionalProperties": true,
