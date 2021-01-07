@@ -153,6 +153,65 @@ func NewLocalFileCheckPointer(path string) (*CheckPointer, error) {
 	}, nil
 }
 
+func getIndexFromCheckpoint(checkpoint map[string]interface{}) (int64, error) {
+	if idx, ok := checkpoint["agglo:checkpoint:idx"]; ok {
+		numericIdx, err := core.GetNumeric(idx)
+		if err != nil {
+			return -1, err
+		}
+		return int64(numericIdx), nil
+	}
+	return -1, common.NewNotFoundError("could not find checkpoint index")
+}
+
+func getDataFromCheckpoint(checkpoint map[string]interface{}) (map[string]interface{}, error) {
+	if rawData, rawOk := checkpoint["agglo:checkpoint:data"]; rawOk {
+		if data, ok := rawData.(map[string]interface{}); ok {
+			return data, nil
+		} else {
+			msg := fmt.Sprintf("invalid checkpoint data, expected map[string]interface{}, got %v",
+				reflect.TypeOf(rawData))
+			return nil, common.NewNotFoundError(msg)
+		}
+	}
+	return nil, common.NewNotFoundError("could not find checkpoint data")
+}
+
+func (c CheckPointer) GetCheckpointWithIndex(in map[string]interface{}) (out map[string]interface{},
+	index int64, err error) {
+
+	// If the internal fields are not found in the map, then we assume there
+	// is no checkpoint
+	err = common.NewNotFoundError("no checkpoint")
+
+	if pipelineName, nameOk := in["agglo:internal:name"]; nameOk {
+		if messageID, messageOk := in["agglo:messageID"]; messageOk {
+			var checkpoint map[string]interface{}
+			checkpointStateKey := fmt.Sprintf("%s:%s", pipelineName, messageID)
+			checkpoint, err = c.fetchFunc(checkpointStateKey)
+			if err != nil {
+				return
+			}
+			// Fetch returns nil.nil if no checkpoint is found
+			if checkpoint == nil {
+				out = nil
+				index = -1
+				err = common.NewNotFoundError("no checkpoint")
+				return
+			}
+			out, err = getDataFromCheckpoint(checkpoint)
+			if err != nil {
+				return
+			}
+			index, err = getIndexFromCheckpoint(checkpoint)
+			if err != nil {
+				return
+			}
+		}
+	}
+	return
+}
+
 func (c CheckPointer) Process(in map[string]interface{}) (map[string]interface{}, error) {
 	if pipelineName, nameOk := in["agglo:internal:name"]; nameOk {
 		if messageID, messageOk := in["agglo:messageID"]; messageOk {

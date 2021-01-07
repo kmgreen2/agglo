@@ -280,3 +280,9 @@ func (e *EmptyQueue) Error() string {
 	return e.msg
 }
 
+// Is
+func (err *EmptyQueue) Is(other error) bool {
+	_, ok := other.(*EmptyQueue)
+	return ok
+}
+

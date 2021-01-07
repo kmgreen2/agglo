@@ -3,16 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/common"
-	"github.com/kmgreen2/agglo/pkg/core/process"
 	"github.com/kmgreen2/agglo/pkg/serialization"
-	"go.uber.org/zap"
-	"golang.org/x/net/netutil"
+	"github.com/kmgreen2/agglo/pkg/server"
 	"io"
 	"io/ioutil"
-	"net"
-	"net/http"
 	"os"
 	"strings"
 )
@@ -31,6 +26,9 @@ type CommandArgs struct {
 	daemonPort int
 	daemonPath string
 	maxConnections int
+	numThreads int
+	force bool
+	stateDbPath string
 }
 
 func usage(msg string, exitCode int) {
@@ -49,6 +47,9 @@ func parseArgs() *CommandArgs {
 	daemonPortPtr := flag.Int("daemonPort", 8080, "daemon listening port (default 8080)")
 	daemonPathPtr := flag.String("daemonPath", "/binge", "daemon processing path (default /binge)")
 	maxConnectionsPtr := flag.Int("maxConnections", 64, "maximum number of connections")
+	numThreadsPtr := flag.Int("numThreads", 16, "number of worker threads")
+	stateDbPathPtr := flag.String("stateDbPath", "/tmp/bingeDb", "location of the state db file")
+	forcePtr := flag.Bool("force", false, "force overwrite state entries")
 
 	flag.Parse()
 
@@ -61,6 +62,9 @@ func parseArgs() *CommandArgs {
 	}
 
 	args.maxConnections = *maxConnectionsPtr
+	args.numThreads = *numThreadsPtr
+	args.force = *forcePtr
+	args.stateDbPath = *stateDbPathPtr
 
 	if len(*configPtr) == 0 {
 		usage("must specify -config", 1)
@@ -86,87 +90,6 @@ func parseArgs() *CommandArgs {
 	}
 
 	return args
-}
-
-type Daemon struct {
-	pipelines []*process.Pipeline
-	logger *zap.Logger
-	daemonPort int
-	daemonPath string
-	maxConnections int
-}
-
-func NewDaemon(daemonPort int, daemonPath string, maxConnections int, pipelines []*process.Pipeline) (*Daemon, error) {
-	logger, err := zap.NewProduction()
-	if err != nil {
-		return nil, err
-	}
-	return &Daemon {
-		pipelines: pipelines,
-		logger: logger,
-		daemonPath: daemonPath,
-		daemonPort: daemonPort,
-		maxConnections: maxConnections,
-	}, nil
-}
-
-func (d *Daemon) Run() error {
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", d.daemonPort))
-	if err != nil {
-		return err
-	}
-
-	defer l.Close()
-
-	l = netutil.LimitListener(l, d.maxConnections)
-
-	http.HandleFunc(d.daemonPath, func(resp http.ResponseWriter, req *http.Request) {
-		bodyBytes, err := ioutil.ReadAll(req.Body)
-		if err != nil {
-			resp.WriteHeader(400)
-			_, _ = resp.Write([]byte(err.Error()))
-			d.logger.Error(err.Error())
-			return
-		}
-		in, err := common.JsonToMap(bodyBytes)
-		if err != nil {
-			resp.WriteHeader(400)
-			_, _ = resp.Write([]byte(err.Error()))
-			d.logger.Error(err.Error())
-			return
-		}
-
-		// ToDo(KMG): This will eventually be de-queuing from a persistent queue,
-		// so we inject checkpoint state to be used in the pipeline.  The main use case
-		// is to figure out where to start when replaying a message from the durable queue.
-		// ToDo(KMG): This UUID must be defined by the process queuing the events, which
-		// will allow the re-player to fetch the checkpoint state, prior to replaying
-		// ToDo(KMG): Each pipeline will also have to mix in its own name to ensure the
-		// there are no conflicts
-		messageID, err := gUuid.NewRandom()
-		if err != nil {
-			resp.WriteHeader(500)
-			_, _ = resp.Write([]byte(err.Error()))
-			d.logger.Error(err.Error())
-			return
-		}
-		in["agglo:messageID"] = messageID.String()
-		for _, pipeline := range d.pipelines {
-			future := pipeline.RunAsync(in)
-			_, err = future.Get()
-			if err != nil {
-				resp.WriteHeader(500)
-				_, _ = resp.Write([]byte(err.Error()))
-				d.logger.Error(err.Error())
-				return
-			}
-		}
-		resp.WriteHeader(200)
-		_, _ = resp.Write([]byte("Success"))
-		return
-	})
-
-	return http.Serve(l, nil)
 }
 
 func main() {
@@ -208,7 +131,21 @@ func main() {
 			}
 		}
 	} else if args.runType == RunDaemon {
-		daemon, err := NewDaemon(args.daemonPort, args.daemonPath, args.maxConnections, pipelines)
+		recoverFunc := func(inBytes []byte) error {
+			in, err := common.JsonToMap(inBytes)
+			if err != nil {
+				return nil
+			}
+			return server.RunPipelines(in, pipelines)
+		}
+
+		dQueue, err := common.OpenDurableQueue(args.stateDbPath, recoverFunc, args.force)
+		if err != nil {
+			panic(err)
+		}
+
+		daemon, err := server.NewDaemon(args.daemonPort, args.daemonPath, args.maxConnections, args.numThreads,
+			dQueue, pipelines)
 		if err != nil {
 			panic(err)
 		}

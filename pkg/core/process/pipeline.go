@@ -3,6 +3,7 @@ package process
 import (
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/pkg/errors"
 	"reflect"
 )
 
@@ -112,13 +113,36 @@ func (pipeline Pipeline) RunSync(in map[string]interface{}) (map[string]interfac
 }
 
 func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
+	var startIndex int64 = 0
+	var err error
+	var inMap map[string]interface{} = in
+
+	// If there are no processes in this pipeline, do nothing and succeed
 	if len(pipeline.processes) == 0 {
 		completable := common.NewCompletable()
 		_ = completable.Success(in)
 		return completable.Future()
 	}
-	f := common.CreateFuture(NewRunnableStartProcess(pipeline.processes[0], in))
-	for i := 1; i < len(pipeline.processes); i++ {
+
+	// If checkpointing is enabled, try to fetch the checkpoint
+	if pipeline.checkPointer != nil {
+		inMap, startIndex, err = pipeline.checkPointer.GetCheckpointWithIndex(in)
+		if err != nil {
+			// This means the checkpoint does not exist, so process as usual
+			if errors.Is(err, &common.NotFoundError{}) {
+				inMap = in
+				startIndex = 0
+			} else {
+				completable := common.NewCompletable()
+				_ = completable.Fail(err)
+				return completable.Future()
+			}
+		}
+	}
+
+	// Chain together the processes of the pipeline
+	f := common.CreateFuture(NewRunnableStartProcess(pipeline.processes[startIndex], inMap))
+	for i := int(startIndex + 1); i < len(pipeline.processes); i++ {
 		f = f.Then(NewRunnablePartialProcess(pipeline.processes[i]))
 		// If this pipeline has checkpointing enabled, then checkpoint after each process
 		if pipeline.checkPointer != nil {
@@ -126,6 +150,7 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 		}
 	}
 
+	// If checkpointing is enabled for this pipeline, set the last process as the checkpoint finalizer
 	if pipeline.checkPointer != nil {
 		// Call checkPointer.Finalize() to remove the checkpoint
 		f = f.Then(NewRunnablePartialFinalizer(pipeline.checkPointer))

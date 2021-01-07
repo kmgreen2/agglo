@@ -81,10 +81,22 @@
               "value": "created"
             }
           },
-          "sender": {
-            "vocabString": {
-              "vocab": ["kmgreen2", "bob", "jane", "jim", "jill"],
-              "sharedName": "thisAuthor"
+          "pusher": {
+            "dict": {
+              "kvs": {
+                "name": {
+                  "vocabString": {
+                    "vocab": [
+                      "kmgreen2",
+                      "bob",
+                      "jane",
+                      "jim",
+                      "jill"
+                    ],
+                    "sharedName": "thisAuthor"
+                  }
+                }
+              }
             }
           },
           "repository": {
@@ -124,12 +136,6 @@
               "storeStringState": "headCommit"
             }
           },
-          "pusher": {
-            "vocabString": {
-              "vocab": ["kmgreen2", "bob", "jane", "jim", "jill"],
-              "sharedName": "thisAuthor"
-            }
-          },
           "commits": {
             "list": {
               "minLen": 1,
@@ -137,21 +143,27 @@
               "value": {
                 "dict": {
                   "kvs": {
-                    "commit": {
+                    "url": {
+                      "randomString": {
+                        "maxLen": 40,
+                        "minLen": 40,
+                        "alphabet": "abcdef1234567890",
+                        "prefixName": "gitUrl",
+                        "sharedName": "thisCommit"
+                      }
+                    },
+                    "author": {
                       "dict": {
                         "kvs": {
-                          "url": {
-                            "randomString": {
-                              "maxLen": 40,
-                              "minLen": 40,
-                              "alphabet": "abcdef1234567890",
-                              "prefixName": "gitUrl",
-                              "sharedName": "thisCommit"
-                            }
-                          },
-                          "author": {
+                          "name": {
                             "vocabString": {
-                              "vocab": ["kmgreen2", "bob", "jane", "jim", "jill"],
+                              "vocab": [
+                                "kmgreen2",
+                                "bob",
+                                "jane",
+                                "jim",
+                                "jill"
+                              ],
                               "sharedName": "thisAuthor"
                             }
                           },
@@ -161,26 +173,21 @@
                               "suffixName": "gitEmail",
                               "sharedName": "thisAuthor"
                             }
-                          },
-                          "committer": {
-                            "vocabString": {
-                              "vocab": ["kmgreen2", "bob", "jane", "jim", "jill"]
-                            }
-                          },
-                          "parents": {
-                            "list": {
-                              "minLen": 1,
-                              "maxLen": 1,
-                              "value": {
-                                "randomString" : {
-                                  "maxLen": 40,
-                                  "minLen": 40,
-                                  "alphabet": "abcdef1234567890",
-                                  "maxRef": 1,
-                                  "sharedName": "prevCommit"
-                                }
-                              }
-                            }
+                          }
+                        }
+                      }
+                    },
+                    "parents": {
+                      "list": {
+                        "minLen": 1,
+                        "maxLen": 1,
+                        "value": {
+                          "randomString" : {
+                            "maxLen": 40,
+                            "minLen": 40,
+                            "alphabet": "abcdef1234567890",
+                            "maxRef": 1,
+                            "sharedName": "prevCommit"
                           }
                         }
                       }
