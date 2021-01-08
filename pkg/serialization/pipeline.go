@@ -460,7 +460,11 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  ([]*process.Pipeline, error) {
 
 		for _, processDesc := range pipeline.Processes {
 			if proc, ok := processes[processDesc.Name]; ok {
-				pipelineBuilder.Add(proc)
+				if processDesc.RetryStrategy != nil {
+					pipelineBuilder.AddWithRetry(proc, processDesc.RetryStrategy)
+				} else {
+					pipelineBuilder.Add(proc)
+				}
 			} else {
 				msg := fmt.Sprintf("cannot find process: %s", processDesc.Name)
 				return nil, common.NewInvalidError(msg)

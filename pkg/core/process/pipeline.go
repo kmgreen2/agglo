@@ -2,9 +2,11 @@ package process
 
 import (
 	"fmt"
+	api "github.com/kmgreen2/agglo/generated/proto"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/pkg/errors"
 	"reflect"
+	"time"
 )
 
 type PipelineProcess interface {
@@ -89,9 +91,41 @@ func NewRunnablePartialFinalizer(finalizer Finalizer) *RunnablePartialFinalizer 
 	}
 }
 
+type ProcessOptions struct {
+	retryStrategy *api.RetryStrategy
+}
+
 type Pipeline struct {
 	processes []PipelineProcess
+	processOptions []*ProcessOptions
 	checkPointer *CheckPointer
+}
+
+func (pipeline *Pipeline) createFutureHelper(pipelineIndex int, in map[string]interface{}) common.Future {
+	process := pipeline.processes[pipelineIndex]
+	processOptions := pipeline.processOptions[pipelineIndex]
+
+	if processOptions.retryStrategy != nil {
+		return common.CreateRetryableFuture(
+			int(processOptions.retryStrategy.NumRetries),
+			time.Duration(processOptions.retryStrategy.InitialBackOffMs) * time.Millisecond,
+			NewRunnableStartProcess(process, in))
+	}
+	return common.CreateFuture(NewRunnableStartProcess(process, in))
+}
+
+func (pipeline *Pipeline) thenFutureHelper(pipelineIndex int, inFuture common.Future) common.Future {
+	process := pipeline.processes[pipelineIndex]
+	processOptions := pipeline.processOptions[pipelineIndex]
+
+	if processOptions.retryStrategy != nil {
+		return inFuture.ThenWithRetry(
+			int(processOptions.retryStrategy.NumRetries),
+			time.Duration(processOptions.retryStrategy.InitialBackOffMs) * time.Millisecond,
+			NewRunnablePartialProcess(process))
+	}
+
+	return inFuture.Then(NewRunnablePartialProcess(process))
 }
 
 func (pipeline Pipeline) RunSync(in map[string]interface{}) (map[string]interface{}, error) {
@@ -141,9 +175,9 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 	}
 
 	// Chain together the processes of the pipeline
-	f := common.CreateFuture(NewRunnableStartProcess(pipeline.processes[startIndex], inMap))
+	f := pipeline.createFutureHelper(int(startIndex), inMap)
 	for i := int(startIndex + 1); i < len(pipeline.processes); i++ {
-		f = f.Then(NewRunnablePartialProcess(pipeline.processes[i]))
+		f = pipeline.thenFutureHelper(i, f)
 		// If this pipeline has checkpointing enabled, then checkpoint after each process
 		if pipeline.checkPointer != nil {
 			f = f.Then(NewRunnablePartialProcess(pipeline.checkPointer))
@@ -171,6 +205,16 @@ func NewPipelineBuilder() *PipelineBuilder {
 
 func (builder *PipelineBuilder) Add(process PipelineProcess) *PipelineBuilder {
 	builder.pipeline.processes = append(builder.pipeline.processes, process)
+	builder.pipeline.processOptions = append(builder.pipeline.processOptions, &ProcessOptions{})
+	return builder
+}
+
+func (builder *PipelineBuilder) AddWithRetry(process PipelineProcess,
+	retryStrategy *api.RetryStrategy) *PipelineBuilder {
+	builder.pipeline.processes = append(builder.pipeline.processes, process)
+	builder.pipeline.processOptions = append(builder.pipeline.processOptions, &ProcessOptions{
+		retryStrategy: retryStrategy,
+	})
 	return builder
 }
 

@@ -12,7 +12,11 @@
           "name": "annotate-cicd"
         },
         {
-          "name": "aggregate-author"
+          "name": "aggregate-author",
+          "retryStrategy": {
+            "numRetries": 5,
+            "initialBackOffMs": 100
+          }
         },
         {
           "name": "completion-hashjoin"
