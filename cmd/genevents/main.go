@@ -618,7 +618,7 @@ func (s *Stats) Finish() string {
 	s.endTime = time.Now()
 
 	str += fmt.Sprintf("Total duration: %d ms\n", s.endTime.Sub(s.startTime).Milliseconds())
-	str += fmt.Sprintf("Avg duration: %f ms\n", float64(s.endTime.Sub(s.startTime).Milliseconds()) / float64(s.num))
+	str += fmt.Sprintf("RPS: %f\n", float64(s.num) / float64(s.endTime.Sub(s.startTime).Seconds()))
 	for i, threadStat := range s.threadStats {
 		str += fmt.Sprintf("Thread %d: %s\n", i, threadStat.String())
 	}
