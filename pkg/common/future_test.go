@@ -20,11 +20,11 @@ func TestCreateFuture(t *testing.T) {
 	testFailure := false
 	testCancel := false
 	runnable := test.NewSquareRunnable(10)
-	f := common.CreateFuture(context.Background(), runnable).OnSuccess(func (x interface{}) {
+	f := common.CreateFuture(runnable).OnSuccess(func (context.Context, interface{}) {
 		testSuccess = true
-	}).OnFail(func (err error) {
+	}).OnFail(func (context.Context, error) {
 		testFailure = true
-	}).OnCancel(func () {
+	}).OnCancel(func (context.Context) {
 		testCancel = true
 	})
 
@@ -45,11 +45,11 @@ func TestCreateFutureFail(t *testing.T) {
 	testFailure := false
 	testCancel := false
 	runnable := test.NewSleepAndFailRunnable(0)
-	f := common.CreateFuture(context.Background(), runnable).OnSuccess(func (x interface{}) {
+	f := common.CreateFuture(runnable).OnSuccess(func (context.Context, interface{}) {
 		testSuccess = true
-	}).OnFail(func (err error) {
+	}).OnFail(func (context.Context, error) {
 		testFailure = true
-	}).OnCancel(func () {
+	}).OnCancel(func (context.Context) {
 		testCancel = true
 	})
 
@@ -69,15 +69,15 @@ func TestCreateFutureCancel(t *testing.T) {
 	testFailure := false
 	testCancel := false
 	runnable := test.NewSleepRunnable(2)
-	f := common.CreateFuture(context.Background(), runnable).OnSuccess(func (x interface{}) {
+	f := common.CreateFuture(runnable).OnSuccess(func (context.Context, interface{}) {
 		testSuccess = true
-	}).OnFail(func (err error) {
+	}).OnFail(func (context.Context, error) {
 		testFailure = true
-	}).OnCancel(func () {
+	}).OnCancel(func (context.Context) {
 		testCancel = true
 	})
 
-	_ = f.Cancel()
+	_ = f.Cancel(context.Background())
 
 	result := f.Get()
 	assert.Error(t, result.Error())
@@ -96,12 +96,12 @@ func TestCreateDeferredFuture(t *testing.T) {
 	testCancel := false
 	runnable := test.NewSquareRunnable(10)
 	before := time.Now()
-	f := common.CreateDeferredFuture(context.Background(), 2*time.Second, runnable).
-		OnSuccess(func (x interface{}) {
+	f := common.CreateFuture(runnable, common.WithDelay(2*time.Second)).
+		OnSuccess(func (context.Context, interface{}) {
 		testSuccess = true
-	}).OnFail(func (err error) {
+	}).OnFail(func (context.Context, error) {
 		testFailure = true
-	}).OnCancel(func () {
+	}).OnCancel(func (context.Context) {
 		testCancel = true
 	})
 
@@ -123,11 +123,11 @@ func TestCreateFutureTimeout(t *testing.T) {
 	testFailure := false
 	testCancel := false
 	runnable := test.NewSleepRunnable(2)
-	f := common.CreateFuture(context.Background(), runnable).OnSuccess(func (x interface{}) {
+	f := common.CreateFuture(runnable).OnSuccess(func (context.Context, interface{}) {
 		testSuccess = true
-	}).OnFail(func (err error) {
+	}).OnFail(func (context.Context, error) {
 		testFailure = true
-	}).OnCancel(func () {
+	}).OnCancel(func (context.Context) {
 		testCancel = true
 	})
 
@@ -148,19 +148,19 @@ func TestCreateFutureThen(t *testing.T) {
 	testThenFailure := false
 	testThenCancel := false
 	runnable := test.NewSquareRunnable(10)
-	f1 := common.CreateFuture(context.Background(), runnable).OnSuccess(func (x interface{}) {
+	f1 := common.CreateFuture(runnable).OnSuccess(func (context.Context, interface{}) {
 		testSuccess = true
-	}).OnFail(func (err error) {
+	}).OnFail(func (context.Context, error) {
 		testFailure = true
-	}).OnCancel(func () {
+	}).OnCancel(func (context.Context) {
 		testCancel = true
 	})
 
-	f2 := f1.Then(runnable).OnSuccess(func (x interface{}) {
+	f2 := f1.Then(runnable).OnSuccess(func (context.Context, interface{}) {
 		testThenSuccess = true
-	}).OnFail(func (err error) {
+	}).OnFail(func (context.Context, error) {
 		testThenFailure = true
-	}).OnCancel(func () {
+	}).OnCancel(func (context.Context) {
 		testThenCancel = true
 	})
 
@@ -187,15 +187,15 @@ func TestCreateFutureThenWithFailure(t *testing.T) {
 	testSecondFailure := false
 	failRunnable := test.NewFailRunnable()
 	runnable := test.NewSquareRunnable(10)
-	f1 := common.CreateFuture(context.Background(), runnable).OnSuccess(func (x interface{}) {
+	f1 := common.CreateFuture(runnable).OnSuccess(func (context.Context, interface{}) {
 		testFirstSuccess = true
 	})
-	f2 := f1.Then(failRunnable).OnFail(func (err error) {
+	f2 := f1.Then(failRunnable).OnFail(func (context.Context, error) {
 		testFirstFailure = true
 	})
-	f3 := f2.Then(runnable).OnSuccess(func (x interface{}) {
+	f3 := f2.Then(runnable).OnSuccess(func (context.Context, interface{}) {
 		testSecondSuccess = true
-	}).OnFail(func (err error) {
+	}).OnFail(func (context.Context, error) {
 		testSecondFailure = true
 	})
 
@@ -216,13 +216,13 @@ func TestRetryableFuture(t *testing.T) {
 	testFailure := false
 	testCancel := false
 	runnable := test.NewFailThenSucceedRunnable(2)
-	f := common.CreateRetryableFuture(
-		context.Background(), 3, 100 * time.Millisecond,runnable).OnSuccess(func (x interface{}) {
+	f := common.CreateFuture(
+		runnable, common.WithRetry(3, 100 * time.Millisecond)).OnSuccess(func (context.Context, interface{}) {
 
 		testSuccess = true
-	}).OnFail(func (err error) {
+	}).OnFail(func (context.Context, error) {
 		testFailure = true
-	}).OnCancel(func () {
+	}).OnCancel(func (context.Context) {
 		testCancel = true
 	})
 
@@ -246,12 +246,12 @@ func TestThenRetryableFuture(t *testing.T) {
 	thenRunnable := test.NewFailThenSucceedRunnable(2)
 
 
-	f := common.CreateFuture(context.Background(), runnable).ThenWithRetry(3, 100 * time.Millisecond, thenRunnable).
-	OnSuccess(func (x interface{}) {
+	f := common.CreateFuture(runnable).Then(thenRunnable, common.WithRetry(3, 100 * time.Millisecond)).
+	OnSuccess(func (context.Context, interface{}) {
 		testSuccess = true
-	}).OnFail(func (err error) {
+	}).OnFail(func (context.Context, error) {
 		testFailure = true
-	}).OnCancel(func () {
+	}).OnCancel(func (context.Context) {
 		testCancel = true
 	})
 
@@ -272,15 +272,15 @@ func TestThenRetryableFutureFailed(t *testing.T) {
 	testFailure := false
 	testCancel := false
 	runnable := test.NewSquareRunnable(2)
-	thenRunnable := test.NewFailThenSucceedRunnable(3)
+	thenRunnable := test.NewFailThenSucceedRunnable(4)
 
 
-	f := common.CreateFuture(context.Background(), runnable).ThenWithRetry(3, 100 * time.Millisecond, thenRunnable).
-		OnSuccess(func (x interface{}) {
+	f := common.CreateFuture(runnable).Then(thenRunnable, common.WithRetry(3, 100 * time.Millisecond)).
+		OnSuccess(func (context.Context, interface{}) {
 			testSuccess = true
-		}).OnFail(func (err error) {
+		}).OnFail(func (context.Context, error) {
 		testFailure = true
-	}).OnCancel(func () {
+	}).OnCancel(func (context.Context) {
 		testCancel = true
 	})
 

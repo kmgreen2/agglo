@@ -1,9 +1,11 @@
 package common
 
+import "context"
+
 type Completable interface {
-	Success(result interface{}) error
-	Fail(err error) error
-	Cancel() error
+	Success(ctx context.Context, result interface{}) error
+	Fail(ctx context.Context, err error) error
+	Cancel(ctx context.Context) error
 	Future() Future
 	Close()
 }
@@ -18,16 +20,16 @@ func NewCompletable() Completable {
 	}
 }
 
-func (p *promise) Success(result interface{}) error {
-	return p.future.success(result)
+func (p *promise) Success(ctx context.Context, result interface{}) error {
+	return p.future.success(ctx, result)
 }
 
-func (p *promise) Fail(err error) error {
-	return p.future.fail(err)
+func (p *promise) Fail(ctx context.Context, err error) error {
+	return p.future.fail(ctx, err)
 }
 
-func (p *promise) Cancel() error {
-	return p.future.Cancel()
+func (p *promise) Cancel(ctx context.Context) error {
+	return p.future.Cancel(ctx)
 }
 
 func (p *promise) Future() Future {

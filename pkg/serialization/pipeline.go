@@ -511,8 +511,13 @@ func buildLifecycle(pipelineName, processName string, instrumentation *api.Proce
 
 	if instrumentation.EnableTracing {
 		var span trace.Span
-		lifecycleBuilder.AppendPrepareFn(func(ctx context.Context) context.Context {
-			ctx, span = emitter.CreateSpan(ctx, processKey(pipelineName, processName))
+		lifecycleBuilder.AppendPrepareFn(func(ctx, prev context.Context) context.Context {
+			var links []trace.Link
+			if parentSpanCtx := common.ExtractSpanContext(prev); parentSpanCtx != common.EmptySpanContext {
+				links = []trace.Link{{SpanContext: parentSpanCtx}}
+			}
+			ctx, span = emitter.CreateSpan(ctx, processKey(pipelineName, processName), trace.WithLinks(links...))
+			ctx = common.InjectSpanContext(ctx, span.SpanContext())
 			return ctx
 		})
 		lifecycleBuilder.AppendSuccessFn(func(ctx context.Context) {
@@ -527,17 +532,15 @@ func buildLifecycle(pipelineName, processName string, instrumentation *api.Proce
 
 	if instrumentation.Latency {
 		emitter.AddMetric(processKey(pipelineName, processName) + ".latency", observability.Int64Recorder)
-		lifecycleBuilder.AppendPrepareFn(func(ctx context.Context) context.Context {
+		lifecycleBuilder.AppendPrepareFn(func(ctx, prev context.Context) context.Context {
 			startTime := time.Now()
-			return context.WithValue(ctx, processKey(pipelineName, processName) + ".start", startTime)
+			return common.InjectProcessStartTime(processKey(pipelineName, processName), startTime, ctx)
 		})
 		lifecycleBuilder.AppendSuccessFn(func(ctx context.Context) {
-			val := ctx.Value(processKey(pipelineName, processName) + ".start")
-			if val != nil {
-				if startTime, ok := val.(time.Time); ok {
-					emitter.RecordInt64(processKey(pipelineName, processName) + ".latency",
-						time.Now().Sub(startTime).Nanoseconds())
-				}
+			startTime := common.ExtractProcessStartTime(processKey(pipelineName, processName), ctx)
+			if startTime != common.InvalidTime {
+				emitter.RecordInt64(processKey(pipelineName, processName) + ".latency",
+					time.Now().Sub(startTime).Nanoseconds())
 			}
 		})
 	}

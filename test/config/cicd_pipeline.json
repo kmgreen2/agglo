@@ -18,22 +18,37 @@
         },
         {
           "name": "aggregate-author",
+          "instrumentation": {
+            "enableTracing": true
+          },
           "retryStrategy": {
             "numRetries": 5,
             "initialBackOffMs": 100
           }
         },
         {
-          "name": "completion-hashjoin"
+          "name": "completion-hashjoin",
+          "instrumentation": {
+            "enableTracing": true
+          }
         },
         {
-          "name": "tee-out-to-file"
+          "name": "tee-out-to-file",
+          "instrumentation": {
+            "enableTracing": true
+          }
         },
         {
-          "name": "tee-git-events"
+          "name": "tee-git-events",
+          "instrumentation": {
+            "enableTracing": true
+          }
         },
         {
-          "name": "tee-cicd-completion"
+          "name": "tee-cicd-completion",
+          "instrumentation": {
+            "enableTracing": true
+          }
         }
       ]
     }

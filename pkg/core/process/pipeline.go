@@ -85,7 +85,7 @@ func NewRunnablePartialFinalizer(finalizer Finalizer) *RunnablePartialFinalizer 
 }
 
 type Lifecycle struct {
-	prepareFns []func(ctx context.Context) context.Context
+	prepareFns []func(ctx, prev context.Context) context.Context
 	successFns []func(ctx context.Context)
 	failFns    []func(ctx context.Context, err error)
 }
@@ -100,7 +100,9 @@ func NewLifecycleBuilder() *LifecycleBuilder {
 	}
 }
 
-func (lifecycleBuilder *LifecycleBuilder) AppendPrepareFn(fn func(ctx context.Context) context.Context) *LifecycleBuilder {
+func (lifecycleBuilder *LifecycleBuilder) AppendPrepareFn(
+	fn func(ctx, prev context.Context) context.Context) *LifecycleBuilder {
+
 	lifecycleBuilder.lifecycle.prepareFns = append(lifecycleBuilder.lifecycle.prepareFns, fn)
 	return lifecycleBuilder
 }
@@ -119,9 +121,9 @@ func (LifecycleBuilder *LifecycleBuilder) Build() *Lifecycle {
 	return LifecycleBuilder.lifecycle
 }
 
-func (lifecycle *Lifecycle) Prepare(ctx context.Context) context.Context {
+func (lifecycle *Lifecycle) Prepare(ctx, prev context.Context) context.Context {
 	for _, prepareFn := range lifecycle.prepareFns {
-		ctx = prepareFn(ctx)
+		ctx = prepareFn(ctx, prev)
 	}
 	return ctx
 }
@@ -166,31 +168,32 @@ type Pipeline struct {
 
 func (pipeline *Pipeline) createFutureHelper(pipelineIndex int, in map[string]interface{}) common.Future {
 	var future common.Future
-	ctx := context.Background()
 
 	process := pipeline.processes[pipelineIndex]
 	processOptions := pipeline.processOptions[pipelineIndex]
 
+	var prepareFn func(ctx, prev context.Context) context.Context
+	if processOptions.processLifecycle != nil {
+		prepareFn = processOptions.processLifecycle.Prepare
+	}
+
 	if processOptions.retryStrategy != nil {
-		future = common.CreateRetryableFuture(ctx,
-			int(processOptions.retryStrategy.NumRetries),
-			time.Duration(processOptions.retryStrategy.InitialBackOffMs) * time.Millisecond,
-			NewRunnableStartProcess(process, in))
+		future = common.CreateFuture(NewRunnableStartProcess(process, in),
+			common.WithRetry(int(processOptions.retryStrategy.NumRetries),
+				time.Duration(processOptions.retryStrategy.InitialBackOffMs) * time.Millisecond),
+			common.SetContext(context.Background()),
+			common.WithPrepare(prepareFn))
 	} else {
-		future = common.CreateFuture(ctx, NewRunnableStartProcess(process, in))
+		future = common.CreateFuture(NewRunnableStartProcess(process, in), common.SetContext(context.Background()),
+			common.WithPrepare(prepareFn))
 	}
 
 	if processOptions.processLifecycle != nil {
-		// ToDo(KMG): This is not the right way to call prepare.  We should add a callback to Futures
-		// called Prepare(ctx, in) that will be called before the run() function.  That way we can put
-		// instrumentation calls closer to the call time and plumb tracing info into the 'in' payload
-		processOptions.processLifecycle.Prepare(ctx)
-
-		future.OnSuccess(func(x interface{}) {
+		future.OnSuccess(func(ctx context.Context, x interface{}) {
 			processOptions.processLifecycle.Success(ctx)
 		})
 
-		future.OnFail(func(err error) {
+		future.OnFail(func(ctx context.Context, err error) {
 			processOptions.processLifecycle.Failure(ctx, err)
 		})
 	}
@@ -200,28 +203,31 @@ func (pipeline *Pipeline) createFutureHelper(pipelineIndex int, in map[string]in
 
 func (pipeline *Pipeline) thenFutureHelper(pipelineIndex int, inFuture common.Future) common.Future {
 	var future common.Future
-	ctx := context.Background()
 
 	process := pipeline.processes[pipelineIndex]
 	processOptions := pipeline.processOptions[pipelineIndex]
 
+	var prepareFn func(ctx, prev context.Context) context.Context
+	if processOptions.processLifecycle != nil {
+		prepareFn = processOptions.processLifecycle.Prepare
+	}
+
 	if processOptions.retryStrategy != nil {
-		future = inFuture.ThenWithRetry(
-			int(processOptions.retryStrategy.NumRetries),
-			time.Duration(processOptions.retryStrategy.InitialBackOffMs) * time.Millisecond,
-			NewRunnablePartialProcess(process))
+		future = inFuture.Then(NewRunnablePartialProcess(process),
+			common.WithRetry(int(processOptions.retryStrategy.NumRetries),
+				time.Duration(processOptions.retryStrategy.InitialBackOffMs) * time.Millisecond),
+			common.SetContext(context.Background()), common.WithPrepare(prepareFn))
 	} else {
-		future = inFuture.Then(NewRunnablePartialProcess(process))
+		future = inFuture.Then(NewRunnablePartialProcess(process), common.SetContext(context.Background()),
+			common.WithPrepare(prepareFn))
 	}
 
 	if processOptions.processLifecycle != nil {
-		ctx = processOptions.processLifecycle.Prepare(ctx)
-
-		future.OnSuccess(func(x interface{}) {
+		future.OnSuccess(func(ctx context.Context, x interface{}) {
 			processOptions.processLifecycle.Success(ctx)
 		})
 
-		future.OnFail(func(err error) {
+		future.OnFail(func(ctx context.Context, err error) {
 			processOptions.processLifecycle.Failure(ctx, err)
 		})
 	}
@@ -254,7 +260,7 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 	// If there are no processes in this pipeline, do nothing and succeed
 	if len(pipeline.processes) == 0 {
 		completable := common.NewCompletable()
-		_ = completable.Success(in)
+		_ = completable.Success(context.Background(), in)
 		return completable.Future()
 	}
 
@@ -268,7 +274,7 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 				startIndex = 0
 			} else {
 				completable := common.NewCompletable()
-				_ = completable.Fail(err)
+				_ = completable.Fail(context.Background(), err)
 				return completable.Future()
 			}
 		}
@@ -280,7 +286,15 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 		f = pipeline.thenFutureHelper(i, f)
 		// If this pipeline has checkpointing enabled, then checkpoint after each process
 		if pipeline.checkPointer != nil {
-			f = f.Then(NewRunnablePartialProcess(pipeline.checkPointer))
+			f = f.Then(NewRunnablePartialProcess(pipeline.checkPointer),
+			// Must pass the span context from the previous process; otherwise, the checkpoint processes
+			// will break the chain
+			common.WithPrepare(func(ctx, prev context.Context) context.Context {
+				if spanCtx := common.ExtractSpanContext(prev); spanCtx != common.EmptySpanContext {
+					return common.InjectSpanContext(ctx, spanCtx)
+				}
+				return ctx
+			}))
 		}
 	}
 

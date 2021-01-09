@@ -30,15 +30,15 @@ func run(runnable common.PartialRunnable, delay time.Duration, sync bool, inData
 		if err != nil {
 			// Note: This only fails if the completable is already completed.  Since this is
 			// brand new, it should never fail here
-			_ = completable.Fail(err)
+			_ = completable.Fail(context.Background(), err)
 			return completable.Future()
 		}
 	}
 
 	if delay > 0 {
-		future = common.CreateDeferredFuture(context.Background(), delay, runnable)
+		future = common.CreateFuture(runnable, common.WithDelay(delay))
 	} else {
-		future = common.CreateFuture(context.Background(), runnable)
+		future = common.CreateFuture(runnable)
 	}
 
 	if sync {
@@ -51,7 +51,7 @@ func (j LocalJob) Run(delay time.Duration, sync bool, inData ...interface{}) com
 	if len(inData) > 1 {
 		completable := common.NewCompletable()
 		msg := fmt.Sprintf("expected 1 inData varadic arg to Run, got %d", len(inData))
-		_ = completable.Fail(common.NewInvalidError(msg))
+		_ = completable.Fail(context.Background(), common.NewInvalidError(msg))
 		return completable.Future()
 	} else if len(inData) == 1 {
 		return run(j.runnable, delay, sync, inData[0])
@@ -74,7 +74,7 @@ func (j CmdJob) Run(delay time.Duration, sync bool, inData ...interface{}) commo
 	if len(inData) > 1 {
 		completable := common.NewCompletable()
 		msg := fmt.Sprintf("expected 1 inData varadic arg to Run, got %d", len(inData))
-		_ = completable.Fail(common.NewInvalidError(msg))
+		_ = completable.Fail(context.Background(), common.NewInvalidError(msg))
 		return completable.Future()
 	} else if len(inData) == 1 {
 		return run(j.runnable, delay, sync, inData[0])
