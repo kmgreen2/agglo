@@ -1,6 +1,7 @@
 package common_test
 
 import (
+	"context"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
@@ -13,12 +14,12 @@ func makeFutures(numFast, numSlow, slowDuration int) []common.Future {
 
 	for i := 0; i < numFast; i++ {
 		runnable := test.NewSquareRunnable(2)
-		futures[i] = common.CreateFuture(runnable)
+		futures[i] = common.CreateFuture(context.Background(), runnable)
 	}
 
 	for i := numSlow; i < numSlow+numFast; i++ {
 		runnable := test.NewSleepRunnable(slowDuration)
-		futures[i] = common.CreateFuture(runnable)
+		futures[i] = common.CreateFuture(context.Background(), runnable)
 	}
 
 	return futures

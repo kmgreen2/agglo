@@ -128,7 +128,7 @@ func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition,
 		if err != nil {
 			return err
 		}
-		req, err := http.NewRequest(http.MethodPost, url, byteBuffer)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, byteBuffer)
 		if err != nil {
 			return err
 		}

@@ -12,9 +12,9 @@ func TestCompletableSuccess(t *testing.T) {
 	err := completable.Success(int(1337))
 	assert.Nil(t, err)
 
-	val, err := completable.Future().Get()
-	assert.Nil(t, err)
-	assert.Equal(t, 1337, val.(int))
+	result := completable.Future().Get()
+	assert.Nil(t, result.Error())
+	assert.Equal(t, 1337, result.Value().(int))
 }
 
 func TestCompletableFail(t *testing.T) {
@@ -23,8 +23,8 @@ func TestCompletableFail(t *testing.T) {
 	err := completable.Fail(common.NewInvalidError("Fail"))
 	assert.Nil(t, err)
 
-	_, err = completable.Future().Get()
-	assert.Error(t, err)
+	result := completable.Future().Get()
+	assert.Error(t, result.Error())
 }
 
 func TestCompletableCancel(t *testing.T) {
@@ -33,7 +33,7 @@ func TestCompletableCancel(t *testing.T) {
 	err := completable.Cancel()
 	assert.Nil(t, err)
 
-	_, err = completable.Future().Get()
-	assert.Error(t, err)
+	result := completable.Future().Get()
+	assert.Error(t, result.Error())
 }
 

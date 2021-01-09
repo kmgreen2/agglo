@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"time"
@@ -17,20 +18,16 @@ func NewSquareRunnable(value int) *SquareRunnable {
 	}
 }
 
-func (r SquareRunnable) Run() (interface{}, error) {
+func (r SquareRunnable) Run(ctx context.Context) (interface{}, error) {
 	return r.value*r.value, nil
 }
 
-func (r *SquareRunnable) SetArgs(args ...interface{}) error {
-	if len(args) > 1 {
-		msg := fmt.Sprintf("SquareRunnable should have 1 int arg, found %d args", len(args))
-		return common.NewInvalidError(msg)
-	}
-	switch rv := args[0].(type) {
+func (r *SquareRunnable) SetInData(inData interface{}) error {
+	switch rv := inData.(type) {
 	case int:
 		r.value = rv
 	default:
-		msg := fmt.Sprintf("SquareRunnable should have an int arg, found %v", reflect.TypeOf(args[0]))
+		msg := fmt.Sprintf("SquareRunnable should have an int arg, found %v", reflect.TypeOf(rv))
 		return common.NewInvalidError(msg)
 	}
 	return nil
@@ -46,12 +43,12 @@ func NewSleepRunnable(value int) *SleepRunnable {
 	}
 }
 
-func (r SleepRunnable) Run() (interface{}, error) {
+func (r SleepRunnable) Run(ctx context.Context) (interface{}, error) {
 	time.Sleep(time.Duration(r.value) * time.Second)
 	return r.value, nil
 }
 
-func (r *SleepRunnable) SetArgs(args ...interface{}) error {
+func (r *SleepRunnable) SetInData(inData interface{}) error {
 	return nil
 }
 
@@ -65,23 +62,19 @@ func NewSleepAndFailRunnable(value int) *SleepAndFailRunnable {
 	}
 }
 
-func (r SleepAndFailRunnable) Run() (interface{}, error) {
+func (r SleepAndFailRunnable) Run(ctx context.Context) (interface{}, error) {
 	if r.value > 0 {
 		time.Sleep(time.Duration(r.value) * time.Second)
 	}
 	return nil, common.NewInvalidError("Failed")
 }
 
-func (r *SleepAndFailRunnable) SetArgs(args ...interface{}) error {
-	if len(args) > 1 {
-		msg := fmt.Sprintf("SleepAndFailRunnable should have 1 int arg, found %d args", len(args))
-		return common.NewInvalidError(msg)
-	}
-	switch rv := args[0].(type) {
+func (r *SleepAndFailRunnable) SetInData(inData interface{}) error {
+	switch rv := inData.(type) {
 	case int:
 		r.value = rv
 	default:
-		msg := fmt.Sprintf("SleepAndFailRunnable should have an int arg, found %v", reflect.TypeOf(args[0]))
+		msg := fmt.Sprintf("SleepAndFailRunnable should have an int arg, found %v", reflect.TypeOf(rv))
 		return common.NewInvalidError(msg)
 	}
 	return nil
@@ -95,11 +88,11 @@ func NewFailRunnable() *FailRunnable {
 	return &FailRunnable{}
 }
 
-func (r FailRunnable) Run() (interface{}, error) {
+func (r FailRunnable) Run(ctx context.Context) (interface{}, error) {
 	return nil, common.NewInvalidError("Failed")
 }
 
-func (r *FailRunnable) SetArgs(args ...interface{}) error {
+func (r *FailRunnable) SetInData(inData interface{}) error {
 	return nil
 }
 
@@ -114,7 +107,7 @@ func NewFailThenSucceedRunnable(numFails int) *FailThenSucceedRunnable {
 	}
 }
 
-func (r *FailThenSucceedRunnable) Run() (interface{}, error) {
+func (r *FailThenSucceedRunnable) Run(ctx context.Context) (interface{}, error) {
 	r.currCalls++
 	if r.currCalls <= r.numFails {
 		return nil, common.NewInvalidError("Failed")
@@ -122,7 +115,7 @@ func (r *FailThenSucceedRunnable) Run() (interface{}, error) {
 	return r.numFails, nil
 }
 
-func (r *FailThenSucceedRunnable) SetArgs(args ...interface{}) error {
+func (r *FailThenSucceedRunnable) SetInData(inData interface{}) error {
 	return nil
 }
 
@@ -131,21 +124,17 @@ type FuncRunnable struct {
 	arg map[string]interface{}
 }
 
-func (r FuncRunnable) Run() (interface{}, error) {
+func (r FuncRunnable) Run(ctx context.Context) (interface{}, error) {
 	r.runFunc(r.arg)
 	return nil, nil
 }
 
-func (r *FuncRunnable) SetArgs(args ...interface{}) error {
-	if len(args) > 1 {
-		msg := fmt.Sprintf("FuncRunnable should have 1 map[string]interface{} arg, found %d args", len(args))
-		return common.NewInvalidError(msg)
-	}
-	switch rv := args[0].(type) {
+func (r *FuncRunnable) SetInData(inData interface{}) error {
+	switch rv := inData.(type) {
 	case map[string]interface{}:
 		r.arg = rv
 	default:
-		msg := fmt.Sprintf("FuncRunnable should have an map[string]interface{} arg, found %v", reflect.TypeOf(args[0]))
+		msg := fmt.Sprintf("FuncRunnable should have an map[string]interface{} arg, found %v", reflect.TypeOf(rv))
 		return common.NewInvalidError(msg)
 	}
 	return nil

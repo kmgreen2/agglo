@@ -14,9 +14,9 @@ func TestLocalJob(t *testing.T) {
 
 	f := job.Run(-1, false)
 
-	result, err := f.Get()
-	assert.Nil(t, err)
-	intResult, ok := result.(int)
+	result := f.Get()
+	assert.Nil(t, result.Error())
+	intResult, ok := result.Value().(int)
 	assert.True(t, ok)
 	assert.Equal(t, 1, intResult)
 }
@@ -31,9 +31,9 @@ func TestLocalJobSync(t *testing.T) {
 
 	assert.True(t, end.Sub(start) > 1 * time.Second)
 
-	result, err := f.Get()
-	assert.Nil(t, err)
-	intResult, ok := result.(int)
+	result := f.Get()
+	assert.Nil(t, result.Error())
+	intResult, ok := result.Value().(int)
 	assert.True(t, ok)
 	assert.Equal(t, 1, intResult)
 }
@@ -44,8 +44,8 @@ func TestLocalJobFailed(t *testing.T) {
 
 	f := job.Run(-1, false)
 
-	_, err := f.Get()
-	assert.Error(t, err)
+	result := f.Get()
+	assert.Error(t, result.Error())
 }
 
 func TestLocalJobDeferred(t *testing.T) {
@@ -58,9 +58,9 @@ func TestLocalJobDeferred(t *testing.T) {
 
 	assert.True(t, end.Sub(start) > 2 * time.Second)
 
-	result, err := f.Get()
-	assert.Nil(t, err)
-	intResult, ok := result.(int)
+	result := f.Get()
+	assert.Nil(t, result.Error())
+	intResult, ok := result.Value().(int)
 	assert.True(t, ok)
 	assert.Equal(t, 1, intResult)
 }

@@ -19,7 +19,7 @@ type RunnableStartProcess struct {
 	in      map[string]interface{}
 }
 
-func (runnable *RunnableStartProcess) Run() (interface{}, error) {
+func (runnable *RunnableStartProcess) Run(ctx context.Context) (interface{}, error) {
 	return runnable.process.Process(runnable.in)
 }
 
@@ -35,21 +35,17 @@ type RunnablePartialProcess struct {
 	in      map[string]interface{}
 }
 
-func (runnable *RunnablePartialProcess) Run() (interface{}, error) {
+func (runnable *RunnablePartialProcess) Run(ctx context.Context) (interface{}, error) {
 	return runnable.process.Process(runnable.in)
 }
 
-func (runnable *RunnablePartialProcess) SetArgs(args ...interface{}) error {
-	if len(args) > 1 {
-		msg := fmt.Sprintf("RunnablePartialProcess should have 1 int arg, found %d args", len(args))
-		return common.NewInvalidError(msg)
-	}
-	switch rv := args[0].(type) {
+func (runnable *RunnablePartialProcess) SetInData(inData interface{}) error {
+	switch rv := inData.(type) {
 	case map[string]interface{}:
 		runnable.in = rv
 	default:
 		msg := fmt.Sprintf("RunnablePartialProcess should have an map[string]interface{} arg, found %v",
-			reflect.TypeOf(args[0]))
+			reflect.TypeOf(rv))
 		return common.NewInvalidError(msg)
 	}
 	return nil
@@ -66,21 +62,17 @@ type RunnablePartialFinalizer struct {
 	in      map[string]interface{}
 }
 
-func (runnable *RunnablePartialFinalizer) Run() (interface{}, error) {
+func (runnable *RunnablePartialFinalizer) Run(ctx context.Context) (interface{}, error) {
 	return nil, runnable.finalizer.Finalize(runnable.in)
 }
 
-func (runnable *RunnablePartialFinalizer) SetArgs(args ...interface{}) error {
-	if len(args) > 1 {
-		msg := fmt.Sprintf("RunnablePartialFinalizer should have 1 int arg, found %d args", len(args))
-		return common.NewInvalidError(msg)
-	}
-	switch rv := args[0].(type) {
+func (runnable *RunnablePartialFinalizer) SetInData(inData interface{}) error {
+	switch rv := inData.(type) {
 	case map[string]interface{}:
 		runnable.in = rv
 	default:
 		msg := fmt.Sprintf("RunnablePartialFinalizer should have an map[string]interface{} arg, found %v",
-			reflect.TypeOf(args[0]))
+			reflect.TypeOf(rv))
 		return common.NewInvalidError(msg)
 	}
 	return nil
@@ -180,12 +172,12 @@ func (pipeline *Pipeline) createFutureHelper(pipelineIndex int, in map[string]in
 	processOptions := pipeline.processOptions[pipelineIndex]
 
 	if processOptions.retryStrategy != nil {
-		future = common.CreateRetryableFuture(
+		future = common.CreateRetryableFuture(ctx,
 			int(processOptions.retryStrategy.NumRetries),
 			time.Duration(processOptions.retryStrategy.InitialBackOffMs) * time.Millisecond,
 			NewRunnableStartProcess(process, in))
 	} else {
-		future = common.CreateFuture(NewRunnableStartProcess(process, in))
+		future = common.CreateFuture(ctx, NewRunnableStartProcess(process, in))
 	}
 
 	if processOptions.processLifecycle != nil {
@@ -238,13 +230,13 @@ func (pipeline *Pipeline) thenFutureHelper(pipelineIndex int, inFuture common.Fu
 
 func (pipeline Pipeline) RunSync(in map[string]interface{}) (map[string]interface{}, error) {
 	f := pipeline.RunAsync(in)
-	result, err := f.Get()
+	result := f.Get()
 
-	if err != nil {
-		return nil, err
+	if result.Error() != nil {
+		return nil, result.Error()
 	}
 
-	switch rv := result.(type) {
+	switch rv := result.Value().(type) {
 	case map[string]interface{}:
 		return rv, nil
 	default:

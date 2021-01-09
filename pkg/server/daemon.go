@@ -21,9 +21,9 @@ type Daemon interface {
 func RunPipelines(in map[string]interface{}, pipelines []*process.Pipeline) error {
 	for _, pipeline := range pipelines {
 		future := pipeline.RunAsync(in)
-		_, err := future.Get()
-		if err != nil {
-			return err
+		result := future.Get()
+		if result.Error() != nil {
+			return result.Error()
 		}
 	}
 	return nil

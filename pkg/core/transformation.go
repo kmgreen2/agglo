@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"reflect"
@@ -46,15 +47,15 @@ type MapTransformation struct {
 }
 
 func NewExecMapTransformation(path string, cmdArgs ...string) *MapTransformation {
-	execRunnable := common.NewExecRunnableWithCmdArgs(path, cmdArgs...)
+	execRunnable := common.NewExecRunnable(common.WithPath(path), common.WithCmdArgs(cmdArgs...))
 
 	return &MapTransformation{
 		func (in interface{}) (interface{}, error) {
-			err := execRunnable.SetArgs(in)
+			err := execRunnable.SetInData(in)
 			if err != nil {
 				return nil, err
 			}
-			return execRunnable.Run()
+			return execRunnable.Run(context.Background())
 		},
 	}
 }
@@ -96,7 +97,7 @@ type LeftFoldTransformation struct {
 }
 
 func NewExecLeftFoldTransformation(path string) *LeftFoldTransformation {
-	execRunnable := common.NewExecRunnable(path)
+	execRunnable := common.NewExecRunnable(common.WithPath(path))
 
 	return &LeftFoldTransformation{
 		func (acc, in interface{}) (interface{}, error) {
@@ -114,11 +115,11 @@ func NewExecLeftFoldTransformation(path string) *LeftFoldTransformation {
 				return nil, common.NewInvalidError(msg)
 			}
 
-			err := execRunnable.SetArgs(in)
+			err := execRunnable.SetInData(in)
 			if err != nil {
 				return nil, err
 			}
-			return execRunnable.Run()
+			return execRunnable.Run(context.Background())
 		},
 	}
 }
@@ -145,7 +146,7 @@ type RightFoldTransformation struct {
 }
 
 func NewExecRightFoldTransformation(path string) *RightFoldTransformation {
-	execRunnable := common.NewExecRunnable(path)
+	execRunnable := common.NewExecRunnable(common.WithPath(path))
 
 	return &RightFoldTransformation{
 		func (acc, in interface{}) (interface{}, error) {
@@ -163,11 +164,11 @@ func NewExecRightFoldTransformation(path string) *RightFoldTransformation {
 				return nil, common.NewInvalidError(msg)
 			}
 
-			err := execRunnable.SetArgs(in)
+			err := execRunnable.SetInData(in)
 			if err != nil {
 				return nil, err
 			}
-			return execRunnable.Run()
+			return execRunnable.Run(context.Background())
 		},
 	}
 }

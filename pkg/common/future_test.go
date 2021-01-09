@@ -1,6 +1,7 @@
 package common_test
 
 import (
+	"context"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
@@ -19,7 +20,7 @@ func TestCreateFuture(t *testing.T) {
 	testFailure := false
 	testCancel := false
 	runnable := test.NewSquareRunnable(10)
-	f := common.CreateFuture(runnable).OnSuccess(func (x interface{}) {
+	f := common.CreateFuture(context.Background(), runnable).OnSuccess(func (x interface{}) {
 		testSuccess = true
 	}).OnFail(func (err error) {
 		testFailure = true
@@ -28,9 +29,9 @@ func TestCreateFuture(t *testing.T) {
 	})
 
 
-	result, err := f.Get()
-	assert.Nil(t, err)
-	assert.Equal(t, 100, result)
+	result := f.Get()
+	assert.Nil(t, result.Error())
+	assert.Equal(t, 100, result.Value())
 	assert.True(t, f.IsCompleted())
 
 	waitForCallbacks(f)
@@ -44,7 +45,7 @@ func TestCreateFutureFail(t *testing.T) {
 	testFailure := false
 	testCancel := false
 	runnable := test.NewSleepAndFailRunnable(0)
-	f := common.CreateFuture(runnable).OnSuccess(func (x interface{}) {
+	f := common.CreateFuture(context.Background(), runnable).OnSuccess(func (x interface{}) {
 		testSuccess = true
 	}).OnFail(func (err error) {
 		testFailure = true
@@ -52,9 +53,9 @@ func TestCreateFutureFail(t *testing.T) {
 		testCancel = true
 	})
 
-	result, err := f.Get()
-	assert.Error(t, err)
-	assert.Nil(t, result)
+	result := f.Get()
+	assert.Error(t, result.Error())
+	assert.Nil(t, result.Value())
 	assert.True(t, f.IsCompleted())
 
 	waitForCallbacks(f)
@@ -68,7 +69,7 @@ func TestCreateFutureCancel(t *testing.T) {
 	testFailure := false
 	testCancel := false
 	runnable := test.NewSleepRunnable(2)
-	f := common.CreateFuture(runnable).OnSuccess(func (x interface{}) {
+	f := common.CreateFuture(context.Background(), runnable).OnSuccess(func (x interface{}) {
 		testSuccess = true
 	}).OnFail(func (err error) {
 		testFailure = true
@@ -78,9 +79,9 @@ func TestCreateFutureCancel(t *testing.T) {
 
 	_ = f.Cancel()
 
-	result, err := f.Get()
-	assert.Error(t, err)
-	assert.Nil(t, result)
+	result := f.Get()
+	assert.Error(t, result.Error())
+	assert.Nil(t, result.Value())
 	assert.True(t, f.IsCancelled())
 
 	waitForCallbacks(f)
@@ -95,7 +96,7 @@ func TestCreateDeferredFuture(t *testing.T) {
 	testCancel := false
 	runnable := test.NewSquareRunnable(10)
 	before := time.Now()
-	f := common.CreateDeferredFuture(2*time.Second, runnable).
+	f := common.CreateDeferredFuture(context.Background(), 2*time.Second, runnable).
 		OnSuccess(func (x interface{}) {
 		testSuccess = true
 	}).OnFail(func (err error) {
@@ -104,10 +105,10 @@ func TestCreateDeferredFuture(t *testing.T) {
 		testCancel = true
 	})
 
-	result, err := f.Get()
+	result := f.Get()
 	after := time.Now()
-	assert.Nil(t, err)
-	assert.Equal(t, 100, result)
+	assert.Nil(t, result.Error())
+	assert.Equal(t, 100, result.Value())
 	assert.True(t, f.IsCompleted())
 	assert.True(t, after.Sub(before) > 2 * time.Second)
 
@@ -122,7 +123,7 @@ func TestCreateFutureTimeout(t *testing.T) {
 	testFailure := false
 	testCancel := false
 	runnable := test.NewSleepRunnable(2)
-	f := common.CreateFuture(runnable).OnSuccess(func (x interface{}) {
+	f := common.CreateFuture(context.Background(), runnable).OnSuccess(func (x interface{}) {
 		testSuccess = true
 	}).OnFail(func (err error) {
 		testFailure = true
@@ -130,8 +131,8 @@ func TestCreateFutureTimeout(t *testing.T) {
 		testCancel = true
 	})
 
-	_, err := f.GetWithTimeout(100 * time.Millisecond)
-	assert.Error(t, err)
+	result := f.GetWithTimeout(100 * time.Millisecond)
+	assert.Error(t, result.Error())
 	assert.False(t, f.IsCompleted())
 
 	assert.False(t, testSuccess)
@@ -147,7 +148,7 @@ func TestCreateFutureThen(t *testing.T) {
 	testThenFailure := false
 	testThenCancel := false
 	runnable := test.NewSquareRunnable(10)
-	f1 := common.CreateFuture(runnable).OnSuccess(func (x interface{}) {
+	f1 := common.CreateFuture(context.Background(), runnable).OnSuccess(func (x interface{}) {
 		testSuccess = true
 	}).OnFail(func (err error) {
 		testFailure = true
@@ -163,9 +164,9 @@ func TestCreateFutureThen(t *testing.T) {
 		testThenCancel = true
 	})
 
-	result, err := f2.Get()
-	assert.Nil(t, err)
-	assert.Equal(t, 10000, result)
+	result := f2.Get()
+	assert.Nil(t, result.Error())
+	assert.Equal(t, 10000, result.Value())
 
 	waitForCallbacks(f1)
 	waitForCallbacks(f2)
@@ -186,20 +187,24 @@ func TestCreateFutureThenWithFailure(t *testing.T) {
 	testSecondFailure := false
 	failRunnable := test.NewFailRunnable()
 	runnable := test.NewSquareRunnable(10)
-	f := common.CreateFuture(runnable).OnSuccess(func (x interface{}) {
+	f1 := common.CreateFuture(context.Background(), runnable).OnSuccess(func (x interface{}) {
 		testFirstSuccess = true
-	}).Then(failRunnable).OnFail(func (err error) {
+	})
+	f2 := f1.Then(failRunnable).OnFail(func (err error) {
 		testFirstFailure = true
-	}).Then(runnable).OnSuccess(func (x interface{}) {
+	})
+	f3 := f2.Then(runnable).OnSuccess(func (x interface{}) {
 		testSecondSuccess = true
 	}).OnFail(func (err error) {
 		testSecondFailure = true
 	})
 
-	_, err := f.Get()
-	assert.Error(t, err)
+	result := f3.Get()
+	assert.Error(t, result.Error())
 
-	waitForCallbacks(f)
+	waitForCallbacks(f1)
+	waitForCallbacks(f2)
+	waitForCallbacks(f3)
 	assert.True(t, testFirstSuccess)
 	assert.True(t, testFirstFailure)
 	assert.True(t, testSecondFailure)
@@ -211,7 +216,9 @@ func TestRetryableFuture(t *testing.T) {
 	testFailure := false
 	testCancel := false
 	runnable := test.NewFailThenSucceedRunnable(2)
-	f := common.CreateRetryableFuture(3, 100 * time.Millisecond, runnable).OnSuccess(func (x interface{}) {
+	f := common.CreateRetryableFuture(
+		context.Background(), 3, 100 * time.Millisecond,runnable).OnSuccess(func (x interface{}) {
+
 		testSuccess = true
 	}).OnFail(func (err error) {
 		testFailure = true
@@ -220,9 +227,9 @@ func TestRetryableFuture(t *testing.T) {
 	})
 
 
-	result, err := f.Get()
-	assert.Nil(t, err)
-	assert.Equal(t, 2, result)
+	result := f.Get()
+	assert.Nil(t, result.Error())
+	assert.Equal(t, 2, result.Value())
 	assert.True(t, f.IsCompleted())
 
 	waitForCallbacks(f)
@@ -239,7 +246,7 @@ func TestThenRetryableFuture(t *testing.T) {
 	thenRunnable := test.NewFailThenSucceedRunnable(2)
 
 
-	f := common.CreateFuture(runnable).ThenWithRetry(3, 100 * time.Millisecond, thenRunnable).
+	f := common.CreateFuture(context.Background(), runnable).ThenWithRetry(3, 100 * time.Millisecond, thenRunnable).
 	OnSuccess(func (x interface{}) {
 		testSuccess = true
 	}).OnFail(func (err error) {
@@ -249,9 +256,9 @@ func TestThenRetryableFuture(t *testing.T) {
 	})
 
 
-	result, err := f.Get()
-	assert.Nil(t, err)
-	assert.Equal(t, 2, result)
+	result := f.Get()
+	assert.Nil(t, result.Error())
+	assert.Equal(t, 2, result.Value())
 	assert.True(t, f.IsCompleted())
 
 	waitForCallbacks(f)
@@ -268,7 +275,7 @@ func TestThenRetryableFutureFailed(t *testing.T) {
 	thenRunnable := test.NewFailThenSucceedRunnable(3)
 
 
-	f := common.CreateFuture(runnable).ThenWithRetry(3, 100 * time.Millisecond, thenRunnable).
+	f := common.CreateFuture(context.Background(), runnable).ThenWithRetry(3, 100 * time.Millisecond, thenRunnable).
 		OnSuccess(func (x interface{}) {
 			testSuccess = true
 		}).OnFail(func (err error) {
@@ -278,9 +285,9 @@ func TestThenRetryableFutureFailed(t *testing.T) {
 	})
 
 
-	result, err := f.Get()
-	assert.Error(t, err)
-	assert.Nil(t, result)
+	result := f.Get()
+	assert.Error(t, result.Error())
+	assert.Nil(t, result.Value())
 	assert.True(t, f.IsCompleted())
 
 	waitForCallbacks(f)

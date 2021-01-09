@@ -1,12 +1,14 @@
 package core
 
 import (
+	"context"
+	"fmt"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"time"
 )
 
 type Job interface {
-	Run(delay time.Duration, sync bool, args ...interface{}) common.Future
+	Run(delay time.Duration, sync bool, inData ...interface{}) common.Future
 }
 
 type LocalJob struct {
@@ -20,21 +22,23 @@ func NewLocalJob(runnable common.PartialRunnable) *LocalJob {
 	}
 }
 
-func run(runnable common.PartialRunnable, delay time.Duration, sync bool, args ...interface{}) common.Future {
+func run(runnable common.PartialRunnable, delay time.Duration, sync bool, inData interface{}) common.Future {
+	completable := common.NewCompletable()
 	var future common.Future
-	err := runnable.SetArgs(args...)
-	if err != nil {
-		completable := common.NewCompletable()
-		// Note: This only fails if the completable is already completed.  Since this is
-		// brand new, it should never fail here
-		_ = completable.Fail(err)
-		return completable.Future()
+	if inData != nil {
+		err := runnable.SetInData(inData)
+		if err != nil {
+			// Note: This only fails if the completable is already completed.  Since this is
+			// brand new, it should never fail here
+			_ = completable.Fail(err)
+			return completable.Future()
+		}
 	}
 
 	if delay > 0 {
-		future = common.CreateDeferredFuture(delay, runnable)
+		future = common.CreateDeferredFuture(context.Background(), delay, runnable)
 	} else {
-		future = common.CreateFuture(runnable)
+		future = common.CreateFuture(context.Background(), runnable)
 	}
 
 	if sync {
@@ -43,8 +47,16 @@ func run(runnable common.PartialRunnable, delay time.Duration, sync bool, args .
 	return future
 }
 
-func (j LocalJob) Run(delay time.Duration, sync bool, args ...interface{}) common.Future {
-	return run(j.runnable, delay, sync, args...)
+func (j LocalJob) Run(delay time.Duration, sync bool, inData ...interface{}) common.Future {
+	if len(inData) > 1 {
+		completable := common.NewCompletable()
+		msg := fmt.Sprintf("expected 1 inData varadic arg to Run, got %d", len(inData))
+		_ = completable.Fail(common.NewInvalidError(msg))
+		return completable.Future()
+	} else if len(inData) == 1 {
+		return run(j.runnable, delay, sync, inData[0])
+	}
+	return run(j.runnable, delay, sync, nil)
 }
 
 type CmdJob struct {
@@ -52,12 +64,20 @@ type CmdJob struct {
 }
 
 func NewCmdJob(cmdPath string, cmdArgs ...string) *CmdJob {
-	runnable := common.NewExecRunnableWithCmdArgs(cmdPath, cmdArgs...)
+	runnable := common.NewExecRunnable(common.WithCmdArgs(cmdArgs...), common.WithPath(cmdPath))
 	return &CmdJob{
 		runnable: runnable,
 	}
 }
 
-func (j CmdJob) Run(delay time.Duration, sync bool, args ...interface{}) common.Future {
-	return run(j.runnable, delay, sync, args...)
+func (j CmdJob) Run(delay time.Duration, sync bool, inData ...interface{}) common.Future {
+	if len(inData) > 1 {
+		completable := common.NewCompletable()
+		msg := fmt.Sprintf("expected 1 inData varadic arg to Run, got %d", len(inData))
+		_ = completable.Fail(common.NewInvalidError(msg))
+		return completable.Future()
+	} else if len(inData) == 1 {
+		return run(j.runnable, delay, sync, inData[0])
+	}
+	return run(j.runnable, delay, sync, nil)
 }

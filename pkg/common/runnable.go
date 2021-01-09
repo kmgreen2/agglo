@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,43 +11,58 @@ import (
 )
 
 type Runnable interface {
-	Run() (interface{}, error)
+	Run(ctx context.Context) (interface{}, error)
 }
 
 type PartialRunnable interface {
 	Runnable
-	SetArgs(args ...interface{}) error
+	SetInData(inData interface{}) error
+}
+
+type ExecOption func(runnable *ExecRunnable)
+
+func WithContext(ctx context.Context) ExecOption {
+	return func (runnable *ExecRunnable) {
+		runnable.ctx = ctx
+	}
+}
+func WithCmdArgs(cmdArgs...string) ExecOption {
+	return func (runnable *ExecRunnable) {
+		runnable.cmdArgs = cmdArgs
+	}
+}
+func WithInData(inData interface{}) ExecOption {
+	return func (runnable *ExecRunnable) {
+		runnable.inData = inData
+	}
+}
+func WithPath(path string) ExecOption {
+	return func (runnable *ExecRunnable) {
+		runnable.path = path
+	}
 }
 
 // ExecRunnable will run a command that accepts a JSON-encoded map on stdin
 // and returns a JSON-encoded map on stdout
 type ExecRunnable struct {
-	path string
+	ctx     context.Context
+	path    string
 	cmdArgs []string
-	args interface{}
+	inData  interface{}
 }
 
-func NewExecRunnable(path string) *ExecRunnable {
-	return &ExecRunnable{
-		path: path,
+func NewExecRunnable(options ...ExecOption) *ExecRunnable {
+	runnable := &ExecRunnable{
 	}
-}
 
-func NewExecRunnableWithCmdArgs(path string, cmdArgs ...string) *ExecRunnable {
-	return &ExecRunnable{
-		path: path,
-		cmdArgs: cmdArgs,
+	for _, option := range options {
+		option(runnable)
 	}
+
+	return runnable
 }
 
-func NewExecRunnableWithArgs(path string, args interface{}) *ExecRunnable {
-	return &ExecRunnable{
-		path: path,
-		args: args,
-	}
-}
-
-func (runnable *ExecRunnable) Run() (interface{}, error) {
+func (runnable *ExecRunnable) Run(ctx context.Context) (interface{}, error) {
 	var outMap map[string]interface{}
 	cmd := exec.Command(runnable.path, runnable.cmdArgs...)
 	stdin, err := cmd.StdinPipe()
@@ -55,7 +71,7 @@ func (runnable *ExecRunnable) Run() (interface{}, error) {
 	}
 
 	encodeBuffer := bytes.NewBuffer([]byte{})
-	switch val := runnable.args.(type) {
+	switch val := runnable.inData.(type) {
 	case map[string]interface{}:
 		encoder := json.NewEncoder(encodeBuffer)
 		err = encoder.Encode(val)
@@ -91,7 +107,7 @@ func (runnable *ExecRunnable) Run() (interface{}, error) {
 	}
 
 	decodeBuffer := bytes.NewBuffer(out)
-	switch runnable.args.(type) {
+	switch runnable.inData.(type) {
 	case map[string]interface{}:
 		decoder := json.NewDecoder(decodeBuffer)
 		err = decoder.Decode(&outMap)
@@ -111,22 +127,16 @@ func (runnable *ExecRunnable) Run() (interface{}, error) {
 	return outMap, err
 }
 
-func (runnable *ExecRunnable) SetArgs(args ...interface{}) error {
-	if len(args) != 1 {
-		msg := fmt.Sprintf("ExecRunnable expects a single map[string]interface{} argument.  Got %d args",
-			len(args))
-		return NewInvalidError(msg)
-	}
-
-	switch val := args[0].(type) {
+func (runnable *ExecRunnable) SetInData(inData interface{}) error {
+	switch val := inData.(type) {
 	case map[string]interface{}:
-		runnable.args = val
+		runnable.inData = val
 		return nil
 	case []interface{}:
-		runnable.args = val
+		runnable.inData = val
 		return nil
 	case string:
-		runnable.args = val
+		runnable.inData = val
 		return nil
 	default:
 		msg := fmt.Sprintf("ExecRunnable expects a single map[string]interface{} argument.  Got %v",

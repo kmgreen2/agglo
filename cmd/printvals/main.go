@@ -25,7 +25,7 @@ func main() {
 	decoder := json.NewDecoder(decodeBuffer)
 	err = decoder.Decode(&inMap)
 	if err != nil {
-		panic(err)
+		panic(err.Error())
 	}
 
 	if len(os.Args) < 2 {

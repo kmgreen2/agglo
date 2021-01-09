@@ -30,9 +30,9 @@ func (s Spawner) Process(in map[string]interface{}) (map[string]interface{}, err
 	if shouldRun {
 		f := s.job.Run(s.delay, s.doSync, out)
 		if s.doSync {
-			_, err := f.Get()
-			if err != nil {
-				return in, err
+			result := f.Get()
+			if result.Error() != nil {
+				return in, result.Error()
 			}
 		}
 	}

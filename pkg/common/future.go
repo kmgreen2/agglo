@@ -16,8 +16,8 @@ const (
 )
 
 type Future interface {
-	Get() (interface{}, error)
-	GetWithTimeout(duration time.Duration) (interface{}, error)
+	Get() *FutureResult
+	GetWithTimeout(duration time.Duration) *FutureResult
 	Then(runnable PartialRunnable) Future
 	ThenWithRetry(numRetries int, initialDelay time.Duration, runnable PartialRunnable) Future
 	Cancel() error
@@ -29,55 +29,65 @@ type Future interface {
 	OnFail(func (err error)) Future
 }
 
-type futureResult struct {
+type FutureResult struct {
+	ctx context.Context
 	value interface{}
 	err error
 }
 
-func newFutureResult(value interface{}) *futureResult {
-	return &futureResult{
+func (result FutureResult) Error() error {
+	return result.err
+}
+
+func (result FutureResult) Value() interface{} {
+	return result.value
+}
+
+func newFutureResult(value interface{}) *FutureResult {
+	return &FutureResult{
 		value: value,
 		err: nil,
 	}
 }
 
-func newCancelledFuture() *futureResult {
-	return &futureResult{
+func newCancelledFuture() *FutureResult {
+	return &FutureResult{
 		value: nil,
 		err: NewCancelledError(),
 	}
 }
 
-func newFailedFuture(err error) *futureResult {
-	return &futureResult{
+func newFailedFuture(err error) *FutureResult {
+	return &FutureResult{
 		value: nil,
 		err: err,
 	}
 }
 
 type future struct {
-	result chan *futureResult
-	finalResult *futureResult
+	result chan *FutureResult
+	finalResult *FutureResult
 	mutex sync.Mutex
 	state futureState
 	callbacksCompleted bool
 	successes []func (interface{})
 	fails []func (error)
 	cancels []func ()
+	ctx context.Context
 }
 
 func newFuture() *future {
 	return &future{
-		result: make(chan *futureResult, 1),
+		result: make(chan *FutureResult, 1),
 		mutex: sync.Mutex{},
 		state: undefinedFuture,
 		callbacksCompleted: false,
 	}
 }
 
-func completeRunnable(completable Completable, runnable Runnable) {
+func completeRunnable(ctx context.Context, completable Completable, runnable Runnable) {
 	defer completable.Close()
-	result, err := runnable.Run()
+	result, err := runnable.Run(ctx)
 	if err != nil {
 		_ = completable.Fail(err)
 	} else {
@@ -85,23 +95,54 @@ func completeRunnable(completable Completable, runnable Runnable) {
 	}
 }
 
-func CreateFuture(runnable Runnable) Future {
+
+/// ToDo(KMG): Refactor the future creation  code to unify creation under the same helper using options.
+/// there is no need to keep the code separate.  Holding off right now while working through another
+//  refactor.  Also add in a WithPrepare option that will run a function before running the underlying function
+
+type retryOption struct {
+	num int
+	initialDelay time.Duration
+}
+
+type FutureOptions struct {
+	ctx context.Context
+	delay time.Duration
+	retry retryOption
+}
+
+type FutureOption func(opts* FutureOptions)
+
+func createFuture(runnable Runnable, options ...FutureOption) Future {
+	completable := NewCompletable()
+	futureOptions := &FutureOptions{
+		ctx: context.Background(),
+	}
+
+	for _, opt := range options {
+		opt(futureOptions)
+	}
+	return completable.Future()
+}
+//////
+
+func CreateFuture(ctx context.Context, runnable Runnable) Future {
 	completable := NewCompletable()
 
 	go func() {
-		completeRunnable(completable, runnable)
+		completeRunnable(ctx, completable, runnable)
 	}()
 	return completable.Future()
 }
 
-func CreateDeferredFuture(duration time.Duration, runnable Runnable) Future {
+func CreateDeferredFuture(ctx context.Context, duration time.Duration, runnable Runnable) Future {
 	completable := NewCompletable()
 
 	go func() {
 		defer completable.Close()
 		t := time.NewTimer(duration)
 		<-t.C
-		result, err := runnable.Run()
+		result, err := runnable.Run(ctx)
 		if err != nil {
 			_ = completable.Fail(err)
 		} else {
@@ -112,7 +153,7 @@ func CreateDeferredFuture(duration time.Duration, runnable Runnable) Future {
 	return completable.Future()
 }
 
-func CreateRetryableFuture(numRetries int, initialDelay time.Duration, runnable Runnable) Future {
+func CreateRetryableFuture(ctx context.Context, numRetries int, initialDelay time.Duration, runnable Runnable) Future {
 	completable := NewCompletable()
 
 	go func() {
@@ -120,8 +161,8 @@ func CreateRetryableFuture(numRetries int, initialDelay time.Duration, runnable 
 		var result interface{}
 		defer completable.Close()
 		delay := initialDelay
-		for i := 0; i < numRetries; i++ {
-			result, err = runnable.Run()
+		for i := 0; i <= numRetries; i++ {
+			result, err = runnable.Run(ctx)
 			if err != nil {
 				time.Sleep(delay)
 				delay <<= 1
@@ -136,11 +177,11 @@ func CreateRetryableFuture(numRetries int, initialDelay time.Duration, runnable 
 	return completable.Future()
 }
 
-func (f *future) Get() (interface{}, error) {
+func (f *future) Get() *FutureResult {
 	return f.getWithContext(context.Background())
 }
 
-func (f *future) GetWithTimeout(timeout time.Duration) (interface{}, error) {
+func (f *future) GetWithTimeout(timeout time.Duration) *FutureResult {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	return f.getWithContext(ctx)
@@ -151,28 +192,28 @@ func (f *future) ThenWithRetry(numRetries int, initialDelay time.Duration, runna
 
 	go func() {
 		var err error
-		var result interface{}
+		var thenResult interface{}
 		defer next.Close()
 
 		delay := initialDelay
-		result, err = f.Get()
-		if err != nil {
-			_ = next.Fail(err)
+		result := f.Get()
+		if result.err != nil {
+			_ = next.Fail(result.err)
 			return
 		}
-		err = runnable.SetArgs(result)
+		err = runnable.SetInData(result.value)
 		if err != nil {
-			_ = next.Fail(err)
+			_ = next.Fail(result.err)
 			return
 		}
 		for i := 0; i < numRetries; i++ {
-			result, err = runnable.Run()
+			thenResult, err = runnable.Run(result.ctx)
 			if err != nil {
 				time.Sleep(delay)
 				delay <<= 1
 				continue
 			} else {
-				_ = next.Success(result)
+				_ = next.Success(thenResult)
 				return
 			}
 		}
@@ -182,30 +223,33 @@ func (f *future) ThenWithRetry(numRetries int, initialDelay time.Duration, runna
 }
 
 func (f *future) Then(runnable PartialRunnable) Future {
+	var err error
 	next := NewCompletable()
 
 	go func() {
-		result, err := f.Get()
-		if err != nil {
-			_ = next.Fail(err)
+		result := f.Get()
+		if result.err != nil {
+			_ = next.Fail(result.err)
 		} else {
-			err = runnable.SetArgs(result)
+			err = runnable.SetInData(result.value)
 			if err != nil {
 				_ = next.Fail(err)
 			} else {
-				completeRunnable(next, runnable)
+				completeRunnable(result.ctx, next, runnable)
 			}
 		}
 	}()
 	return next.Future()
 }
 
-func (f *future) getWithContext(ctx context.Context) (interface{}, error) {
+func (f *future) getWithContext(ctx context.Context) *FutureResult {
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return &FutureResult{
+			err: ctx.Err(),
+		}
 	case <-f.result:
-		return f.finalResult.value, f.finalResult.err
+		return f.finalResult
 	}
 }
 
