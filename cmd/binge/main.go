@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/observability"
 	"github.com/kmgreen2/agglo/pkg/serialization"
 	"github.com/kmgreen2/agglo/pkg/server"
 	"io"
@@ -30,6 +31,7 @@ type CommandArgs struct {
 	numThreads int
 	force bool
 	stateDbPath string
+	exporter observability.Exporter
 }
 
 func usage(msg string, exitCode int) {
@@ -50,6 +52,7 @@ func parseArgs() *CommandArgs {
 	maxConnectionsPtr := flag.Int("maxConnections", 64, "maximum number of connections")
 	numThreadsPtr := flag.Int("numThreads", 16, "number of worker threads")
 	stateDbPathPtr := flag.String("stateDbPath", "/tmp/bingeDb", "location of the state db file")
+	exporterPtr := flag.String("exporter", "stdout", "OpenTelemetry exporter type")
 	forcePtr := flag.Bool("force", false, "force overwrite state entries")
 
 	flag.Parse()
@@ -68,6 +71,15 @@ func parseArgs() *CommandArgs {
 	args.numThreads = *numThreadsPtr
 	args.force = *forcePtr
 	args.stateDbPath = *stateDbPathPtr
+
+	if strings.Compare(*exporterPtr, "stdout") == 0 {
+		args.exporter, err = observability.NewExporter(observability.StdoutExporter)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		usage(fmt.Sprintf("invalid exporter: %s", *exporterPtr), 1)
+	}
 
 	if len(*configPtr) == 0 {
 		usage("must specify -config", 1)
@@ -107,6 +119,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	_ = args.exporter.Start()
+	defer func() { _ = args.exporter.Stop() }()
 
 	// RunStandalone will invoke each pipeline synchronously
 	if args.runType == RunStandalone {

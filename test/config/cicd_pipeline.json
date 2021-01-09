@@ -9,7 +9,12 @@
       },
       "processes": [
         {
-          "name": "annotate-cicd"
+          "name": "annotate-cicd",
+          "instrumentation": {
+            "enableTracing": true,
+            "latency": true,
+            "counter": true
+          }
         },
         {
           "name": "aggregate-author",

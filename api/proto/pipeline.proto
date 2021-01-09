@@ -102,6 +102,11 @@ enum ComparatorOperator {
     RegexNotMatch = 26;
 }
 
+message ProcessInstrumentation {
+    bool enableTracing = 1;
+    bool latency = 2;
+    bool counter = 3;
+}
 
 message Pipelines {
     string partitionUuid = 1;
@@ -125,6 +130,7 @@ message RetryStrategy {
 message PipelineProcess {
     string name = 1;
     RetryStrategy retryStrategy = 2;
+    ProcessInstrumentation instrumentation = 3;
 }
 
 message ProcessDefinition {

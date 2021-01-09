@@ -22,6 +22,24 @@
                         },
                         "additionalProperties": true,
                         "type": "object"
+                    },
+                    "instrumentation": {
+                        "properties": {
+                            "enableTracing": {
+                                "type": "boolean"
+                            },
+                            "latency": {
+                                "type": "boolean"
+                            },
+                            "counter": {
+                                "type": "boolean"
+                            },
+                            "failureCounter": {
+                                "type": "boolean"
+                            }
+                        },
+                        "additionalProperties": true,
+                        "type": "object"
                     }
                 },
                 "additionalProperties": true,

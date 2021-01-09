@@ -1,0 +1,19 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "properties": {
+        "enableTracing": {
+            "type": "boolean"
+        },
+        "latency": {
+            "type": "boolean"
+        },
+        "counter": {
+            "type": "boolean"
+        },
+        "failureCounter": {
+            "type": "boolean"
+        }
+    },
+    "additionalProperties": true,
+    "type": "object"
+}

@@ -1,6 +1,7 @@
 package process
 
 import (
+	"context"
 	"fmt"
 	api "github.com/kmgreen2/agglo/generated/proto"
 	"github.com/kmgreen2/agglo/pkg/common"
@@ -91,41 +92,148 @@ func NewRunnablePartialFinalizer(finalizer Finalizer) *RunnablePartialFinalizer 
 	}
 }
 
-type ProcessOptions struct {
+type Lifecycle struct {
+	prepareFns []func(ctx context.Context) context.Context
+	successFns []func(ctx context.Context)
+	failFns    []func(ctx context.Context, err error)
+}
+
+type LifecycleBuilder struct {
+	lifecycle *Lifecycle
+}
+
+func NewLifecycleBuilder() *LifecycleBuilder {
+	return &LifecycleBuilder{
+		&Lifecycle{},
+	}
+}
+
+func (lifecycleBuilder *LifecycleBuilder) AppendPrepareFn(fn func(ctx context.Context) context.Context) *LifecycleBuilder {
+	lifecycleBuilder.lifecycle.prepareFns = append(lifecycleBuilder.lifecycle.prepareFns, fn)
+	return lifecycleBuilder
+}
+
+func (lifecycleBuilder *LifecycleBuilder) AppendSuccessFn(fn func(ctx context.Context)) *LifecycleBuilder {
+	lifecycleBuilder.lifecycle.successFns = append(lifecycleBuilder.lifecycle.successFns, fn)
+	return lifecycleBuilder
+}
+
+func (lifecycleBuilder *LifecycleBuilder) AppendFailFn(fn func(ctx context.Context, err error)) *LifecycleBuilder {
+	lifecycleBuilder.lifecycle.failFns = append(lifecycleBuilder.lifecycle.failFns, fn)
+	return lifecycleBuilder
+}
+
+func (LifecycleBuilder *LifecycleBuilder) Build() *Lifecycle {
+	return LifecycleBuilder.lifecycle
+}
+
+func (lifecycle *Lifecycle) Prepare(ctx context.Context) context.Context {
+	for _, prepareFn := range lifecycle.prepareFns {
+		ctx = prepareFn(ctx)
+	}
+	return ctx
+}
+
+func (lifecycle *Lifecycle) Success(ctx context.Context) {
+	for _, successFn := range lifecycle.successFns {
+		successFn(ctx)
+	}
+}
+
+func (lifecycle *Lifecycle) Failure(ctx context.Context, err error) {
+	for _, failureFn := range lifecycle.failFns {
+		failureFn(ctx, err)
+	}
+}
+
+type OptionBuilder func(process *Options)
+
+func WithRetry(strategy *api.RetryStrategy) OptionBuilder {
+	return func(options *Options) {
+		options.retryStrategy = strategy
+	}
+}
+
+func WithLifecycle(processLifecycle *Lifecycle) OptionBuilder {
+	return func(options *Options) {
+		options.processLifecycle = processLifecycle
+	}
+}
+
+type Options struct {
 	retryStrategy *api.RetryStrategy
+	processLifecycle *Lifecycle
 }
 
 type Pipeline struct {
 	processes []PipelineProcess
-	processOptions []*ProcessOptions
+	processOptions []*Options
+	processLifecycles []*Lifecycle
 	checkPointer *CheckPointer
 }
 
 func (pipeline *Pipeline) createFutureHelper(pipelineIndex int, in map[string]interface{}) common.Future {
+	var future common.Future
+	ctx := context.Background()
+
 	process := pipeline.processes[pipelineIndex]
 	processOptions := pipeline.processOptions[pipelineIndex]
 
 	if processOptions.retryStrategy != nil {
-		return common.CreateRetryableFuture(
+		future = common.CreateRetryableFuture(
 			int(processOptions.retryStrategy.NumRetries),
 			time.Duration(processOptions.retryStrategy.InitialBackOffMs) * time.Millisecond,
 			NewRunnableStartProcess(process, in))
+	} else {
+		future = common.CreateFuture(NewRunnableStartProcess(process, in))
 	}
-	return common.CreateFuture(NewRunnableStartProcess(process, in))
+
+	if processOptions.processLifecycle != nil {
+		// ToDo(KMG): This is not the right way to call prepare.  We should add a callback to Futures
+		// called Prepare(ctx, in) that will be called before the run() function.  That way we can put
+		// instrumentation calls closer to the call time and plumb tracing info into the 'in' payload
+		processOptions.processLifecycle.Prepare(ctx)
+
+		future.OnSuccess(func(x interface{}) {
+			processOptions.processLifecycle.Success(ctx)
+		})
+
+		future.OnFail(func(err error) {
+			processOptions.processLifecycle.Failure(ctx, err)
+		})
+	}
+
+	return future
 }
 
 func (pipeline *Pipeline) thenFutureHelper(pipelineIndex int, inFuture common.Future) common.Future {
+	var future common.Future
+	ctx := context.Background()
+
 	process := pipeline.processes[pipelineIndex]
 	processOptions := pipeline.processOptions[pipelineIndex]
 
 	if processOptions.retryStrategy != nil {
-		return inFuture.ThenWithRetry(
+		future = inFuture.ThenWithRetry(
 			int(processOptions.retryStrategy.NumRetries),
 			time.Duration(processOptions.retryStrategy.InitialBackOffMs) * time.Millisecond,
 			NewRunnablePartialProcess(process))
+	} else {
+		future = inFuture.Then(NewRunnablePartialProcess(process))
 	}
 
-	return inFuture.Then(NewRunnablePartialProcess(process))
+	if processOptions.processLifecycle != nil {
+		ctx = processOptions.processLifecycle.Prepare(ctx)
+
+		future.OnSuccess(func(x interface{}) {
+			processOptions.processLifecycle.Success(ctx)
+		})
+
+		future.OnFail(func(err error) {
+			processOptions.processLifecycle.Failure(ctx, err)
+		})
+	}
+	return future
 }
 
 func (pipeline Pipeline) RunSync(in map[string]interface{}) (map[string]interface{}, error) {
@@ -203,18 +311,15 @@ func NewPipelineBuilder() *PipelineBuilder {
 	}
 }
 
-func (builder *PipelineBuilder) Add(process PipelineProcess) *PipelineBuilder {
+func (builder *PipelineBuilder) Add(process PipelineProcess, options ...OptionBuilder) *PipelineBuilder {
 	builder.pipeline.processes = append(builder.pipeline.processes, process)
-	builder.pipeline.processOptions = append(builder.pipeline.processOptions, &ProcessOptions{})
-	return builder
-}
 
-func (builder *PipelineBuilder) AddWithRetry(process PipelineProcess,
-	retryStrategy *api.RetryStrategy) *PipelineBuilder {
-	builder.pipeline.processes = append(builder.pipeline.processes, process)
-	builder.pipeline.processOptions = append(builder.pipeline.processOptions, &ProcessOptions{
-		retryStrategy: retryStrategy,
-	})
+	option := &Options{}
+	for _, opt := range options {
+		opt(option)
+	}
+
+	builder.pipeline.processOptions = append(builder.pipeline.processOptions, option)
 	return builder
 }
 

@@ -1,24 +1,36 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"log"
-	"net/http"
+	"context"
+	"github.com/kmgreen2/agglo/pkg/observability"
 )
 
-func handler(w http.ResponseWriter, r *http.Request) {
-	var jsonBody map[string]interface{}
-	jsonDecoder := json.NewDecoder(r.Body)
-	err := jsonDecoder.Decode(&jsonBody)
-	if err != nil {
-		fmt.Printf("Error decoding json: %s\n", err.Error())
-	}
-	fmt.Printf("Body: %v\n\n", jsonBody)
-}
-
 func main() {
-	http.HandleFunc("/binge", handler)
-	log.Fatal(http.ListenAndServe(":80", nil))
+	exporter, err := observability.NewExporter(observability.StdoutExporter)
+	if err != nil {
+		panic(err)
+	}
+	_ = exporter.Start()
+	defer func() {_ = exporter.Stop()}()
+
+	emitter := observability.NewEmitter("foo.io")
+	emitter.AddMetric("fizz", observability.Int64Counter)
+	emitter.AddMetric("buzz", observability.Int64Recorder)
+	ctx1, span1 := emitter.CreateSpan(context.Background(), "foo")
+	ctx2, span2 := emitter.CreateSpan(ctx1, "bar")
+	_, span3 := emitter.CreateSpan(ctx2, "baz")
+
+	span1.AddEvent("Did a thing")
+
+	emitter.AddInt64("fizz", 1)
+	emitter.AddInt64("fizz", 1)
+	emitter.AddInt64("fizz", 1)
+	emitter.AddInt64("fizz", 1)
+	emitter.AddInt64("fizz", 1)
+	emitter.AddInt64("fizz", 1)
+
+	span1.End()
+	span2.End()
+	span3.End()
 }
 

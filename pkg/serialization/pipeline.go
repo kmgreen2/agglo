@@ -2,6 +2,7 @@ package serialization
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/golang/protobuf/jsonpb"
 	gUuid "github.com/google/uuid"
@@ -10,7 +11,9 @@ import (
 	"github.com/kmgreen2/agglo/pkg/core/process"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/generated/proto"
+	"github.com/kmgreen2/agglo/pkg/observability"
 	"github.com/kmgreen2/agglo/pkg/streaming"
+	"go.opentelemetry.io/otel/trace"
 	"net/http"
 	"reflect"
 	"time"
@@ -460,11 +463,10 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  ([]*process.Pipeline, error) {
 
 		for _, processDesc := range pipeline.Processes {
 			if proc, ok := processes[processDesc.Name]; ok {
-				if processDesc.RetryStrategy != nil {
-					pipelineBuilder.AddWithRetry(proc, processDesc.RetryStrategy)
-				} else {
-					pipelineBuilder.Add(proc)
-				}
+				lifecycle := buildLifecycle(pipeline.Name, processDesc.Name, processDesc.Instrumentation)
+				pipelineBuilder.Add(proc, process.WithRetry(processDesc.RetryStrategy),
+					process.WithLifecycle(lifecycle))
+
 			} else {
 				msg := fmt.Sprintf("cannot find process: %s", processDesc.Name)
 				return nil, common.NewInvalidError(msg)
@@ -494,3 +496,62 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  ([]*process.Pipeline, error) {
 	return builtPipelines, nil
 }
 
+func processKey(pipelineName, processName string) string {
+	return fmt.Sprintf("%s.%s", pipelineName, processName)
+}
+
+func buildLifecycle(pipelineName, processName string, instrumentation *api.ProcessInstrumentation) *process.Lifecycle {
+	lifecycleBuilder := process.NewLifecycleBuilder()
+
+	if instrumentation == nil {
+		return lifecycleBuilder.Build()
+	}
+
+	emitter := observability.NewEmitter("agglo/pipeline")
+
+	if instrumentation.EnableTracing {
+		var span trace.Span
+		lifecycleBuilder.AppendPrepareFn(func(ctx context.Context) context.Context {
+			ctx, span = emitter.CreateSpan(ctx, processKey(pipelineName, processName))
+			return ctx
+		})
+		lifecycleBuilder.AppendSuccessFn(func(ctx context.Context) {
+			span.End()
+		})
+		lifecycleBuilder.AppendFailFn(func(ctx context.Context, err error) {
+			span.RecordError(err)
+			span.End()
+		})
+
+	}
+
+	if instrumentation.Latency {
+		emitter.AddMetric(processKey(pipelineName, processName) + ".latency", observability.Int64Recorder)
+		lifecycleBuilder.AppendPrepareFn(func(ctx context.Context) context.Context {
+			startTime := time.Now()
+			return context.WithValue(ctx, processKey(pipelineName, processName) + ".start", startTime)
+		})
+		lifecycleBuilder.AppendSuccessFn(func(ctx context.Context) {
+			val := ctx.Value(processKey(pipelineName, processName) + ".start")
+			if val != nil {
+				if startTime, ok := val.(time.Time); ok {
+					emitter.RecordInt64(processKey(pipelineName, processName) + ".latency",
+						time.Now().Sub(startTime).Nanoseconds())
+				}
+			}
+		})
+	}
+
+	if instrumentation.Counter {
+		emitter.AddMetric(processKey(pipelineName, processName) + ".success", observability.Int64Counter)
+		emitter.AddMetric(processKey(pipelineName, processName) + ".failure", observability.Int64Counter)
+		lifecycleBuilder.AppendSuccessFn(func(ctx context.Context) {
+			emitter.AddInt64(processKey(pipelineName, processName) + ".success", 1)
+		})
+		lifecycleBuilder.AppendFailFn(func(ctx context.Context, err error) {
+			emitter.AddInt64(processKey(pipelineName, processName) + ".failure", 1)
+		})
+	}
+
+	return lifecycleBuilder.Build()
+}

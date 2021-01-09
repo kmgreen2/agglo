@@ -17,23 +17,23 @@ const (
 	StdoutExporter ExporterType = iota
 )
 
-type Observer interface {
+type Exporter interface {
 	Start() error
 	Stop() error
 }
 
-type stdoutObserver struct {
+type stdoutExporter struct {
 	exporter *stdout.Exporter
 	spanProcessor *sdktrace.BatchSpanProcessor
 	traceProvider *sdktrace.TracerProvider
 	pusher *push.Controller
 }
 
-func NewObserver(exporterType ExporterType) (*stdoutObserver, error) {
+func NewExporter(exporterType ExporterType) (*stdoutExporter, error) {
 	var err error
-	observer := &stdoutObserver{}
+	exporter := &stdoutExporter{}
 
-	observer.exporter, err = stdout.NewExporter([]stdout.Option{
+	exporter.exporter, err = stdout.NewExporter([]stdout.Option{
 		stdout.WithQuantiles([]float64{0.5, 0.9, 0.99}),
 		stdout.WithPrettyPrint(),
 	}...)
@@ -42,31 +42,31 @@ func NewObserver(exporterType ExporterType) (*stdoutObserver, error) {
 		return nil, err
 	}
 
-	observer.spanProcessor = sdktrace.NewBatchSpanProcessor(observer.exporter)
-	observer.traceProvider = sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(observer.spanProcessor))
+	exporter.spanProcessor = sdktrace.NewBatchSpanProcessor(exporter.exporter)
+	exporter.traceProvider = sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(exporter.spanProcessor))
 
-	observer.pusher = push.New(
+	exporter.pusher = push.New(
 		basic.New(
 			simple.NewWithExactDistribution(),
-			observer.exporter,
+			exporter.exporter,
 		),
-		observer.exporter,
+		exporter.exporter,
 	)
 
-	otel.SetTracerProvider(observer.traceProvider)
-	otel.SetMeterProvider(observer.pusher.MeterProvider())
+	otel.SetTracerProvider(exporter.traceProvider)
+	otel.SetMeterProvider(exporter.pusher.MeterProvider())
 
 	otel.SetTextMapPropagator(propagation.Baggage{})
 
-	return observer, nil
+	return exporter, nil
 }
 
-func (observer stdoutObserver) Start() error {
+func (observer stdoutExporter) Start() error {
 	observer.pusher.Start()
 	return nil
 }
 
-func (observer stdoutObserver) Stop() error {
+func (observer stdoutExporter) Stop() error {
 	_ = observer.traceProvider.Shutdown(context.Background())
 	observer.pusher.Stop()
 	return nil
