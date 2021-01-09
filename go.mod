@@ -6,7 +6,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/Knetic/govaluate v2.3.0+incompatible
 	github.com/golang/mock v1.4.4
-	github.com/golang/protobuf v1.4.1
+	github.com/golang/protobuf v1.4.2
 	github.com/google/uuid v1.1.2
 	github.com/jinzhu/gorm v1.9.16
 	github.com/pkg/errors v0.9.1
@@ -15,6 +15,7 @@ require (
 	go.etcd.io/bbolt v1.3.5
 	go.opentelemetry.io/otel v0.15.0
 	go.opentelemetry.io/otel/exporters/stdout v0.15.0
+	go.opentelemetry.io/otel/exporters/trace/zipkin v0.15.0
 	go.opentelemetry.io/otel/sdk v0.15.0
 	go.uber.org/zap v1.10.0
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e

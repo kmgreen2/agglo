@@ -73,10 +73,12 @@ func parseArgs() *CommandArgs {
 	args.stateDbPath = *stateDbPathPtr
 
 	if strings.Compare(*exporterPtr, "stdout") == 0 {
-		args.exporter, err = observability.NewExporter(observability.StdoutExporter)
+		args.exporter, err = observability.NewStdoutExporter()
 		if err != nil {
 			panic(err)
 		}
+	} else if strings.Compare(*exporterPtr, "zipkin") == 0 {
+		args.exporter = observability.NewZipkinExporter("http://localhost:9411/api/v2/spans", "binge")
 	} else {
 		usage(fmt.Sprintf("invalid exporter: %s", *exporterPtr), 1)
 	}

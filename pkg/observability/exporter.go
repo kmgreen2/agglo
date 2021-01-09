@@ -2,9 +2,10 @@ package observability
 
 import (
 	"context"
-	_ "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel"
+	_ "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/stdout"
+	"go.opentelemetry.io/otel/exporters/trace/zipkin"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/metric/controller/push"
 	"go.opentelemetry.io/otel/sdk/metric/processor/basic"
@@ -15,6 +16,7 @@ import (
 type ExporterType int
 const (
 	StdoutExporter ExporterType = iota
+	ZipkinExporter
 )
 
 type Exporter interface {
@@ -29,7 +31,7 @@ type stdoutExporter struct {
 	pusher *push.Controller
 }
 
-func NewExporter(exporterType ExporterType) (*stdoutExporter, error) {
+func NewStdoutExporter() (*stdoutExporter, error) {
 	var err error
 	exporter := &stdoutExporter{}
 
@@ -61,14 +63,45 @@ func NewExporter(exporterType ExporterType) (*stdoutExporter, error) {
 	return exporter, nil
 }
 
-func (observer stdoutExporter) Start() error {
-	observer.pusher.Start()
+func (exporter stdoutExporter) Start() error {
+	exporter.pusher.Start()
 	return nil
 }
 
-func (observer stdoutExporter) Stop() error {
-	_ = observer.traceProvider.Shutdown(context.Background())
-	observer.pusher.Stop()
+func (exporter stdoutExporter) Stop() error {
+	_ = exporter.traceProvider.Shutdown(context.Background())
+	exporter.pusher.Stop()
 	return nil
 }
+
+type zipkinExporter struct {
+	url string
+	serviceName string
+}
+
+func NewZipkinExporter(url, serviceName string) *zipkinExporter {
+	return &zipkinExporter{
+		url: url,
+		serviceName: serviceName,
+	}
+}
+
+func (exporter zipkinExporter) Start() error {
+	err := zipkin.InstallNewPipeline(
+		exporter.url,
+		exporter.serviceName,
+		zipkin.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (exporter zipkinExporter) Stop() error {
+	return nil
+}
+
+
 

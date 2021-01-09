@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	exporter, err := observability.NewExporter(observability.StdoutExporter)
+	exporter, err := observability.NewStdoutExporter(observability.StdoutExporter)
 	if err != nil {
 		panic(err)
 	}
