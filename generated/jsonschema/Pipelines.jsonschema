@@ -40,9 +40,6 @@
                                         },
                                         "counter": {
                                             "type": "boolean"
-                                        },
-                                        "failureCounter": {
-                                            "type": "boolean"
                                         }
                                     },
                                     "additionalProperties": true,
@@ -86,6 +83,12 @@
                         },
                         "additionalProperties": true,
                         "type": "object"
+                    },
+                    "enableTracing": {
+                        "type": "boolean"
+                    },
+                    "enableMetrics": {
+                        "type": "boolean"
                     }
                 },
                 "additionalProperties": true,

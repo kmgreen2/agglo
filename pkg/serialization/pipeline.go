@@ -454,6 +454,13 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  ([]*process.Pipeline, error) {
 	// Build pipelines
 	for _, pipeline := range pipelinesPb.Pipelines {
 		pipelineBuilder := process.NewPipelineBuilder()
+		pipelineBuilder.SetName(pipeline.Name)
+		if pipeline.EnableTracing {
+			pipelineBuilder.EnableTracing()
+		}
+		if pipeline.EnableMetrics {
+			pipelineBuilder.EnableMetrics()
+		}
 		// Each pipeline must set annotations to ensure there are no conflicts in the state stores
 		annotatorBuilder := process.NewAnnotatorBuilder()
 		annotatorBuilder.Add(core.NewAnnotation("agglo:internal:partitionID", partitionUuid.String(), core.TrueCondition))

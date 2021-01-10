@@ -7,6 +7,7 @@ import (
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/observability"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel/trace"
 	"reflect"
 	"time"
 )
@@ -161,11 +162,14 @@ type Options struct {
 }
 
 type Pipeline struct {
+	name string
 	processes []PipelineProcess
 	processOptions []*Options
 	processLifecycles []*Lifecycle
 	checkPointer *CheckPointer
 	emitter *observability.Emitter
+	enableTracing bool
+	enableMetrics bool
 }
 
 func (pipeline *Pipeline) createFutureHelper(ctx context.Context, pipelineIndex int,
@@ -260,6 +264,9 @@ func (pipeline Pipeline) RunSync(in map[string]interface{}) (map[string]interfac
 func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 	var startIndex int64 = 0
 	var err error
+	var span trace.Span
+	var ctx context.Context
+	var startTime time.Time
 	var inMap map[string]interface{} = in
 
 	// If there are no processes in this pipeline, do nothing and succeed
@@ -285,7 +292,13 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 		}
 	}
 
-	ctx, span := pipeline.emitter.CreateSpan(context.Background(), "pipeline")
+	if pipeline.enableTracing {
+		ctx, span = pipeline.emitter.CreateSpan(context.Background(), "pipeline")
+	}
+
+	if pipeline.enableMetrics {
+		startTime = time.Now()
+	}
 
 	// Chain together the processes of the pipeline
 	f := pipeline.createFutureHelper(ctx, int(startIndex), inMap)
@@ -312,11 +325,22 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 	}
 
 	f.OnSuccess(func(ctx context.Context, x interface{}) {
-		span.End()
+		if pipeline.enableMetrics {
+			pipeline.emitter.RecordInt64(pipeline.name + ".latency", time.Now().Sub(startTime).Milliseconds())
+			pipeline.emitter.AddInt64(pipeline.name + ".fuccess", 1)
+		}
+		if pipeline.enableTracing {
+			span.End()
+		}
 	})
 	f.OnFail(func(ctx context.Context, err error) {
-		span.RecordError(err)
-		span.End()
+		if pipeline.enableMetrics {
+			pipeline.emitter.AddInt64(pipeline.name + ".failure", 1)
+		}
+		if pipeline.enableTracing {
+			span.RecordError(err)
+			span.End()
+		}
 	})
 
 	return f
@@ -348,6 +372,24 @@ func (builder *PipelineBuilder) Add(process PipelineProcess, options ...OptionBu
 
 func (builder *PipelineBuilder) Checkpoint(checkPointer *CheckPointer) *PipelineBuilder {
 	builder.pipeline.checkPointer = checkPointer
+	return builder
+}
+
+func (builder *PipelineBuilder) EnableTracing() *PipelineBuilder {
+	builder.pipeline.enableTracing = true
+	return builder
+}
+
+func (builder *PipelineBuilder) EnableMetrics() *PipelineBuilder {
+	builder.pipeline.emitter.AddMetric(builder.pipeline.name + ".latency", observability.Int64Recorder)
+	builder.pipeline.emitter.AddMetric(builder.pipeline.name + ".success", observability.Int64Counter)
+	builder.pipeline.emitter.AddMetric(builder.pipeline.name + ".failure", observability.Int64Counter)
+	builder.pipeline.enableMetrics = true
+	return builder
+}
+
+func (builder *PipelineBuilder) SetName(name string) *PipelineBuilder {
+	builder.pipeline.name = name
 	return builder
 }
 

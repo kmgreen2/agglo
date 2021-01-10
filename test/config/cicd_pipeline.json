@@ -7,6 +7,8 @@
         "outputConnector": "/tmp/checkpoints",
         "externalType": "ExternalLocalFile"
       },
+      "enableTracing": true,
+      "enableMetrics": true,
       "processes": [
         {
           "name": "annotate-cicd",

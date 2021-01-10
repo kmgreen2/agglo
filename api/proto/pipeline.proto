@@ -120,6 +120,8 @@ message Pipeline {
     string name = 1;
     repeated PipelineProcess processes = 2;
     Checkpoint checkpoint = 3;
+    bool enableTracing = 4;
+    bool enableMetrics = 5;
 }
 
 message RetryStrategy {

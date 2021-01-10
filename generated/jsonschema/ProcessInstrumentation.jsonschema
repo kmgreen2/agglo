@@ -9,9 +9,6 @@
         },
         "counter": {
             "type": "boolean"
-        },
-        "failureCounter": {
-            "type": "boolean"
         }
     },
     "additionalProperties": true,
