@@ -507,16 +507,12 @@ func buildLifecycle(pipelineName, processName string, instrumentation *api.Proce
 		return lifecycleBuilder.Build()
 	}
 
-	emitter := observability.NewEmitter("agglo/pipeline")
+	emitter := observability.NewEmitter("agglo/process")
 
 	if instrumentation.EnableTracing {
 		var span trace.Span
 		lifecycleBuilder.AppendPrepareFn(func(ctx, prev context.Context) context.Context {
-			var links []trace.Link
-			if parentSpanCtx := common.ExtractSpanContext(prev); parentSpanCtx != common.EmptySpanContext {
-				links = []trace.Link{{SpanContext: parentSpanCtx}}
-			}
-			ctx, span = emitter.CreateSpan(ctx, processKey(pipelineName, processName), trace.WithLinks(links...))
+			ctx, span = emitter.CreateSpan(ctx, processKey(pipelineName, processName))
 			ctx = common.InjectSpanContext(ctx, span.SpanContext())
 			return ctx
 		})

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	api "github.com/kmgreen2/agglo/generated/proto"
 	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/observability"
 	"github.com/pkg/errors"
 	"reflect"
 	"time"
@@ -164,9 +165,11 @@ type Pipeline struct {
 	processOptions []*Options
 	processLifecycles []*Lifecycle
 	checkPointer *CheckPointer
+	emitter *observability.Emitter
 }
 
-func (pipeline *Pipeline) createFutureHelper(pipelineIndex int, in map[string]interface{}) common.Future {
+func (pipeline *Pipeline) createFutureHelper(ctx context.Context, pipelineIndex int,
+	in map[string]interface{}) common.Future {
 	var future common.Future
 
 	process := pipeline.processes[pipelineIndex]
@@ -181,10 +184,10 @@ func (pipeline *Pipeline) createFutureHelper(pipelineIndex int, in map[string]in
 		future = common.CreateFuture(NewRunnableStartProcess(process, in),
 			common.WithRetry(int(processOptions.retryStrategy.NumRetries),
 				time.Duration(processOptions.retryStrategy.InitialBackOffMs) * time.Millisecond),
-			common.SetContext(context.Background()),
+			common.SetContext(ctx),
 			common.WithPrepare(prepareFn))
 	} else {
-		future = common.CreateFuture(NewRunnableStartProcess(process, in), common.SetContext(context.Background()),
+		future = common.CreateFuture(NewRunnableStartProcess(process, in), common.SetContext(ctx),
 			common.WithPrepare(prepareFn))
 	}
 
@@ -201,7 +204,9 @@ func (pipeline *Pipeline) createFutureHelper(pipelineIndex int, in map[string]in
 	return future
 }
 
-func (pipeline *Pipeline) thenFutureHelper(pipelineIndex int, inFuture common.Future) common.Future {
+func (pipeline *Pipeline) thenFutureHelper(ctx context.Context, pipelineIndex int,
+	inFuture common.Future) common.Future {
+
 	var future common.Future
 
 	process := pipeline.processes[pipelineIndex]
@@ -216,9 +221,9 @@ func (pipeline *Pipeline) thenFutureHelper(pipelineIndex int, inFuture common.Fu
 		future = inFuture.Then(NewRunnablePartialProcess(process),
 			common.WithRetry(int(processOptions.retryStrategy.NumRetries),
 				time.Duration(processOptions.retryStrategy.InitialBackOffMs) * time.Millisecond),
-			common.SetContext(context.Background()), common.WithPrepare(prepareFn))
+			common.SetContext(ctx), common.WithPrepare(prepareFn))
 	} else {
-		future = inFuture.Then(NewRunnablePartialProcess(process), common.SetContext(context.Background()),
+		future = inFuture.Then(NewRunnablePartialProcess(process), common.SetContext(ctx),
 			common.WithPrepare(prepareFn))
 	}
 
@@ -280,10 +285,12 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 		}
 	}
 
+	ctx, span := pipeline.emitter.CreateSpan(context.Background(), "pipeline")
+
 	// Chain together the processes of the pipeline
-	f := pipeline.createFutureHelper(int(startIndex), inMap)
+	f := pipeline.createFutureHelper(ctx, int(startIndex), inMap)
 	for i := int(startIndex + 1); i < len(pipeline.processes); i++ {
-		f = pipeline.thenFutureHelper(i, f)
+		f = pipeline.thenFutureHelper(ctx, i, f)
 		// If this pipeline has checkpointing enabled, then checkpoint after each process
 		if pipeline.checkPointer != nil {
 			f = f.Then(NewRunnablePartialProcess(pipeline.checkPointer),
@@ -304,6 +311,14 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 		f = f.Then(NewRunnablePartialFinalizer(pipeline.checkPointer))
 	}
 
+	f.OnSuccess(func(ctx context.Context, x interface{}) {
+		span.End()
+	})
+	f.OnFail(func(ctx context.Context, err error) {
+		span.RecordError(err)
+		span.End()
+	})
+
 	return f
 }
 
@@ -313,7 +328,9 @@ type PipelineBuilder struct {
 
 func NewPipelineBuilder() *PipelineBuilder {
 	return &PipelineBuilder{
-		&Pipeline{},
+		&Pipeline{
+			emitter: observability.NewEmitter("agglo/pipeline"),
+		},
 	}
 }
 

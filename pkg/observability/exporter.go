@@ -77,6 +77,7 @@ func (exporter stdoutExporter) Stop() error {
 type zipkinExporter struct {
 	url string
 	serviceName string
+	underlying *zipkin.Exporter
 }
 
 func NewZipkinExporter(url, serviceName string) *zipkinExporter {
@@ -96,11 +97,23 @@ func (exporter zipkinExporter) Start() error {
 		return err
 	}
 
+	exporter.underlying, err = zipkin.NewRawExporter(exporter.url,
+		exporter.serviceName,
+		zipkin.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
+	)
+	if err != nil {
+		return err
+	}
+
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter.underlying))
+
+	otel.SetTracerProvider(tp)
+
 	return nil
 }
 
 func (exporter zipkinExporter) Stop() error {
-	return nil
+	return exporter.underlying.Shutdown(context.Background())
 }
 
 
