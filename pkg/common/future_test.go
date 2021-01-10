@@ -296,3 +296,71 @@ func TestThenRetryableFutureFailed(t *testing.T) {
 	assert.True(t, testFailure)
 }
 
+func TestCallbackAfterFutureCompletes(t *testing.T) {
+	testSuccess := false
+	testFailure := false
+	testCancel := false
+	runnable := test.NewSquareRunnable(10)
+	f := common.CreateFuture(runnable)
+
+	waitForCallbacks(f)
+
+	f.OnSuccess(func (context.Context, interface{}) {
+		testSuccess = true
+	}).OnFail(func (context.Context, error) {
+		testFailure = true
+	}).OnCancel(func (context.Context) {
+		testCancel = true
+	})
+
+	result := f.Get()
+	assert.Nil(t, result.Error())
+	assert.Equal(t, 100, result.Value())
+	assert.True(t, f.IsCompleted())
+
+	assert.True(t, testSuccess)
+	assert.False(t, testCancel)
+	assert.False(t, testFailure)
+}
+
+func TestThenAfterFutureComplete(t *testing.T) {
+	testSuccess := false
+	testFailure := false
+	testCancel := false
+	testThenSuccess := false
+	testThenFailure := false
+	testThenCancel := false
+	runnable := test.NewSquareRunnable(10)
+	f1 := common.CreateFuture(runnable).OnSuccess(func (context.Context, interface{}) {
+		testSuccess = true
+	}).OnFail(func (context.Context, error) {
+		testFailure = true
+	}).OnCancel(func (context.Context) {
+		testCancel = true
+	})
+
+	waitForCallbacks(f1)
+
+	f2 := f1.Then(runnable).OnSuccess(func (context.Context, interface{}) {
+		testThenSuccess = true
+	}).OnFail(func (context.Context, error) {
+		testThenFailure = true
+	}).OnCancel(func (context.Context) {
+		testThenCancel = true
+	})
+
+	result := f2.Get()
+	assert.Nil(t, result.Error())
+	assert.Equal(t, 10000, result.Value())
+
+	waitForCallbacks(f2)
+	assert.True(t, testSuccess)
+	assert.False(t, testFailure)
+	assert.False(t, testCancel)
+	assert.True(t, testThenSuccess)
+	assert.False(t, testThenFailure)
+	assert.False(t, testThenCancel)
+	assert.True(t, f1.IsCompleted())
+	assert.True(t, f2.IsCompleted())
+}
+

@@ -266,7 +266,7 @@ func (f *future) OnSuccess(cb func (context.Context, interface{})) Future {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	if f.CallbacksCompleted() {
+	if f.CallbacksCompleted() && f.state == succeededFuture {
 		cb(f.finalResult.ctx, f.finalResult.value)
 	} else {
 		f.successes = append(f.successes, cb)
@@ -278,7 +278,7 @@ func (f *future) OnCancel(cb func (context.Context)) Future {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	if f.CallbacksCompleted() {
+	if f.CallbacksCompleted() && f.IsCancelled() {
 		cb(f.finalResult.ctx)
 	} else {
 		f.cancels = append(f.cancels, cb)
@@ -290,7 +290,7 @@ func (f *future) OnFail(cb func (context.Context, error)) Future {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	if f.CallbacksCompleted() {
+	if f.CallbacksCompleted() && f.state == failedFuture {
 		cb(f.finalResult.ctx, f.finalResult.err)
 	} else {
 		f.fails = append(f.fails, cb)
