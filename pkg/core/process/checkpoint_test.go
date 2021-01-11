@@ -28,7 +28,7 @@ func TestKVCheckPointer(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 
-		_, err = checkpointer.Process(in)
+		_, err = checkpointer.Process(context.Background(), in)
 		if err != nil {
 			assert.FailNow(t, err.Error())
 		}
@@ -44,7 +44,7 @@ func TestKVCheckPointer(t *testing.T) {
 		}
 		assert.Equal(t, float64(i), m[CheckpointIdxKey].(float64))
 	}
-	err = checkpointer.Finalize(in)
+	err = checkpointer.Finalize(context.Background(), in)
 	assert.Nil(t, err)
 }
 
@@ -75,7 +75,7 @@ func TestLocalFileCheckPointer(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		_, err = checkpointer.Process(in)
+		_, err = checkpointer.Process(context.Background(), in)
 		if err != nil {
 			assert.FailNow(t, err.Error())
 		}
@@ -91,6 +91,6 @@ func TestLocalFileCheckPointer(t *testing.T) {
 		}
 		assert.Equal(t, float64(i), m[CheckpointIdxKey].(float64))
 	}
-	err = checkpointer.Finalize(in)
+	err = checkpointer.Finalize(context.Background(), in)
 	assert.Nil(t, err)
 }

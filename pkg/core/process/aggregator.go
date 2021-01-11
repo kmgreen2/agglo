@@ -24,8 +24,8 @@ func NewAggregator(aggregation *core.Aggregation, condition *core.Condition, kvS
 	}
 }
 
-func (a Aggregator) getAggregationState(partitionID gUuid.UUID, name string) ([]byte, error) {
-	stateBytes, err := a.aggregatorStateStore.Get(context.Background(), core.AggregationStateKey(partitionID, name))
+func (a Aggregator) getAggregationState(ctx context.Context, partitionID gUuid.UUID, name string) ([]byte, error) {
+	stateBytes, err := a.aggregatorStateStore.Get(ctx, core.AggregationStateKey(partitionID, name))
 	if err != nil {
 		if errors.Is(err, &common.NotFoundError{}) {
 			return nil, nil
@@ -35,12 +35,12 @@ func (a Aggregator) getAggregationState(partitionID gUuid.UUID, name string) ([]
 	return stateBytes, nil
 }
 
-func (a Aggregator) updateAggregationState(partitionID gUuid.UUID, name string, prev, newState []byte) error {
-	return a.aggregatorStateStore.AtomicPut(context.Background(), core.AggregationStateKey(partitionID, name), prev,
-		newState)
+func (a Aggregator) updateAggregationState(ctx context.Context, partitionID gUuid.UUID, name string, prev,
+	newState []byte) error {
+	return a.aggregatorStateStore.AtomicPut(ctx, core.AggregationStateKey(partitionID, name), prev, newState)
 }
 
-func (a Aggregator) Process(in map[string]interface{}) (map[string]interface{}, error) {
+func (a Aggregator) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
 	var aggregationState *core.AggregationState
 
 	if shouldProcess, err := a.condition.Evaluate(in); !shouldProcess || err != nil {
@@ -99,7 +99,7 @@ func (a Aggregator) Process(in map[string]interface{}) (map[string]interface{}, 
 	// Notice that the differences should only 1 for the count-based aggregations.  Without this, the delta cannot
 	// be replayed with any other future aggregation state.
 	//
-	stateBytes, err := a.getAggregationState(partitionID, name)
+	stateBytes, err := a.getAggregationState(ctx, partitionID, name)
 	if err != nil {
 		return out, err
 	}
@@ -125,7 +125,7 @@ func (a Aggregator) Process(in map[string]interface{}) (map[string]interface{}, 
 
 	// Note: If there are any errors after this step, we should do a *hard* failure, since the process
 	// cannot be retried.  Probably best to always call this function last
-	err = a.updateAggregationState(partitionID, name, stateBytes, newStateBytes)
+	err = a.updateAggregationState(ctx, partitionID, name, stateBytes, newStateBytes)
 	if err != nil {
 		return out, err
 	}

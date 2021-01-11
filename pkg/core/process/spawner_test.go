@@ -1,6 +1,7 @@
 package process_test
 
 import (
+	"context"
 	"github.com/kmgreen2/agglo/pkg/core"
 	"github.com/kmgreen2/agglo/pkg/core/process"
 	"github.com/kmgreen2/agglo/test"
@@ -16,7 +17,7 @@ func TestSpawnerHappyPathAsync(t *testing.T) {
 
 	spawner := process.NewSpawner(job, core.TrueCondition, -1, false)
 
-	out, err := spawner.Process(in)
+	out, err := spawner.Process(context.Background(), in)
 
 	assert.Nil(t, err)
 	assert.Equal(t, in, out)
@@ -30,7 +31,7 @@ func TestSpawnerHappyPathFalseCondition(t *testing.T) {
 	spawner := process.NewSpawner(job, core.FalseCondition, 10*time.Second, true)
 
 	start := time.Now()
-	out, err := spawner.Process(in)
+	out, err := spawner.Process(context.Background(), in)
 	end := time.Now()
 
 	assert.True(t, end.Sub(start) < 1*time.Second)
@@ -48,7 +49,7 @@ func TestSpawnerHappyPathSync(t *testing.T) {
 
 
 	start := time.Now()
-	out, err := spawner.Process(in)
+	out, err := spawner.Process(context.Background(), in)
 	end := time.Now()
 
 	assert.True(t, end.Sub(start) > 1 * time.Second)
@@ -63,7 +64,7 @@ func TestSpawnerFailSync(t *testing.T) {
 
 	spawner := process.NewSpawner(job, core.TrueCondition, -1, true)
 
-	out, err := spawner.Process(in)
+	out, err := spawner.Process(context.Background(), in)
 
 	assert.Error(t, err)
 	assert.Equal(t, in, out)
@@ -78,7 +79,7 @@ func TestSpawnerHappyPathDelaySync(t *testing.T) {
 
 
 	start := time.Now()
-	out, err := spawner.Process(in)
+	out, err := spawner.Process(context.Background(), in)
 	end := time.Now()
 
 	assert.True(t, end.Sub(start) > 2 * time.Second)

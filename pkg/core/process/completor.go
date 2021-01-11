@@ -25,13 +25,14 @@ func NewCompleter(name string, completion *core.Completion, kvStore kvs.KVStore)
 	}
 }
 
-func (c Completer) getCompletionState(partitionID gUuid.UUID, name string, value interface{}) ([]byte, error) {
+func (c Completer) getCompletionState(ctx context.Context, partitionID gUuid.UUID, name string,
+	value interface{}) ([]byte, error) {
 	stateKey, err := core.CompletionStateKey(partitionID, name, value)
 	if err != nil {
 		return nil, err
 	}
 
-	stateBytes, err := c.completionStateStore.Get(context.Background(), stateKey)
+	stateBytes, err := c.completionStateStore.Get(ctx, stateKey)
 	if err != nil {
 		if errors.Is(err, &common.NotFoundError{}) {
 			return nil, nil
@@ -41,7 +42,7 @@ func (c Completer) getCompletionState(partitionID gUuid.UUID, name string, value
 	return stateBytes, nil
 }
 
-func (c Completer) Process(in map[string]interface{}) (map[string]interface{}, error) {
+func (c Completer) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
 	var completionState *core.CompletionState
 
 	out := core.CopyableMap(in).DeepCopy()
@@ -65,7 +66,7 @@ func (c Completer) Process(in map[string]interface{}) (map[string]interface{}, e
 		return out, err
 	}
 
-	completionStateBytes, err := c.getCompletionState(partitionID, name, matchedVal)
+	completionStateBytes, err := c.getCompletionState(ctx, partitionID, name, matchedVal)
 	if err != nil {
 		return out, err
 	}
@@ -102,7 +103,7 @@ func (c Completer) Process(in map[string]interface{}) (map[string]interface{}, e
 	}
 
 	if completionState.IsDone() {
-		err = c.completionStateStore.AtomicDelete(context.Background(), stateKey, completionStateBytes)
+		err = c.completionStateStore.AtomicDelete(ctx, stateKey, completionStateBytes)
 		if err != nil {
 			return out, err
 		}
@@ -115,7 +116,7 @@ func (c Completer) Process(in map[string]interface{}) (map[string]interface{}, e
 	} else if completionState.CompletionDeadline > 0 && time.Now().UnixNano() > completionState.CompletionDeadline {
 			out[fmt.Sprintf("agglo:completion:%s", name)] = "timedout"
 	} else {
-		err = c.completionStateStore.AtomicPut(context.Background(), stateKey, completionStateBytes, newCompletionBytes)
+		err = c.completionStateStore.AtomicPut(ctx, stateKey, completionStateBytes, newCompletionBytes)
 		if err != nil {
 			return out, err
 		}

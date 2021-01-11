@@ -18,13 +18,13 @@ var CheckpointIdxKey string = "agglo:checkpoint:idx"
 var CheckpointDataKey string = "agglo:checkpoint:data"
 
 type Finalizer interface {
-	Finalize(in map[string]interface{}) error
+	Finalize(ctx context.Context, in map[string]interface{}) error
 }
 
 type CheckPointer struct {
-	updateFunc func(key string, checkpointState, data map[string]interface{}) error
-	fetchFunc func(key string) (map[string]interface{}, error)
-	removeFunc func(key string) error
+	updateFunc func(ctx context.Context, key string, checkpointState, data map[string]interface{}) error
+	fetchFunc func(ctx context.Context, key string) (map[string]interface{}, error)
+	removeFunc func(ctx context.Context, key string) error
 	outputType string
 	connectionString string
 }
@@ -65,17 +65,17 @@ func updateSerializeCheckpoint(checkpointState, data map[string]interface{}) (ol
 }
 
 func NewKVCheckPointer(kvStore kvs.KVStore) *CheckPointer {
-	updateFunc := func(key string, checkpointState, data map[string]interface{}) error {
+	updateFunc := func(ctx context.Context, key string, checkpointState, data map[string]interface{}) error {
 		oldCheckpoint, newCheckpoint, err := updateSerializeCheckpoint(checkpointState, data)
 		if err != nil {
 			return err
 		}
-		return kvStore.AtomicPut(context.Background(), key, oldCheckpoint, newCheckpoint)
+		return kvStore.AtomicPut(ctx, key, oldCheckpoint, newCheckpoint)
 	}
 
-	fetchFunc := func(key string) (map[string]interface{}, error) {
+	fetchFunc := func(ctx context.Context, key string) (map[string]interface{}, error) {
 		var state map[string]interface{}
-		stateBytes, err := kvStore.Get(context.Background(), key)
+		stateBytes, err := kvStore.Get(ctx, key)
 		if err != nil {
 			// If not found, just return nil with no error
 			if errors.Is(err, &common.NotFoundError{}) {
@@ -92,8 +92,8 @@ func NewKVCheckPointer(kvStore kvs.KVStore) *CheckPointer {
 		return state, nil
 	}
 
-	removeFunc := func(key string) error {
-		return kvStore.Delete(context.Background(), key)
+	removeFunc := func(ctx context.Context, key string) error {
+		return kvStore.Delete(ctx, key)
 	}
 
 	return &CheckPointer{
@@ -111,7 +111,7 @@ func NewLocalFileCheckPointer(path string) (*CheckPointer, error) {
 		return nil, common.NewInvalidError(msg)
 	}
 
-	updateFunc := func(key string, checkpointState, data map[string]interface{}) error {
+	updateFunc := func(ctx context.Context, key string, checkpointState, data map[string]interface{}) error {
 		_, newCheckpoint, err := updateSerializeCheckpoint(checkpointState, data)
 		if err != nil {
 			return err
@@ -119,7 +119,7 @@ func NewLocalFileCheckPointer(path string) (*CheckPointer, error) {
 		return ioutil.WriteFile(fmt.Sprintf("%s/%s.json", path, key), newCheckpoint, 0644)
 	}
 
-	fetchFunc := func(key string) (map[string]interface{}, error) {
+	fetchFunc := func(ctx context.Context, key string) (map[string]interface{}, error) {
 		var state map[string]interface{}
 		stateBytes, err := ioutil.ReadFile(fmt.Sprintf("%s/%s.json", path, key))
 		if err != nil {
@@ -140,7 +140,7 @@ func NewLocalFileCheckPointer(path string) (*CheckPointer, error) {
 		return state, nil
 	}
 
-	removeFunc := func(key string) error {
+	removeFunc := func(ctx context.Context, key string) error {
 		return os.Remove(fmt.Sprintf("%s/%s.json", path, key))
 	}
 
@@ -177,7 +177,7 @@ func getDataFromCheckpoint(checkpoint map[string]interface{}) (map[string]interf
 	return nil, common.NewNotFoundError("could not find checkpoint data")
 }
 
-func (c CheckPointer) GetCheckpointWithIndex(in map[string]interface{}) (out map[string]interface{},
+func (c CheckPointer) GetCheckpointWithIndex(ctx context.Context, in map[string]interface{}) (out map[string]interface{},
 	index int64, err error) {
 
 	// If the internal fields are not found in the map, then we assume there
@@ -188,7 +188,7 @@ func (c CheckPointer) GetCheckpointWithIndex(in map[string]interface{}) (out map
 		if messageID, messageOk := in["agglo:messageID"]; messageOk {
 			var checkpoint map[string]interface{}
 			checkpointStateKey := fmt.Sprintf("%s:%s", pipelineName, messageID)
-			checkpoint, err = c.fetchFunc(checkpointStateKey)
+			checkpoint, err = c.fetchFunc(ctx, checkpointStateKey)
 			if err != nil {
 				return
 			}
@@ -212,15 +212,15 @@ func (c CheckPointer) GetCheckpointWithIndex(in map[string]interface{}) (out map
 	return
 }
 
-func (c CheckPointer) Process(in map[string]interface{}) (map[string]interface{}, error) {
+func (c CheckPointer) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
 	if pipelineName, nameOk := in["agglo:internal:name"]; nameOk {
 		if messageID, messageOk := in["agglo:messageID"]; messageOk {
 			checkpointStateKey := fmt.Sprintf("%s:%s", pipelineName, messageID)
-			checkpoint, err := c.fetchFunc(checkpointStateKey)
+			checkpoint, err := c.fetchFunc(ctx, checkpointStateKey)
 			if err != nil {
 				return nil, err
 			}
-			err = c.updateFunc(checkpointStateKey, checkpoint, in)
+			err = c.updateFunc(ctx, checkpointStateKey, checkpoint, in)
 			if err != nil {
 				return nil, err
 			}
@@ -233,11 +233,11 @@ func (c CheckPointer) Process(in map[string]interface{}) (map[string]interface{}
 	return in, nil
 }
 
-func (c CheckPointer) Finalize(in map[string]interface{}) error {
+func (c CheckPointer) Finalize(ctx context.Context, in map[string]interface{}) error {
 	if pipelineName, nameOk := in["agglo:internal:name"]; nameOk {
 		if messageID, messageOk := in["agglo:messageID"]; messageOk {
 			checkpointStateKey := fmt.Sprintf("%s:%s", pipelineName, messageID)
-			return c.removeFunc(checkpointStateKey)
+			return c.removeFunc(ctx, checkpointStateKey)
 		} else {
 			return common.NewInternalError("could not find 'agglo:messageID' to remove checkpoint")
 		}

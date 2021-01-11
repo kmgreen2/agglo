@@ -21,7 +21,7 @@ var TeeMetadataKey string = "agglo:tee:output"
 // Tee is a process processor that will send a provided mapping to
 // a system (i.e. KVStore, Pubsub, etc.) and return the map
 type Tee struct {
-	outputFunc func(key string, in map[string]interface{}) error
+	outputFunc func(ctx context.Context, key string, in map[string]interface{}) error
 	condition *core.Condition
 	transformer *Transformer
 	outputType string
@@ -31,14 +31,14 @@ type Tee struct {
 // NewKVTee will create a Tee processor that stores maps in the provided KVStore
 // Note: the returned map will contain the UUID of the KV entry with key "_uuid_key"
 func NewKVTee(kvStore kvs.KVStore, condition *core.Condition, transformer *Transformer) *Tee {
-	outputFunc := func(key string, in map[string]interface{}) error {
+	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) error {
 		byteBuffer := bytes.NewBuffer([]byte{})
 		encoder := json.NewEncoder(byteBuffer)
 		err := encoder.Encode(in)
 		if err != nil {
 			return err
 		}
-		return kvStore.Put(context.Background(), key, byteBuffer.Bytes())
+		return kvStore.Put(ctx, key, byteBuffer.Bytes())
 	}
 
 	if transformer == nil {
@@ -63,7 +63,7 @@ func NewLocalFileTee(path string, condition *core.Condition, transformer *Transf
 		msg := fmt.Sprintf("'%s is not a valid path", path)
 		return nil, common.NewInvalidError(msg)
 	}
-	outputFunc := func(key string, in map[string]interface{}) error {
+	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) error {
 		byteBuffer := bytes.NewBuffer([]byte{})
 		encoder := json.NewEncoder(byteBuffer)
 		err := encoder.Encode(in)
@@ -92,14 +92,14 @@ func NewLocalFileTee(path string, condition *core.Condition, transformer *Transf
 // NewPubSubTee will create a Tee processor that publishes maps using the provided
 // publisher.
 func NewPubSubTee(publisher streaming.Publisher, condition *core.Condition, transformer *Transformer) *Tee {
-	outputFunc := func(key string, in map[string]interface{}) error {
+	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) error {
 		byteBuffer := bytes.NewBuffer([]byte{})
 		encoder := json.NewEncoder(byteBuffer)
 		err := encoder.Encode(in)
 		if err != nil {
 			return err
 		}
-		return publisher.Publish(context.Background(), byteBuffer.Bytes())
+		return publisher.Publish(ctx, byteBuffer.Bytes())
 	}
 
 	if transformer == nil {
@@ -121,14 +121,14 @@ func NewPubSubTee(publisher streaming.Publisher, condition *core.Condition, tran
 // NewHttpTee will create a tee processor that posts JSON-encoded
 // maps to a specified endpoint
 func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition, transformer *Transformer) *Tee {
-	outputFunc := func(key string, in map[string]interface{}) error {
+	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) error {
 		byteBuffer := bytes.NewBuffer([]byte{})
 		encoder := json.NewEncoder(byteBuffer)
 		err := encoder.Encode(in)
 		if err != nil {
 			return err
 		}
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, byteBuffer)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, byteBuffer)
 		if err != nil {
 			return err
 		}
@@ -165,7 +165,7 @@ func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition,
 
 // Process processes an input map by sending it to the appropriate system and
 // returns a copy of the provided map annotated with information about the backing system
-func (t Tee) Process(in map[string]interface{}) (map[string]interface{}, error) {
+func (t Tee) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
 	shouldTee, err := t.condition.Evaluate(in)
 	if err != nil {
 		return in, err
@@ -182,12 +182,12 @@ func (t Tee) Process(in map[string]interface{}) (map[string]interface{}, error) 
 
 	out := core.CopyableMap(in).DeepCopy()
 
-	teeOut, err := t.transformer.Process(in)
+	teeOut, err := t.transformer.Process(ctx, in)
 	if err != nil {
 		return nil, err
 	}
 
-	err = t.outputFunc(uuid.String(), teeOut)
+	err = t.outputFunc(ctx, uuid.String(), teeOut)
 	if err != nil {
 		return nil, err
 	}

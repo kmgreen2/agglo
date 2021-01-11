@@ -1,6 +1,7 @@
 package process
 
 import (
+	"context"
 	"regexp"
 	"strings"
 )
@@ -47,7 +48,7 @@ func (filter *Filter) process(in map[string]interface{}, out map[string]interfac
 	return out
 }
 
-func (filter *Filter) Process(in map[string]interface{}) (map[string]interface{}, error) {
+func (filter *Filter) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
 	out := make(map[string]interface{})
 
 	filter.process(in, out)

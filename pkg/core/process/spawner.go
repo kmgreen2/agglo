@@ -1,6 +1,7 @@
 package process
 
 import (
+	"context"
 	"github.com/kmgreen2/agglo/pkg/core"
 	"time"
 )
@@ -21,7 +22,7 @@ func NewSpawner(job core.Job, condition *core.Condition, delay time.Duration, do
 	}
 }
 
-func (s Spawner) Process(in map[string]interface{}) (map[string]interface{}, error) {
+func (s Spawner) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
 	out := core.CopyableMap(in).DeepCopy()
 	shouldRun, err := s.condition.Evaluate(out)
 	if err != nil {

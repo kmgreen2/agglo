@@ -1,6 +1,7 @@
 package process
 
 import (
+	"context"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -17,7 +18,7 @@ func TestNewRegexKeyFilter(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	out, err := filter.Process(testMap)
+	out, err := filter.Process(context.Background(), testMap)
 	assert.Equal(t, 2, len(out))
 	assert.Equal(t, 1, out["foo"])
 	assert.Equal(t, "bar", out["fi:zz"])
@@ -35,7 +36,7 @@ func TestNewRegexKeyFilterInvert(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	out, err := filter.Process(testMap)
+	out, err := filter.Process(context.Background(), testMap)
 	assert.Equal(t, 1, len(out))
 	assert.Equal(t, "foo", out["baz"])
 }
@@ -52,7 +53,7 @@ func TestNewListKeyFilter(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	out, err := filter.Process(testMap)
+	out, err := filter.Process(context.Background(), testMap)
 	assert.Equal(t, 2, len(out))
 	assert.Equal(t, 1, out["foo"])
 	assert.Equal(t, "foo", out["baz"])
@@ -77,7 +78,7 @@ func TestNewListMultilevelKeyFilter(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	out, err := filter.Process(testMap)
+	out, err := filter.Process(context.Background(), testMap)
 	assert.Equal(t, 3, len(out))
 	assert.Equal(t, 1, out["foo"])
 	assert.Equal(t, "foo", out["baz"])

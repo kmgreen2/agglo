@@ -1,0 +1,39 @@
+{
+  "schemas": [
+    {
+      "name": "postMicroBlog",
+      "root": {
+        "kvs": {
+          "authorUsername": {
+            "vocabString": {
+              "vocab": [
+                "kmgreen2",
+                "bob",
+                "jane",
+                "jim",
+                "jill"
+              ]
+            },
+            "userType": {
+              "vocabString": {
+                "vocab": [
+                  "free",
+                  "paid",
+                  "silver",
+                  "gold",
+                  "platinum"
+                ]
+              },
+            "body": {
+              "randomString": {
+                "maxLen": 512,
+                "minLen": 16,
+                "alphabet": "abcdefghijklmnopqrstuvwxyz"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

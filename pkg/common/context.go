@@ -11,6 +11,7 @@ type Key string
 const (
 	ParentContext Key = "agglo.io/parentContext"
 	SpanContext Key = "agglo.io/spanContext"
+	ProcessSpan Key = "agglo.io/processSpan"
 	ProcessStartTime = "agglo.io/processStartTime"
 )
 

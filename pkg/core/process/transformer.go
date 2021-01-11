@@ -1,6 +1,7 @@
 package process
 
 import (
+	"context"
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/core"
@@ -115,7 +116,7 @@ func (t Transformer) createPathAndTransform(sourceField, targetField string, tra
 	return nil
 }
 
-func (t Transformer) Process(in map[string]interface{}) (map[string]interface{}, error) {
+func (t Transformer) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
 	out := make(map[string]interface{})
 
 	for _, spec := range t.specs {

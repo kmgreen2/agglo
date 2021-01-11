@@ -1,6 +1,7 @@
 package process_test
 
 import (
+	"context"
 	"github.com/kmgreen2/agglo/pkg/core"
 	"github.com/kmgreen2/agglo/pkg/core/process"
 	"github.com/kmgreen2/agglo/test"
@@ -27,7 +28,7 @@ func TestAnnotateHappyPath(t *testing.T) {
 
 	annotate := builder.Build()
 
-	result, err := annotate.Process(jsonMap)
+	result, err := annotate.Process(context.Background(), jsonMap)
 	assert.Nil(t, err)
 	assert.Equal(t, "bar", result["foo"])
 	_, ok := result["fizz"]
@@ -47,6 +48,6 @@ func TestAnnotateDuplicateField(t *testing.T) {
 
 	annotate := builder.Build()
 
-	_, err = annotate.Process(jsonMap)
+	_, err = annotate.Process(context.Background(), jsonMap)
 	assert.Error(t, err)
 }

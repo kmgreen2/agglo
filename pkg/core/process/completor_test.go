@@ -1,6 +1,7 @@
 package process_test
 
 import (
+	"context"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/core"
 	"github.com/kmgreen2/agglo/pkg/core/process"
@@ -36,7 +37,7 @@ func DoCompleter(numMaps, numJoined int, timeout time.Duration, missingJoinKey s
 	numComplete := 0
 	numTimedOut := 0
 	for _, m := range maps {
-		out, err := completer.Process(m)
+		out, err := completer.Process(context.Background(), m)
 		if err != nil {
 			return 0, 0, 0, nil
 		}

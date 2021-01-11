@@ -13,7 +13,7 @@ import (
 )
 
 type PipelineProcess interface {
-	Process(in map[string]interface{}) (map[string]interface{}, error)
+	Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error)
 }
 
 type RunnableStartProcess struct {
@@ -22,7 +22,7 @@ type RunnableStartProcess struct {
 }
 
 func (runnable *RunnableStartProcess) Run(ctx context.Context) (interface{}, error) {
-	return runnable.process.Process(runnable.in)
+	return runnable.process.Process(ctx, runnable.in)
 }
 
 func NewRunnableStartProcess(process PipelineProcess, in map[string]interface{}) *RunnableStartProcess {
@@ -38,7 +38,7 @@ type RunnablePartialProcess struct {
 }
 
 func (runnable *RunnablePartialProcess) Run(ctx context.Context) (interface{}, error) {
-	return runnable.process.Process(runnable.in)
+	return runnable.process.Process(ctx, runnable.in)
 }
 
 func (runnable *RunnablePartialProcess) SetInData(inData interface{}) error {
@@ -65,7 +65,7 @@ type RunnablePartialFinalizer struct {
 }
 
 func (runnable *RunnablePartialFinalizer) Run(ctx context.Context) (interface{}, error) {
-	return nil, runnable.finalizer.Finalize(runnable.in)
+	return nil, runnable.finalizer.Finalize(ctx, runnable.in)
 }
 
 func (runnable *RunnablePartialFinalizer) SetInData(inData interface{}) error {
@@ -276,9 +276,17 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 		return completable.Future()
 	}
 
+	if pipeline.enableTracing {
+		ctx, span = pipeline.emitter.CreateSpan(context.Background(), "pipeline")
+	}
+
+	if pipeline.enableMetrics {
+		startTime = time.Now()
+	}
+
 	// If checkpointing is enabled, try to fetch the checkpoint
 	if pipeline.checkPointer != nil {
-		inMap, startIndex, err = pipeline.checkPointer.GetCheckpointWithIndex(in)
+		inMap, startIndex, err = pipeline.checkPointer.GetCheckpointWithIndex(ctx, in)
 		if err != nil {
 			// This means the checkpoint does not exist, so process as usual
 			if errors.Is(err, &common.NotFoundError{}) {
@@ -292,36 +300,56 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 		}
 	}
 
-	if pipeline.enableTracing {
-		ctx, span = pipeline.emitter.CreateSpan(context.Background(), "pipeline")
-	}
-
-	if pipeline.enableMetrics {
-		startTime = time.Now()
-	}
-
 	// Chain together the processes of the pipeline
 	f := pipeline.createFutureHelper(ctx, int(startIndex), inMap)
 	for i := int(startIndex + 1); i < len(pipeline.processes); i++ {
 		f = pipeline.thenFutureHelper(ctx, i, f)
 		// If this pipeline has checkpointing enabled, then checkpoint after each process
 		if pipeline.checkPointer != nil {
-			f = f.Then(NewRunnablePartialProcess(pipeline.checkPointer),
+			f = f.Then(NewRunnablePartialProcess(pipeline.checkPointer), common.SetContext(ctx),
 			// Must pass the span context from the previous process; otherwise, the checkpoint processes
 			// will break the chain
 			common.WithPrepare(func(ctx, prev context.Context) context.Context {
-				if spanCtx := common.ExtractSpanContext(prev); spanCtx != common.EmptySpanContext {
-					return common.InjectSpanContext(ctx, spanCtx)
+				if pipeline.enableTracing {
+					ctx, span = pipeline.emitter.CreateSpan(ctx, "checkpoint")
 				}
 				return ctx
-			}))
+			})).OnSuccess(func(ctx context.Context, x interface{}) {
+				span := trace.SpanFromContext(ctx)
+				if span != nil {
+					span.End()
+				}
+			}).OnFail(func(ctx context.Context, err error) {
+				span := trace.SpanFromContext(ctx)
+				if span != nil {
+					span.RecordError(err)
+					span.End()
+				}
+			})
 		}
 	}
 
 	// If checkpointing is enabled for this pipeline, set the last process as the checkpoint finalizer
 	if pipeline.checkPointer != nil {
 		// Call checkPointer.Finalize() to remove the checkpoint
-		f = f.Then(NewRunnablePartialFinalizer(pipeline.checkPointer))
+		f = f.Then(NewRunnablePartialFinalizer(pipeline.checkPointer), common.SetContext(ctx),
+			common.WithPrepare(func(ctx, prev context.Context) context.Context {
+				if pipeline.enableTracing {
+					ctx, span = pipeline.emitter.CreateSpan(ctx, "checkpoint-finalize")
+				}
+				return ctx
+			})).OnSuccess(func(ctx context.Context, x interface{}) {
+			span := trace.SpanFromContext(ctx)
+			if span != nil {
+				span.End()
+			}
+		}).OnFail(func(ctx context.Context, err error) {
+			span := trace.SpanFromContext(ctx)
+			if span != nil {
+				span.RecordError(err)
+				span.End()
+			}
+		})
 	}
 
 	f.OnSuccess(func(ctx context.Context, x interface{}) {

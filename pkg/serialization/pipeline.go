@@ -308,7 +308,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  ([]*process.Pipeline, error) {
 	for _, externalSystem := range pipelinesPb.ExternalSystems {
 		switch externalSystem.ExternalType {
 		case api.ExternalType_ExternalKVStore:
-			externalKVStores[externalSystem.Name] = kvs.NewMemKVStore()
+			externalKVStores[externalSystem.Name] = kvs.NewMemKVStore(kvs.WithTracing())
 		case api.ExternalType_ExternalPubSub:
 			externalPublisher[externalSystem.Name], err = streaming.NewMemPublisher(streaming.NewMemPubSub(),
 				externalSystem.ConnectionString)
@@ -517,20 +517,23 @@ func buildLifecycle(pipelineName, processName string, instrumentation *api.Proce
 	emitter := observability.NewEmitter("agglo/process")
 
 	if instrumentation.EnableTracing {
-		var span trace.Span
 		lifecycleBuilder.AppendPrepareFn(func(ctx, prev context.Context) context.Context {
-			ctx, span = emitter.CreateSpan(ctx, processKey(pipelineName, processName))
-			ctx = common.InjectSpanContext(ctx, span.SpanContext())
+			ctx, _ = emitter.CreateSpan(ctx, processKey(pipelineName, processName))
 			return ctx
 		})
 		lifecycleBuilder.AppendSuccessFn(func(ctx context.Context) {
-			span.End()
+			span := trace.SpanFromContext(ctx)
+			if span != nil {
+				span.End()
+			}
 		})
 		lifecycleBuilder.AppendFailFn(func(ctx context.Context, err error) {
-			span.RecordError(err)
-			span.End()
+			span := trace.SpanFromContext(ctx)
+			if span != nil {
+				span.RecordError(err)
+				span.End()
+			}
 		})
-
 	}
 
 	if instrumentation.Latency {

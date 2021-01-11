@@ -45,7 +45,7 @@ func TestHttpTee(t *testing.T) {
 
 	httpTee := process.NewHttpTee(httpClient, "foo", core.TrueCondition, nil)
 
-	out, err := httpTee.Process(jsonMap)
+	out, err := httpTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, err)
 	assert.Nil(t, checkErr)
 	delete(out, process.TeeMetadataKey)
@@ -57,13 +57,13 @@ func TestHttpTeeError(t *testing.T) {
 	httpClient := test.NewMockHttpClient(fmt.Errorf("error"),500, func(req *http.Request){})
 	httpTee := process.NewHttpTee(httpClient, "foo", core.TrueCondition, nil)
 
-	out, err := httpTee.Process(jsonMap)
+	out, err := httpTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, out)
 	assert.Error(t, err)
 
 	httpClient = test.NewMockHttpClient(nil, 500, func(req *http.Request){})
 	httpTee = process.NewHttpTee(httpClient, "foo", core.TrueCondition, nil)
-	out, err = httpTee.Process(jsonMap)
+	out, err = httpTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, out)
 	assert.Error(t, err)
 }
@@ -73,7 +73,7 @@ func TestHttpFalseCondition(t *testing.T) {
 	httpClient := test.NewMockHttpClient(nil, 200, func(req *http.Request){})
 	httpTee := process.NewHttpTee(httpClient, "foo", core.FalseCondition, nil)
 
-	out, err := httpTee.Process(jsonMap)
+	out, err := httpTee.Process(context.Background(), jsonMap)
 	assert.Equal(t, jsonMap, out)
 	assert.Nil(t, err)
 }
@@ -84,7 +84,7 @@ func TestKVTee(t *testing.T) {
 	kvStore := kvs.NewMemKVStore()
 	kvTee := process.NewKVTee(kvStore, core.TrueCondition, nil)
 
-	out, err := kvTee.Process(jsonMap)
+	out, err := kvTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, err)
 
 	teeMetadata := out[process.TeeMetadataKey].([]map[string]string)
@@ -110,7 +110,7 @@ func TestKVTeeError(t *testing.T) {
 
 	kvTee := process.NewKVTee(kvStore, core.TrueCondition,nil)
 
-	out, err := kvTee.Process(jsonMap)
+	out, err := kvTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, out)
 	assert.Error(t, err)
 }
@@ -122,7 +122,7 @@ func TestKVTeeFalseCondition(t *testing.T) {
 	kvStore.EXPECT().ConnectionString().Return("")
 	kvTee := process.NewKVTee(kvStore, core.FalseCondition, nil)
 
-	out, err := kvTee.Process(jsonMap)
+	out, err := kvTee.Process(context.Background(), jsonMap)
 	assert.Equal(t, jsonMap, out)
 	assert.Nil(t, err)
 }
@@ -161,7 +161,7 @@ func TestPublisherTee(t *testing.T) {
 
 	publisherTee := process.NewPubSubTee(publisher, core.TrueCondition, nil)
 
-	out, err := publisherTee.Process(jsonMap)
+	out, err := publisherTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, err)
 
 	// Wait for subscriber
@@ -179,7 +179,7 @@ func TestPublisherTeeError(t *testing.T) {
 	publisher.EXPECT().ConnectionString().Return("")
 
 	publisherTee := process.NewPubSubTee(publisher, core.TrueCondition, nil)
-	out, err := publisherTee.Process(jsonMap)
+	out, err := publisherTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, out)
 	assert.Error(t, err)
 }
@@ -191,7 +191,7 @@ func TestPublisherTeeFalseCondition(t *testing.T) {
 	publisher.EXPECT().ConnectionString().Return("")
 	publisherTee := process.NewPubSubTee(publisher, core.FalseCondition, nil)
 
-	out, err := publisherTee.Process(jsonMap)
+	out, err := publisherTee.Process(context.Background(), jsonMap)
 	assert.Equal(t, jsonMap, out)
 	assert.Nil(t, err)
 }

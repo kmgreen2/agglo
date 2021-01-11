@@ -28,7 +28,7 @@ name string, partitionID gUuid.UUID, aggPath string, evalValAt EvaluateValAt) (i
 	aggregator := process.NewAggregator(aggregation, core.TrueCondition, kvStore)
 
 	for i, m := range maps {
-		out, err := aggregator.Process(m)
+		out, err := aggregator.Process(context.Background(), m)
 		if err != nil {
 			return nil, err
 		}

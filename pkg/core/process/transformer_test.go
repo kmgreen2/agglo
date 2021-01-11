@@ -1,6 +1,7 @@
 package process_test
 
 import (
+	"context"
 	"github.com/kmgreen2/agglo/pkg/core"
 	"github.com/kmgreen2/agglo/pkg/core/process"
 	"github.com/kmgreen2/agglo/test"
@@ -15,7 +16,7 @@ func TestCopyAllTransformer(t *testing.T) {
 	transformer := process.NewTransformer(nil, ".", "[]")
 	transformer.AddSpec("", "", transformation)
 
-	out, err := transformer.Process(testJson)
+	out, err := transformer.Process(context.Background(), testJson)
 	assert.Nil(t, err)
 	assert.Equal(t, testJson, out)
 }
@@ -28,7 +29,7 @@ func TestCopySomeTransformer(t *testing.T) {
 	transformer.AddSpec("a", "foo", transformation)
 	transformer.AddSpec("b", "bar", transformation)
 
-	out, err := transformer.Process(testJson)
+	out, err := transformer.Process(context.Background(), testJson)
 	assert.Nil(t, err)
 	assert.Equal(t, testJson["a"], out["foo"])
 	assert.Equal(t, testJson["b"], out["bar"])
@@ -44,7 +45,7 @@ func TestCopyAllAndTransformTransformer(t *testing.T) {
 	transformation = builder.AddFieldTransformation(core.SumTransformation{}).Get()
 	transformer.AddSpec("b.d", "bSum", transformation)
 
-	out, err := transformer.Process(testJson)
+	out, err := transformer.Process(context.Background(), testJson)
 	assert.Nil(t, err)
 
 	for k, v := range testJson {
@@ -64,7 +65,7 @@ func TestCopySomeAndTransformTransformer(t *testing.T) {
 	transformation = builder.AddFieldTransformation(core.SumTransformation{}).Get()
 	transformer.AddSpec("b.d", "bSum", transformation)
 
-	out, err := transformer.Process(testJson)
+	out, err := transformer.Process(context.Background(), testJson)
 	assert.Nil(t, err)
 	assert.Equal(t, testJson["a"], out["foo"])
 	assert.Equal(t, testJson["b"], out["bar"])
@@ -86,7 +87,7 @@ func TestCopyNoneAndTransformTransformer(t *testing.T) {
 	transformation = builder.AddFieldTransformation(core.LeftFoldCountAll).Get()
 	transformer.AddSpec("e", "eCount", transformation)
 
-	out, err := transformer.Process(testJson)
+	out, err := transformer.Process(context.Background(), testJson)
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(out))
 	assert.Equal(t, float64(12), out["bSum"])

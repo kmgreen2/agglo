@@ -1,6 +1,7 @@
 package process
 
 import (
+	"context"
 	"github.com/kmgreen2/agglo/pkg/core"
 )
 
@@ -10,7 +11,7 @@ type Annotator struct {
 }
 
 // Process will conditionally apply underlying annotations to a copy of a provided map
-func (a Annotator) Process(in map[string]interface{}) (map[string]interface{}, error) {
+func (a Annotator) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
 	out := core.CopyableMap(in).DeepCopy()
 	for _, annotation := range a.annotations {
 		should, err := annotation.ShouldAnnotate(core.Flatten(out))
