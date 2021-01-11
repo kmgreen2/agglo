@@ -40,3 +40,8 @@ func (memPublisher *MemPublisher) Flush(ctx context.Context, timeout time.Durati
 func (memPublisher *MemPublisher) ConnectionString() string {
 	return "inMemPubSub"
 }
+
+// Close is a no-op, since all changes immediately take effect
+func (memPublisher *MemPublisher) Close() error {
+	return nil
+}

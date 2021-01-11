@@ -172,6 +172,36 @@ type Pipeline struct {
 	enableMetrics bool
 }
 
+type Pipelines struct {
+	pipelines []*Pipeline
+	shutdownFns []func() error
+}
+
+func NewPipelines(pipelines []*Pipeline, shutdownFns []func() error) *Pipelines {
+	return &Pipelines{
+		pipelines,
+		shutdownFns,
+	}
+}
+
+func (pipelines Pipelines) Underlying() []*Pipeline {
+	return pipelines.pipelines
+}
+
+func (pipelines Pipelines) Shutdown() error {
+	errStr := ""
+	for _, fn := range pipelines.shutdownFns {
+		err := fn()
+		if err != nil {
+			errStr += err.Error() + "\n"
+		}
+	}
+	if len(errStr) > 0 {
+		return common.NewInternalError(errStr)
+	}
+	return nil
+}
+
 func (pipeline *Pipeline) createFutureHelper(ctx context.Context, pipelineIndex int,
 	in map[string]interface{}) common.Future {
 	var future common.Future
@@ -372,6 +402,9 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 	})
 
 	return f
+}
+
+func (pipeline *Pipeline) Shutdown() {
 }
 
 type PipelineBuilder struct {

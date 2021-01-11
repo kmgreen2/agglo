@@ -26,13 +26,13 @@ func TestPipelinesBasic(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 	assert.NotNil(t, pipelines)
-	assert.Equal(t, 1, len(pipelines))
+	assert.Equal(t, 1, len(pipelines.Underlying()))
 
 
 	testMaps := test.PipelineTestMapsOne()
 
 	for _, m := range testMaps {
-		out, err := pipelines[0].RunSync(m)
+		out, err := pipelines.Underlying()[0].RunSync(m)
 		if _, ok := out["author"]; ok {
 			assert.Equal(t, "git-dev", out["version-control"].(string))
 		}

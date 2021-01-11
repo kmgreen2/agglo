@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/core/process"
@@ -16,10 +17,12 @@ import (
 
 type Daemon interface {
 	Run() error
+	Shutdown() error
+	IsShutdown() bool
 }
 
-func RunPipelines(in map[string]interface{}, pipelines []*process.Pipeline) error {
-	for _, pipeline := range pipelines {
+func RunPipelines(in map[string]interface{}, pipelines *process.Pipelines) error {
+	for _, pipeline := range pipelines.Underlying() {
 		future := pipeline.RunAsync(in)
 		result := future.Get()
 		if result.Error() != nil {
@@ -30,15 +33,18 @@ func RunPipelines(in map[string]interface{}, pipelines []*process.Pipeline) erro
 }
 
 type StatelessDaemon struct {
-	pipelines []*process.Pipeline
+	srv *http.Server
+	pipelines *process.Pipelines
 	logger *zap.Logger
 	daemonPort int
 	daemonPath string
 	maxConnections int
+	shutdown bool
+	isRunning bool
 }
 
 func NewStatelessDaemon(daemonPort int, daemonPath string, maxConnections int,
-	pipelines []*process.Pipeline) (Daemon, error) {
+	pipelines *process.Pipelines) (Daemon, error) {
 	logger, err := zap.NewProduction()
 	if err != nil {
 		return nil, err
@@ -61,6 +67,8 @@ func (d *StatelessDaemon) Run() error {
 	defer l.Close()
 
 	l = netutil.LimitListener(l, d.maxConnections)
+
+	d.srv = &http.Server{}
 
 	http.HandleFunc(d.daemonPath, func(resp http.ResponseWriter, req *http.Request) {
 		begin := time.Now()
@@ -109,11 +117,31 @@ func (d *StatelessDaemon) Run() error {
 		return
 	})
 
-	return http.Serve(l, nil)
+	d.isRunning = true
+	return d.srv.Serve(l)
+}
+
+func (d *StatelessDaemon) IsShutdown() bool {
+	return d.shutdown && !d.isRunning
+}
+
+func (d *StatelessDaemon) Shutdown() error {
+	d.shutdown = true
+	defer func(){d.isRunning = false}()
+	d.logger.Info("shutting down daemon...")
+	if err := d.srv.Shutdown(context.Background()); err != nil {
+		d.logger.Error(err.Error())
+	}
+	if err := d.pipelines.Shutdown(); err != nil {
+		d.logger.Error(err.Error())
+	}
+	d.logger.Info("shutdown complete...")
+	return nil
 }
 
 type DurableDaemon struct {
-	pipelines []*process.Pipeline
+	srv *http.Server
+	pipelines *process.Pipelines
 	logger *zap.Logger
 	daemonPort int
 	daemonPath string
@@ -122,10 +150,12 @@ type DurableDaemon struct {
 	dQueue *common.DurableQueue
 	waiterChannel chan bool
 	workerSleeping bool
+	shutdown bool
+	isRunning bool
 }
 
 func NewDurableDaemon(daemonPort int, daemonPath string, maxConnections, numThreads int,
-	dQueue *common.DurableQueue, pipelines []*process.Pipeline) (Daemon, error) {
+	dQueue *common.DurableQueue, pipelines *process.Pipelines) (Daemon, error) {
 	logger, err := zap.NewProduction()
 	if err != nil {
 		return nil, err
@@ -146,6 +176,10 @@ func (d *DurableDaemon) startWorkerLoop() {
 	go func() {
 		threadChannel := make(chan bool, d.numThreads)
 		for {
+
+			if d.shutdown == true {
+				break
+			}
 
 			item, err := d.dQueue.Dequeue()
 			if err != nil {
@@ -192,6 +226,8 @@ func (d *DurableDaemon) Run() error {
 	defer l.Close()
 
 	l = netutil.LimitListener(l, d.maxConnections)
+
+	d.srv = &http.Server{}
 
 	d.startWorkerLoop()
 
@@ -255,5 +291,27 @@ func (d *DurableDaemon) Run() error {
 		return
 	})
 
-	return http.Serve(l, nil)
+	d.isRunning = true
+	return d.srv.Serve(l)
+}
+
+func (d *DurableDaemon) IsShutdown() bool {
+	return d.shutdown && !d.isRunning
+}
+
+func (d *DurableDaemon) Shutdown() error {
+	d.shutdown = true
+	defer func(){d.isRunning = false}()
+	d.logger.Info("shutting down daemon...")
+	if err := d.srv.Shutdown(context.Background()); err != nil {
+		d.logger.Error(err.Error())
+	}
+	if err := d.dQueue.Close(); err != nil {
+		d.logger.Error(err.Error())
+	}
+	if err := d.pipelines.Shutdown(); err != nil {
+		d.logger.Error(err.Error())
+	}
+	d.logger.Info("shutdown complete...")
+	return nil
 }

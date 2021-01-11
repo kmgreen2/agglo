@@ -10,7 +10,10 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/signal"
+	"runtime/pprof"
 	"strings"
+	"sync"
 )
 
 type RunType int
@@ -32,12 +35,27 @@ type CommandArgs struct {
 	force bool
 	stateDbPath string
 	exporter observability.Exporter
+	profileStopFn func()
 }
 
 func usage(msg string, exitCode int) {
 	fmt.Println(msg)
 	flag.PrintDefaults()
 	os.Exit(exitCode)
+}
+
+func registerSignalHandler(daemon server.Daemon) *sync.WaitGroup {
+	wg := &sync.WaitGroup{}
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, os.Kill)
+
+	go func () {
+		<-c
+		wg.Add(1)
+		_ = daemon.Shutdown()
+		wg.Done()
+	}()
+	return wg
 }
 
 func parseArgs() *CommandArgs {
@@ -54,8 +72,28 @@ func parseArgs() *CommandArgs {
 	stateDbPathPtr := flag.String("stateDbPath", "/tmp/bingeDb", "location of the state db file")
 	exporterPtr := flag.String("exporter", "stdout", "OpenTelemetry exporter type")
 	forcePtr := flag.Bool("force", false, "force overwrite state entries")
+	cpuProfilePtr := flag.String("cpuprofile", "", "write the CPU profile to a file")
 
 	flag.Parse()
+
+	args.profileStopFn = func() {
+	}
+
+	if cpuProfilePtr != nil {
+		if *cpuProfilePtr != "" {
+			f, err := os.Create(*cpuProfilePtr)
+			if err != nil {
+				usage("must specify file location with cpuprofile", 1)
+			}
+			err = pprof.StartCPUProfile(f)
+			if err != nil {
+				usage(err.Error(), 1)
+			}
+			args.profileStopFn = func() {
+				pprof.StopCPUProfile()
+			}
+		}
+	}
 
 	if strings.Compare(*runTypePtr, "standalone") == 0 {
 		args.runType = RunStandalone
@@ -112,6 +150,8 @@ func parseArgs() *CommandArgs {
 func main() {
 	args := parseArgs()
 
+	defer args.profileStopFn()
+
 	configBytes, err := ioutil.ReadAll(args.config)
 	if err != nil {
 		panic(err)
@@ -122,8 +162,12 @@ func main() {
 		panic(err)
 	}
 
-	_ = args.exporter.Start()
-	defer func() { _ = args.exporter.Stop() }()
+	err = args.exporter.Start()
+	if err != nil {
+		panic(err)
+	}
+
+	defer func(commandArgs *CommandArgs) { _ = args.exporter.Stop() }(args)
 
 	// RunStandalone will invoke each pipeline synchronously
 	if args.runType == RunStandalone {
@@ -138,7 +182,7 @@ func main() {
 			panic(err)
 		}
 
-		for _, pipeline := range pipelines {
+		for _, pipeline := range pipelines.Underlying() {
 			out, err := pipeline.RunSync(in)
 			if err != nil {
 				panic(err)
@@ -150,6 +194,7 @@ func main() {
 				panic(err)
 			}
 		}
+		_ = pipelines.Shutdown()
 	} else if args.runType == RunPersistentDaemon {
 		recoverFunc := func(inBytes []byte) error {
 			in, err := common.JsonToMap(inBytes)
@@ -169,8 +214,10 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		waiter := registerSignalHandler(daemon)
 		err = daemon.Run()
-		if err != nil {
+		waiter.Wait()
+		if !daemon.IsShutdown() && err != nil {
 			panic(err)
 		}
 	} else if args.runType == RunStatelessDaemon {
@@ -178,10 +225,11 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		waiter := registerSignalHandler(daemon)
 		err = daemon.Run()
-		if err != nil {
+		waiter.Wait()
+		if !daemon.IsShutdown() && err != nil {
 			panic(err)
 		}
 	}
-
 }

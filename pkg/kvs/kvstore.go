@@ -12,6 +12,7 @@ type KVStore interface {
 	Delete(ctx context.Context, key string) error
 	List(ctx context.Context, prefix string) ([]string, error)
 	ConnectionString() string
+	Close() error
 }
 
 // ROKVStore is a read-only interface to a KVSTore

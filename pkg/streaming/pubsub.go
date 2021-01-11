@@ -8,6 +8,7 @@ import (
 type Publisher interface {
 	Publish(ctx context.Context, b []byte) error
 	Flush(ctx context.Context, timeout time.Duration) error
+	Close() error
 	ConnectionString() string
 }
 

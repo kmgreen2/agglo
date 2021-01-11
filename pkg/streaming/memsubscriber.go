@@ -75,3 +75,8 @@ func (memSubscriber *MemSubscriber) Status() SubscriberState {
 func (memSubscriber *MemSubscriber) ConnectionString() string {
 	return "inMemPubSub"
 }
+
+// Close will call stop (conforming to closer interface)
+func (memSubscriber *MemSubscriber) Close() error {
+	return memSubscriber.Stop()
+}

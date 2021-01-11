@@ -88,15 +88,7 @@ func NewZipkinExporter(url, serviceName string) *zipkinExporter {
 }
 
 func (exporter zipkinExporter) Start() error {
-	err := zipkin.InstallNewPipeline(
-		exporter.url,
-		exporter.serviceName,
-		zipkin.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
-	)
-	if err != nil {
-		return err
-	}
-
+	var err error
 	exporter.underlying, err = zipkin.NewRawExporter(exporter.url,
 		exporter.serviceName,
 		zipkin.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
@@ -113,8 +105,8 @@ func (exporter zipkinExporter) Start() error {
 }
 
 func (exporter zipkinExporter) Stop() error {
-	return exporter.underlying.Shutdown(context.Background())
+	if exporter.underlying != nil {
+		return exporter.underlying.Shutdown(context.Background())
+	}
+	return nil
 }
-
-
-

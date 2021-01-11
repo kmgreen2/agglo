@@ -211,3 +211,8 @@ func (kvStore *MemKVStore) ConnectionString() string {
 	return "inMemStore"
 }
 
+// Close will flush any in-flight changes and close the connection to the backing system.  In this case, a no-op
+func (kvStore *MemKVStore) Close() error {
+	return nil
+}
+

@@ -95,6 +95,3 @@ func (e Emitter) GaugeFloat64WithContext(ctx context.Context, name string, value
 	}
 }
 
-
-
-

@@ -280,7 +280,7 @@ func buildTransformer(transformerSpecs []*api.TransformerSpec) (*process.Transfo
 	return transformer, nil
 }
 
-func PipelinesFromJson(pipelineJson []byte) ([]*process.Pipeline, error) {
+func PipelinesFromJson(pipelineJson []byte) (*process.Pipelines, error) {
 	var pipelinesPb api.Pipelines
 	byteBuffer := bytes.NewBuffer(pipelineJson)
 	err := jsonpb.Unmarshal(byteBuffer, &pipelinesPb)
@@ -290,8 +290,9 @@ func PipelinesFromJson(pipelineJson []byte) ([]*process.Pipeline, error) {
 	return PipelinesFromPb(&pipelinesPb)
 }
 
-func PipelinesFromPb(pipelinesPb *api.Pipelines)  ([]*process.Pipeline, error) {
+func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*process.Pipelines, error) {
 	var builtPipelines  []*process.Pipeline
+	var shutdownFns []func() error
 
 	externalKVStores := make(map[string]kvs.KVStore)
 	externalPublisher := make(map[string]streaming.Publisher)
@@ -309,12 +310,14 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  ([]*process.Pipeline, error) {
 		switch externalSystem.ExternalType {
 		case api.ExternalType_ExternalKVStore:
 			externalKVStores[externalSystem.Name] = kvs.NewMemKVStore(kvs.WithTracing())
+			shutdownFns = append(shutdownFns, externalKVStores[externalSystem.Name].Close)
 		case api.ExternalType_ExternalPubSub:
 			externalPublisher[externalSystem.Name], err = streaming.NewMemPublisher(streaming.NewMemPubSub(),
 				externalSystem.ConnectionString)
 			if err != nil {
 				return nil, err
 			}
+			shutdownFns = append(shutdownFns, externalPublisher[externalSystem.Name].Close)
 		case api.ExternalType_ExternalHttp:
 			externalHttp[externalSystem.Name] = externalSystem.ConnectionString
 		}
@@ -500,7 +503,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  ([]*process.Pipeline, error) {
 
 		builtPipelines = append(builtPipelines, pipelineBuilder.Get())
 	}
-	return builtPipelines, nil
+	return process.NewPipelines(builtPipelines, shutdownFns), nil
 }
 
 func processKey(pipelineName, processName string) string {
