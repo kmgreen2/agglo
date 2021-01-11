@@ -30,6 +30,8 @@ type CommandArgs struct {
 	runType RunType
 	daemonPort int
 	daemonPath string
+	maintenancePort int
+	maintenancePath string
 	maxConnections int
 	numThreads int
 	force bool
@@ -67,6 +69,8 @@ func parseArgs() *CommandArgs {
 		"run type for the process: standalone (default), stateless-daemon, persistent-daemon")
 	daemonPortPtr := flag.Int("daemonPort", 8080, "daemon listening port (default 8080)")
 	daemonPathPtr := flag.String("daemonPath", "/binge", "daemon processing path (default /binge)")
+	maintenancePortPtr := flag.Int("maintenancePort", 8081, "daemon listening port (default 8080)")
+	maintenancePathPtr := flag.String("maintenancePath", "/maintenance", "daemon processing path (default /binge)")
 	maxConnectionsPtr := flag.Int("maxConnections", 64, "maximum number of connections")
 	numThreadsPtr := flag.Int("numThreads", 16, "number of worker threads")
 	stateDbPathPtr := flag.String("stateDbPath", "/tmp/bingeDb", "location of the state db file")
@@ -142,6 +146,8 @@ func parseArgs() *CommandArgs {
 	} else if args.runType == RunStatelessDaemon || args.runType == RunPersistentDaemon {
 		args.daemonPath = *daemonPathPtr
 		args.daemonPort = *daemonPortPtr
+		args.maintenancePath = *maintenancePathPtr
+		args.maintenancePort = *maintenancePortPtr
 	}
 
 	return args
@@ -209,7 +215,12 @@ func main() {
 			panic(err)
 		}
 
-		daemon, err := server.NewDurableDaemon(args.daemonPort, args.daemonPath, args.maxConnections, args.numThreads,
+		daemon, err := server.NewDurableDaemon(args.daemonPort,
+			args.maintenancePort,
+			args.daemonPath,
+			args.maintenancePath,
+			args.maxConnections,
+			args.numThreads,
 			dQueue, pipelines)
 		if err != nil {
 			panic(err)
@@ -221,7 +232,12 @@ func main() {
 			panic(err)
 		}
 	} else if args.runType == RunStatelessDaemon {
-		daemon, err := server.NewStatelessDaemon(args.daemonPort, args.daemonPath, args.maxConnections, pipelines)
+		daemon, err := server.NewStatelessDaemon(args.daemonPort,
+			args.maintenancePort,
+			args.daemonPath,
+			args.maintenancePath,
+			args.maxConnections,
+			pipelines)
 		if err != nil {
 			panic(err)
 		}

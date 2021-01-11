@@ -202,6 +202,29 @@ func (pipelines Pipelines) Shutdown() error {
 	return nil
 }
 
+func (pipelines Pipelines) GetCheckpoints(messageID string) ([]map[string]interface{}, error) {
+	var err error
+	var errStr string
+	numNotFound := 0
+	checkpoints := make([]map[string]interface{}, len(pipelines.pipelines))
+	for i, pipeline := range pipelines.pipelines {
+		checkpoints[i], err = pipeline.checkPointer.GetCheckpoint(context.Background(), pipeline.name, messageID)
+		if err != nil && !errors.Is(err, &common.NotFoundError{}){
+			if !errors.Is(err, &common.NotFoundError{}){
+				errStr += err.Error() + "\n"
+			}
+			numNotFound++
+		}
+	}
+	if numNotFound == len(pipelines.pipelines) {
+		return checkpoints, common.NewInternalError("no checkpoints found")
+	}
+	if len(errStr) > 0 {
+		return checkpoints, common.NewInternalError(fmt.Sprintf("found errors getting checkpoints: %s", errStr))
+	}
+	return checkpoints, nil
+}
+
 func (pipeline *Pipeline) createFutureHelper(ctx context.Context, pipelineIndex int,
 	in map[string]interface{}) common.Future {
 	var future common.Future
@@ -316,7 +339,7 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 
 	// If checkpointing is enabled, try to fetch the checkpoint
 	if pipeline.checkPointer != nil {
-		inMap, startIndex, err = pipeline.checkPointer.GetCheckpointWithIndex(ctx, in)
+		inMap, startIndex, err = pipeline.checkPointer.GetCheckpointWithIndexFromMap(ctx, in)
 		if err != nil {
 			// This means the checkpoint does not exist, so process as usual
 			if errors.Is(err, &common.NotFoundError{}) {
@@ -402,9 +425,6 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) common.Future {
 	})
 
 	return f
-}
-
-func (pipeline *Pipeline) Shutdown() {
 }
 
 type PipelineBuilder struct {

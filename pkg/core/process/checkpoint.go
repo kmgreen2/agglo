@@ -177,7 +177,28 @@ func getDataFromCheckpoint(checkpoint map[string]interface{}) (map[string]interf
 	return nil, common.NewNotFoundError("could not find checkpoint data")
 }
 
-func (c CheckPointer) GetCheckpointWithIndex(ctx context.Context, in map[string]interface{}) (out map[string]interface{},
+func (c CheckPointer) GetCheckpoint(ctx context.Context, pipelineName, messageID string) (out map[string]interface{},
+	err error) {
+	var checkpoint map[string]interface{}
+	checkpointStateKey := fmt.Sprintf("%s:%s", pipelineName, messageID)
+	checkpoint, err = c.fetchFunc(ctx, checkpointStateKey)
+	if err != nil {
+				return
+			}
+	// Fetch returns nil.nil if no checkpoint is found
+	if checkpoint == nil {
+		out = nil
+		err = common.NewNotFoundError("no checkpoint")
+		return
+	}
+	out, err = getDataFromCheckpoint(checkpoint)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (c CheckPointer) GetCheckpointWithIndexFromMap(ctx context.Context, in map[string]interface{}) (out map[string]interface{},
 	index int64, err error) {
 
 	// If the internal fields are not found in the map, then we assume there

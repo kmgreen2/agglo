@@ -201,3 +201,75 @@ func TestDurableQueueFailAndFailRecovery(t *testing.T) {
 	q, err = common.OpenDurableQueue("/tmp/testdb", failRecoverFunc(5), false)
 	assert.Equal(t, int64(12), q.NumInflight())
 }
+
+func TestUnprocessedAndInflightGetters(t *testing.T) {
+	numItems := 100
+	numProcessed := 80
+	numAcked := 20
+	_ = os.Remove("/tmp/testdb")
+	q, err := common.OpenDurableQueue("/tmp/testdb", noOpRecoverFunc, false)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	defer func() {
+		err = q.Close()
+		assert.Nil(t, err)
+
+		err = q.Drop()
+		assert.Nil(t, err)
+	}()
+
+	items := make([][]byte, numItems)
+	queueItems := make([]*common.QueueItem, numItems)
+	for i := 0; i < numItems; i++ {
+		items[i] = []byte(fmt.Sprintf("%d", i))
+		err = q.Enqueue(items[i])
+		if err != nil {
+			assert.FailNow(t, err.Error())
+		}
+	}
+
+	assert.Equal(t, int64(numItems), q.Length())
+
+	queueItems, err = consumeQueue(q, numProcessed, numAcked)
+	assert.Nil(t, err)
+
+	for i := 0; i < numProcessed; i++ {
+		assert.Equal(t, items[i], queueItems[i].Data)
+	}
+
+	assert.Equal(t, int64(numItems-numProcessed), q.Length())
+	assert.Equal(t, int64(numProcessed-numAcked), q.NumInflight())
+
+	inflight, err := q.GetInflight()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	unprocessed, err := q.GetUnprocessed()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	inflightMap := make(map[string]bool)
+	for i := numProcessed + numAcked; i < numItems; i++ {
+		inflightMap[fmt.Sprintf("%d", i)] = true
+	}
+	unprocessedMap := make(map[string]bool)
+	for i := numProcessed; i < numItems; i++ {
+		unprocessedMap[fmt.Sprintf("%d", i)] = true
+	}
+
+	for _, item := range inflight {
+		delete(inflightMap, string(item.Data))
+	}
+
+	for _, item := range unprocessed {
+		delete(unprocessedMap, string(item.Data))
+	}
+
+	assert.Len(t, inflightMap, 0)
+	assert.Len(t, unprocessedMap, 0)
+	err = q.Close()
+	assert.Nil(t, err)
+}

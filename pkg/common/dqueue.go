@@ -454,6 +454,64 @@ func (q *DurableQueue) NumInflight() int64 {
 	return q.numInflight
 }
 
+func (q *DurableQueue) GetUnprocessed() ([]*QueueItem, error) {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
+	var unprocessedItems []*QueueItem
+
+	err := q.db.View(func(tx *bolt.Tx) error {
+		unprocessedBucket := tx.Bucket([]byte(UnprocessedQueue))
+		if unprocessedBucket == nil {
+			return NewInternalError(fmt.Sprintf("cannot find unprocessed queue"))
+		}
+
+		return unprocessedBucket.ForEach(func(k, v []byte) error {
+			queueItem, err := bytesToQueueItem(v)
+			if err != nil {
+				return err
+			}
+			unprocessedItems = append(unprocessedItems, queueItem)
+			return nil
+		})
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return unprocessedItems, nil
+}
+
+func (q *DurableQueue) GetInflight() ([]*QueueItem, error) {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
+	var inflightItems []*QueueItem
+
+	err := q.db.View(func(tx *bolt.Tx) error {
+		inflightBucket := tx.Bucket([]byte(InflightQueue))
+		if inflightBucket == nil {
+			return NewInternalError(fmt.Sprintf("cannot find inflight queue"))
+		}
+
+		return inflightBucket.ForEach(func(k, v []byte) error {
+			queueItem, err := bytesToQueueItem(v)
+			if err != nil {
+				return err
+			}
+			inflightItems = append(inflightItems, queueItem)
+			return nil
+		})
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return inflightItems, nil
+}
+
 func (q *DurableQueue) recoverInflight(tx *bolt.Tx) error {
 	q.lock.Lock()
 	defer q.lock.Unlock()
