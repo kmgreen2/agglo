@@ -64,6 +64,7 @@ func NewExecRunnable(options ...ExecOption) *ExecRunnable {
 
 func (runnable *ExecRunnable) Run(ctx context.Context) (interface{}, error) {
 	var outMap map[string]interface{}
+
 	cmd := exec.Command(runnable.path, runnable.cmdArgs...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

@@ -1,0 +1,70 @@
+{
+  "partitionUuid": "938e16fe-a216-4fe1-92bd-dcab49646fb9",
+  "pipelines": [
+    {
+      "name": "tester-slow",
+      "checkpoint": {
+        "outputConnector": "/tmp/checkpoints",
+        "externalType": "ExternalLocalFile"
+      },
+      "enableTracing": true,
+      "enableMetrics": true,
+      "processes": [
+        {
+          "name": "annotator-all",
+          "instrumentation": {
+            "enableTracing": true,
+            "latency": true,
+            "counter": true
+          }
+        },
+        {
+          "name": "spawner-sleep",
+          "instrumentation": {
+            "enableTracing": true,
+            "latency": true,
+            "counter": true
+          }
+        }
+      ]
+    }
+  ],
+  "processDefinitions": [
+    {
+      "annotator": {
+        "name": "annotator-all",
+        "annotations": [
+          {
+            "fieldKey": "everyoneGetsThis",
+            "value": "annotation"
+          }
+        ]
+      }
+    },
+    {
+      "spawner": {
+        "name": "spawner-sleep",
+        "delayInMs": 30000,
+        "doSync": true,
+        "condition": {
+          "exists": {
+            "ops": [
+              {
+                "key": "everyoneGetsThis",
+                "op": "Exists"
+              }
+            ]
+          }
+        },
+        "job": {
+          "runnable": {
+            "pathToExec": "/bin/sleep",
+            "cmdArgs": [
+              "1"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

@@ -267,21 +267,26 @@ func (d *DurableDaemon) startWorkerLoop() {
 			begin := time.Now()
 			threadChannel <- true
 			go func(item *common.QueueItem) {
+				defer func() {
+					<- threadChannel
+				}()
 				in, err := common.JsonToMap(item.Data)
 				if err != nil {
 					d.logger.Error("unable to decode data: " + err.Error())
+					return
 				}
 				err = RunPipelines(in, d.pipelines)
 				if err != nil {
 					d.logger.Error("error running pipeline: " + err.Error())
+					return
 				}
 				err = d.dQueue.Ack(item)
 				if err != nil {
 					d.logger.Error("error acking item: " + err.Error())
+					return
 				}
 				elapsed := time.Now().Sub(begin)
 				d.logger.Info(fmt.Sprintf("Worker: %d ms", elapsed.Milliseconds()))
-				<- threadChannel
 			}(item)
 		}
 	}()

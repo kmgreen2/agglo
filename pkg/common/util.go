@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"hash"
+	"sync"
 	"time"
 )
 
@@ -36,10 +37,18 @@ func InitHash(digestType DigestType) hash.Hash {
 	}
 }
 
+// ToDo(KMG): Re-visit this function.  I could not think of a way to
+// use WaitGroups without leaking a go routine when the Wait() call
+// hangs forever when we set a timeout.  The best I could think of was
+// to track the number of waiters and decrement the count when we timeout.
+//
+// This can probably done with atomic incr/decr and channels
 func WaitAll(futures []Future, timeout time.Duration) {
-	timedOut := false
+	lock := &sync.Mutex{}
+	numFutures := len(futures)
 	done := make(chan bool, 1)
-	completedFutures := make(map[int]Future)
+	wg := sync.WaitGroup{}
+	wg.Add(numFutures)
 
 	go func() {
 		var ctx context.Context
@@ -53,21 +62,32 @@ func WaitAll(futures []Future, timeout time.Duration) {
 
 		select {
 		case <-ctx.Done():
-			timedOut = true
+			lock.Lock()
+			defer lock.Unlock()
+			if numFutures == 0 {
+				return
+			}
+			wg.Add(-numFutures)
 		case <-done:
 			return
 		}
 	}()
 
-
-	for len(completedFutures) != len(futures) && !timedOut {
-		for i, future := range futures {
-			if future.IsCompleted() || future.IsCancelled() {
-				completedFutures[i] = futures[i]
-			}
-		}
+	for _, future := range futures {
+		future.OnSuccess(func(ctx context.Context, x interface{}) {
+			lock.Lock()
+			defer lock.Unlock()
+			numFutures--
+			wg.Done()
+		}).OnFail(func(ctx context.Context, err error) {
+			lock.Lock()
+			defer lock.Unlock()
+			numFutures--
+			wg.Done()
+		})
 	}
 
+	wg.Wait()
 	done <- true
 }
 
