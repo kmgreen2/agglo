@@ -47,7 +47,7 @@ func WaitAll(futures []Future, timeout time.Duration) {
 	lock := &sync.Mutex{}
 	numFutures := len(futures)
 	done := make(chan bool, 1)
-	wg := sync.WaitGroup{}
+	wg := &sync.WaitGroup{}
 	wg.Add(numFutures)
 
 	go func() {
@@ -80,6 +80,11 @@ func WaitAll(futures []Future, timeout time.Duration) {
 			numFutures--
 			wg.Done()
 		}).OnFail(func(ctx context.Context, err error) {
+			lock.Lock()
+			defer lock.Unlock()
+			numFutures--
+			wg.Done()
+		}).OnCancel(func(ctx context.Context) {
 			lock.Lock()
 			defer lock.Unlock()
 			numFutures--

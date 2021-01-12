@@ -22,6 +22,7 @@ type Future interface {
 	Cancel(ctx context.Context) error
 	IsCancelled() bool
 	IsCompleted() bool
+	IsSucceeded() bool
 	CallbacksCompleted() bool
 	OnSuccess(func (context.Context, interface{})) Future
 	OnCancel(func (context.Context)) Future
@@ -76,6 +77,7 @@ type future struct {
 	mutex sync.Mutex
 	state futureState
 	callbacksCompleted bool
+	callbacksCalled bool
 	successes []func (context.Context, interface{})
 	fails []func (context.Context, error)
 	cancels []func (context.Context)
@@ -151,6 +153,11 @@ func CreateFuture(runnable Runnable, options ...FutureOption) Future {
 		var err error
 		var result interface{}
 		defer completable.Close()
+		defer func() {
+			if r := recover(); r != nil {
+				_ = completable.Fail(futureOptions.ctx, err)
+			}
+		}()
 		if futureOptions.delay > 0 {
 			t := time.NewTimer(futureOptions.delay)
 			<-t.C
@@ -163,10 +170,12 @@ func CreateFuture(runnable Runnable, options ...FutureOption) Future {
 		delay := futureOptions.retry.initialDelay
 		for i := 0; i <= futureOptions.retry.num; i++ {
 			result, err = runnable.Run(futureOptions.ctx)
-			if err != nil {
+			if err != nil && futureOptions.retry.num > 0 {
 				time.Sleep(delay)
 				delay <<= 1
 				continue
+			} else if err != nil {
+				break
 			} else {
 				_ = completable.Success(futureOptions.ctx, result)
 				return
@@ -196,6 +205,11 @@ func (f *future) Then(runnable PartialRunnable, options ...FutureOption) Future 
 		var err error
 		var thenResult interface{}
 		defer next.Close()
+		defer func() {
+			if r := recover(); r != nil {
+				_ = next.Fail(futureOptions.ctx, err)
+			}
+		}()
 
 		result := f.Get()
 		if result.err != nil {
@@ -215,10 +229,12 @@ func (f *future) Then(runnable PartialRunnable, options ...FutureOption) Future 
 		delay := futureOptions.retry.initialDelay
 		for i := 0; i <= futureOptions.retry.num; i++ {
 			thenResult, err = runnable.Run(futureOptions.ctx)
-			if err != nil {
+			if err != nil && futureOptions.retry.num > 0 {
 				time.Sleep(delay)
 				delay <<= 1
 				continue
+			} else if err != nil {
+				break
 			} else {
 				_ = next.Success(futureOptions.ctx, thenResult)
 				return
@@ -258,17 +274,25 @@ func (f *future) IsCompleted() bool {
 	return f.state == succeededFuture || f.state == failedFuture
 }
 
+func (f *future) IsSucceeded() bool {
+	return f.state == succeededFuture
+}
+
 func (f *future) CallbacksCompleted() bool {
 	return f.callbacksCompleted
+}
+
+func (f *future) CallbacksCalled() bool {
+	return f.callbacksCalled
 }
 
 func (f *future) OnSuccess(cb func (context.Context, interface{})) Future {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	if f.CallbacksCompleted() && f.state == succeededFuture {
+	if f.CallbacksCalled() && f.state == succeededFuture {
 		cb(f.finalResult.ctx, f.finalResult.value)
-	} else {
+	} else if !f.CallbacksCalled() {
 		f.successes = append(f.successes, cb)
 	}
 	return f
@@ -278,9 +302,9 @@ func (f *future) OnCancel(cb func (context.Context)) Future {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	if f.CallbacksCompleted() && f.IsCancelled() {
+	if f.CallbacksCalled() && f.IsCancelled() {
 		cb(f.finalResult.ctx)
-	} else {
+	} else if !f.CallbacksCalled() {
 		f.cancels = append(f.cancels, cb)
 	}
 	return f
@@ -290,9 +314,9 @@ func (f *future) OnFail(cb func (context.Context, error)) Future {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	if f.CallbacksCompleted() && f.state == failedFuture {
+	if f.CallbacksCalled() && f.state == failedFuture {
 		cb(f.finalResult.ctx, f.finalResult.err)
-	} else {
+	} else if !f.CallbacksCalled() {
 		f.fails = append(f.fails, cb)
 	}
 	return f
@@ -353,17 +377,30 @@ func (f *future) close() {
 func (f *future) doCallbacks(ctx context.Context) {
 	wg := &sync.WaitGroup{}
 
-	defer func () {
-		go func() {
-			wg.Wait()
-			f.callbacksCompleted = true
-		}()
+	numCallbacks := 0
+	switch f.state {
+	case succeededFuture:
+		numCallbacks = len(f.successes)
+	case failedFuture:
+		numCallbacks = len(f.fails)
+	case canceledFuture:
+		numCallbacks = len(f.cancels)
+	}
+
+	wg.Add(numCallbacks)
+
+	defer func() {
+		f.callbacksCalled = true
+	}()
+
+	go func() {
+		wg.Wait()
+		f.callbacksCompleted = true
 	}()
 
 	switch f.state {
 	case succeededFuture:
 		for _, cb := range f.successes {
-			wg.Add(1)
 			go func(callback func(context.Context, interface{})) {
 				callback(ctx, f.finalResult.value)
 				wg.Done()
@@ -371,7 +408,6 @@ func (f *future) doCallbacks(ctx context.Context) {
 		}
 	case failedFuture:
 		for _, cb := range f.fails {
-			wg.Add(1)
 			go func(callback func(context.Context, error)) {
 				callback(ctx, f.finalResult.err)
 				wg.Done()
@@ -379,7 +415,6 @@ func (f *future) doCallbacks(ctx context.Context) {
 		}
 	case canceledFuture:
 		for _, cb := range f.cancels {
-			wg.Add(1)
 			go func(callback func(context.Context)) {
 				callback(ctx)
 				wg.Done()

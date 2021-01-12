@@ -16,7 +16,7 @@ func makeFutures(numFast, numSlow, slowDuration int) []common.Future {
 		futures[i] = common.CreateFuture(runnable)
 	}
 
-	for i := numSlow; i < numSlow+numFast; i++ {
+	for i := numFast; i < numSlow+numFast; i++ {
 		runnable := test.NewSleepRunnable(slowDuration)
 		futures[i] = common.CreateFuture(runnable)
 	}
@@ -25,7 +25,14 @@ func makeFutures(numFast, numSlow, slowDuration int) []common.Future {
 }
 
 func TestWaitAll(t *testing.T) {
-	futures := makeFutures(10, 10, 1)
+	futures := makeFutures(100, 100, 1)
+	common.WaitAll(futures, -1)
+
+	for _, future := range futures {
+		assert.True(t, future.IsCompleted())
+	}
+
+	futures = makeFutures(10, 1, 1)
 	common.WaitAll(futures, -1)
 
 	for _, future := range futures {

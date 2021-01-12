@@ -23,6 +23,7 @@ build:
 	CGO_ENABLED=1 go build -o bin/printvals cmd/printvals/main.go
 	CGO_ENABLED=1 go build -o bin/binge cmd/binge/main.go
 	CGO_ENABLED=1 go build -o bin/genevents cmd/genevents/main.go
+	CGO_ENABLED=0 go build -o bin/scratch cmd/scratch/main.go
 
 .PHONY: genmocks
 genmocks:
