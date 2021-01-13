@@ -29,6 +29,16 @@
           }
         },
         {
+          "name": "count-repo",
+          "instrumentation": {
+            "enableTracing": true
+          },
+          "retryStrategy": {
+            "numRetries": 5,
+            "initialBackOffMs": 100
+          }
+        },
+        {
           "name": "completion-hashjoin",
           "instrumentation": {
             "enableTracing": true
@@ -119,6 +129,27 @@
             }
           }
         ]
+      }
+    },
+    {
+      "aggregator": {
+        "name": "count-repo",
+        "stateStore": "memKVStore",
+        "condition": {
+          "exists": {
+            "ops": [
+              {
+                "key": "repository.name",
+                "op": "Exists"
+              }
+            ]
+          }
+        },
+        "aggregation": {
+          "key": "repository.name",
+          "aggregationType": "AggCount",
+          "groupByKeys": ["repository.name"]
+        }
       }
     },
     {
