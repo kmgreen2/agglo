@@ -152,15 +152,16 @@ stores for persistence, which lends itself to more ephemeral environments.
 As shown in Figure~\ref{fig:durable-queue}, we have $5$ unprocessed events a
 $0$ in-flight, before a worker pulls an event off the queue.  Prior to
 returning the event to the worker, $Evt_{3}$ is atomically swapped to the
-in-flight queue.  While processing the event, the daemon (as well as the
-worker) crashes and restarts.  Before accespting any new connections the daemon
-will process the unprocessed and in-flight queues.  Depending on the current
-status of each event, some may remain on the in-flight queue after the start-up
-process finishes.  This could be due to an external resource being unavailable
-or an issue with the state of the event or checkpoint.  The proper action
-depends mostly on the use case and could be a combination of: throw the events
-away, fire an alert, or forward the events to another system \footnote{ToDo:
-Add recovery rules to the pipelines.  For example, add an OnFail section to a
+in-flight queue.  An event is not removed from the in-flight queue until it is
+acked.  While processing the event, the daemon (as well as the worker) crashes
+and restarts.  Before accespting any new connections the daemon will process
+the unprocessed and in-flight queues.  Depending on the current status of each
+event, some may remain on the in-flight queue after the start-up process
+finishes.  This could be due to an external resource being unavailable or an
+issue with the state of the event or checkpoint.  The proper action depends
+mostly on the use case and could be a combination of: throw the events away,
+fire an alert, or forward the events to another system \footnote{ToDo: Add
+recovery rules to the pipelines.  For example, add an OnFail section to a
 process, which can take an action when it fails}
 
 \begin{figure}[h]
@@ -203,6 +204,15 @@ case, the daemon itself can be configured to mitigate this issue by offloading
 newly consumed events until a low-water mark is hit.
 
 \subsection{Pipelines}
+
+Pipelines are at the heart of binge.  Each event will be proceessed through
+each pipeline configured for the daemon.  This allows different
+binge/configuration artifacts to be deployed for specific events.  For example,
+you can deploy a specific configuration to an auto-scale group to serve events
+for your CI/CD processes from GitHub, GitLab and CircleCI, while a separate
+configuration is deployed to an auto-scale group to serve your Slack
+events.
+
 \subsection{Configuration}
 
 \section{Binge Implementaion}\label{binge:implementation}
