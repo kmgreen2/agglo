@@ -19,6 +19,7 @@
 \renewcommand\theadfont{\bfseries}
 \renewcommand\theadgape{\Gape[4pt]}
 \renewcommand\cellgape{\Gape[4pt]}
+\def\code#1{\texttt{#1}}
 
 \lstset{basicstyle=\small\ttfamily,columns=fullflexible,language=Golang}
 \begin{document}
@@ -60,7 +61,7 @@ consume all events from any number of SaaS integrations and publish them to
 Kafka topics to be consumed by SPEs, custom microservice applications or big
 data systems such as BigQuery.  
 
-The many emerging IoT use cases are very similar.  That is, consuming disperate
+The many emerging IoT use cases are very similar.  That is, consuming disparate
 events, publishing them to a centralized event bus and using SPEs to process.
 The main difference between the IoT use cases and the integration platform use
 case is the definition of edge.  In the case of IoT, the edge is as close to
@@ -96,7 +97,7 @@ The high-level components of Binge are illustrated in
 Figure~\ref{fig:binge-daemon}.  Opposed to most SPEs and microservice
 architectures, which require a great deal of configuration and moving parts,
 Binge is composed of a single binary that can run as a  command (e.g.
-process a single event in a Lmabda for use in a serverless architecture, for
+process a single event in a Lambda for use in a server-less architecture, for
 testing or debugging) or as a daemon.  The figure shows the components used for
 daemon mode.  Binge exposes a HTTP endpoint that accepts POST requests
 containing JSON-formatted content, each representing an event.  All events
@@ -125,7 +126,7 @@ difference here is that the daemon operates in a pull model opposed to the push
 model of an HTTP endpoint.
 
 The rest of this section will be devoted to digging deeper into the durable
-queueing mechanism, pipelines, configuration and tradeoffs between different
+queuing mechanism, pipelines, configuration and tradeoffs between different
 configurations.
 
 \subsection{Durable Queue}
@@ -135,7 +136,7 @@ queue before replying with success to the caller.  This is done for two
 reasons.  First, it allows this or another daemon to process events that were
 either unprocessed or in-flight after a crash.  Second, it provides a buffering
 mechanism between the incoming events and the workers, preventing the need to
-apply backpressure.  The remainer of this section is devoted to both of these
+apply backpressure.  The remainder of this section is devoted to both of these
 aspects of the durable queue.
 
 \subsubsection{Event Processing and Crashes}
@@ -165,8 +166,8 @@ As shown in Figure~\ref{fig:durable-queue}, we have $5$ unprocessed events a
 $0$ in-flight, before a worker pulls an event off the queue.  Prior to
 returning the event to the worker, $Evt_{3}$ is atomically swapped to the
 in-flight queue.  An event is not removed from the in-flight queue until it is
-acked.  While processing the event, the daemon (as well as the worker) crashes
-and restarts.  Before accespting any new connections the daemon will process
+ack-ed.  While processing the event, the daemon (as well as the worker) crashes
+and restarts.  Before accepting any new connections the daemon will process
 the unprocessed and in-flight queues.  Depending on the current status of each
 event, some may remain on the in-flight queue after the start-up process
 finishes.  This could be due to an external resource being unavailable or an
@@ -195,7 +196,7 @@ detects the daemon stopped and requires restart.
 We want to ensure all events are eventually processed, but there are times when
 a daemon gets overloaded and applies backpressure, usually in the form of a
 HTTP $429$ response.  One way to avoid the need to apply backpressure is to put
-a buffer between the enpoint serving the request and the processing.  Here, the
+a buffer between the endpoint serving the request and the processing.  Here, the
 tradeoff is that returning a $200$ OK only means the event has been persisted
 and the event is hopefully processed.  As we have shown, we use a durable queue
 as our buffer.  We use tracing to ensure we have visibility into the state of
@@ -218,8 +219,8 @@ newly consumed events until a low-water mark is hit.
 \subsubsection{Stateless Mode}
 
 As previously discussed, binge can run in stateless mode, either as a daemon or
-in command mode.  Stateless mode effectively disables the durable queueing
-mechanism and crash recovery lifecycle.  This means that backpressure will be
+in command mode.  Stateless mode effectively disables the durable queuing
+mechanism and crash recovery life-cycle.  This means that backpressure will be
 applied when the all of the daemon threads or allowable connections are
 consumed, and unprocessed events will likely be dropped in the event of a
 crash.  
@@ -227,12 +228,12 @@ crash.
 This mode is best suited for cases where the source events can be safely
 dropped or binge is run within a serverless architecture (i.e. command
 mode).  As we will show in the next section, pipelines provide a checkpoint
-mechanism that can ensure indivdual pipeline executions can proceed after a
+mechanism that can ensure individual pipeline executions can proceed after a
 crash.
 
 \subsection{Pipeline Processes}\label{sec:pipelineproc}
 
-Pipelines are at the heart of binge.  Each event will be proceessed through
+Pipelines are at the heart of binge.  Each event will be processed through
 every pipeline configured for the daemon.  This allows different
 binge/configuration artifacts to be deployed for specific events.  For example,
 you can deploy a specific configuration to an auto-scale group to serve events
@@ -240,7 +241,7 @@ for your CI/CD processes from GitHub, GitLab and CircleCI, while a separate
 configuration is deployed to an auto-scale group to serve your Slack
 events.
 
-A pipeline is a colleciton of processes that are applied in sequetial order.
+A pipeline is a collection of processes that are applied in sequential order.
 Each process must implement the following interface to be used within a pipeline:
 
 \begin{lstlisting}[linewidth=\columnwidth,breaklines=true]
@@ -261,32 +262,37 @@ allows one to define a rich set of operations that can handle many stream
 processing tasks.
 
 Each pipeline invocation will process an event serially through the pipeline.
-We rely on a $Completable$/$Future$ abstraction, which simplifies asynchronous
-processing.  Since Golang does not have native support for $Futures$, we
-created our own implementation.  In a nutshell, a $Completable$ contains the
-eventual result of a computation, which is exposed to the caller as a $Future$.
-The caller can invoke $Future.Get()$ to block and obtain the result, or rely on
+We rely on a \code{Completable}/\code{Future} abstraction, which simplifies asynchronous
+processing.  Since Golang does not have native support for \code{Futures}, we
+created our own implementation.  In a nutshell, a \code{Completable} contains the
+eventual result of a computation, which is exposed to the caller as a \code{Future}.
+The caller can invoke \code{Future.Get()} to block and obtain the result, or rely on
 callbacks to perform actions on the result.  To enable highly concurrent
-pipelines, the Future abstraction exposes a $Then(Runnable)$ function
+pipelines, the Future abstraction exposes a \code{Then(Runnable)} function
 that will run the provided runnable using output of the parent future as input,
 when the parent future completes.  This model maps very nicely with invoking
 pipelines on events.
 
 \begin{figure}
 \begin{lstlisting}[linewidth=\columnwidth,breaklines=true]
-// RunnableStartProcess will create a runnable that calls 
-// outMap = pipelineProcess1.Process(inMap)
-runnable1 := NewRunnableStartProcess(pipelineProcess1, inMap)
+/* RunnableStartProcess will create 
+ * a runnable that calls 
+ * outMap = p1.Process(inMap)
+ */
+r1 := NewRunnableStartProcess(p1, inMap)
 
-// RunnablePartialProcess will create a runnable that implements 
-// SetInData(x map[string]interface{}) and runs pipelineProcess2.Process(SetInData(x))
-runnable2 := NewRunnablePartialProcess(pipelineProcess2)
-runnable3 := NewRunnablePartialProcess(pipelineProcess3)
+/* RunnablePartialProcess will create a 
+ * runnable that implements 
+ * SetInData(x map[string]interface{}) and 
+ * runs p.Process(SetInData(x))
+ */
+r2 := NewRunnablePartialProcess(p2)
+r3 := NewRunnablePartialProcess(p3)
 
 // A pipeline invocation is a chain of futures
-f1 := CreateFuture(runnable1)
-f2 := f1.Then(runnable2)
-f3 := f2.Then(runnable3)
+f1 := CreateFuture(r1)
+f2 := f1.Then(r2)
+f3 := f2.Then(r3)
 f3.Get()
 \end{lstlisting}
 \caption{Example of chaining runnables}
@@ -295,10 +301,10 @@ f3.Get()
 
 Figure~\ref{fig:runnables} illustrates how the Future abstraction fits nicely
 with pipeline invocation.  Each pipeline process is contained in a runnable
-object.  A $RunnableStartProcess$ must implement $Run()$, which will simply
-invoke $Process$.  A $RunnablePartialProcess$ must implement both $Run$ and
-$SetInData$, where $SetInData$ is called by $Then$ with the result of the
-previous future and $Run$ invokes $Process$ with the result.
+object.  A \code{RunnableStartProcess} must implement \code{Run()}, which will simply
+invoke \code{Process}.  A \code{RunnablePartialProcess} must implement both \code{Run} and
+\code{SetInData}, where \code{SetInData} is called by \code{Then} with the result of the
+previous future and \code{Run} invokes \code{Process} with the result.
 
 In addition to chaining, callbacks such as Prepare, OnSuccess and OnFailure are
 used to add instrumentation (meters and counters) and trace information (spans)
@@ -306,14 +312,14 @@ to the individual processes.
 
 \subsection{Pipeline Configuration}
 
-There are five manjor components to a pipeline configuration:
+There are five major components to a pipeline configuration:
 
 \begin{itemize}
-\item{{\bfseries External Systems:}} This contains global configuration for external systems, such as databases, key-value stores, SPEs, HTTP/gRPC endpoints or pub/sub systems.
-\item{{\bfseries Pipeline Process Definition:}} This contains the configuration for a pipeline process that can be referenced by one or more pieplines.
-\item{{\bfseries Pipeline Manifests:}} Each pipeline will contain a manifest, which is a list of ordered pipeline processes that define the pipeline.
-\item{{\bfseries Checkpoint Process:}} The checkpoint process is a special process that will checkpoint state to a provided external system.  It is configured per pipeline.
-\item{{\bfseries Pipelines:}} Pipelines is root configuration object for binge and contains the external systems, pipeline process definitions and pipeline manifests.
+\item[]{{\bfseries External Systems:}} This contains global configuration for external systems, such as databases, key-value stores, SPEs, HTTP/gRPC endpoints or pub/sub systems.
+\item[]{{\bfseries Pipeline Process Definition:}} This contains the configuration for a pipeline process that can be referenced by one or more pipelines.
+\item[]{{\bfseries Pipeline Manifests:}} Each pipeline will contain a manifest, which is a list of ordered pipeline processes that define the pipeline.
+\item[]{{\bfseries Checkpoint Process:}} The checkpoint process is a special process that will checkpoint state to a provided external system.  It is configured per pipeline.
+\item[]{{\bfseries Pipelines:}} Pipelines is root configuration object for binge and contains the external systems, pipeline process definitions and pipeline manifests.
 \end{itemize}
 
 \subsection{Pipeline Process Types}
@@ -325,7 +331,7 @@ There are five manjor components to a pipeline configuration:
 {\bfseries Type} & {\bfseries Desc} & {\bfseries Cond?} & {\bfseries Update?} & {\bfseries Stateful?} \\ \hline
 Annotator & Add annotations to output map & Yes & Yes & No \\ \hline
 Aggregator & Update an aggregation based on one or more fields & Yes & Yes & Yes \\ \hline
-Completor & \makecell{Define a join on $N$ fields and emit a completion \\ annotation when a specific value for all $N$ fields is observed} & No & Yes & Yes \\ \hline
+Completer & \makecell{Define a join on $N$ fields and emit a completion \\ annotation when a specific value for all $N$ fields is observed} & Yes & Yes & Yes \\ \hline
 Filter & Filter (or inverse filter) fields using string match or regex & No & Yes & No \\ \hline
 Spawner & Spawn a job & Yes & No & No \\ \hline
 Transformer & Transform one or more fields of the source map & Yes & Yes & No \\ \hline
@@ -338,7 +344,7 @@ Tee & Send the current map or a transformed map to an external system & Yes & No
 As shown in Table~\ref{tab:processtypes}, there are seven process types.  As
 described in Section~\ref{sec:pipelineproc}, a process essentially processes an
 input map and returns an output map.  Many of the processes can be
-conditionally guarded with a condition implementing the folloowing interface:
+conditionally guarded with a condition implementing the following interface:
 
 \begin{lstlisting}[linewidth=\columnwidth,breaklines=true]
 type Condition interface {
@@ -355,29 +361,63 @@ All but two of the processes apply updates to the map.  Note that the input map
 left untouched and an update simply means the output map is a transformed copy
 of the input map.
 
+\subsubsection{Checkpoint Processes}
+
+Talk about checkpoints.
+
+\subsubsection{Stateless Processes}
+
+Stateless process are the easiest to reason about, since they can more-or-less
+run anywhere without an external dependency for managing state.
+
 The Annotator, Filter and Spawner are the simplest of the processes, and all
 can be defined with a conditional guard.  An Annotator will simply add
 annotations to the map.  A Filter will either apply a filter or inverse filter
-to a map.  Finally, a Spawner will spawn a job.  Currently, jobs are processes
-that are spawned locally must adhere to the same interface a Processes.  That
-is, a JSON-encoded map is written to standard input and a JSON-encoded map is
-expected on standard output.
+to a map.  Finally, a Spawner will spawn a job and conditionally block.
+Currently, jobs are processes that are spawned locally must adhere to the same
+interface a Processes.  That is, a JSON-encoded map is written to standard
+input and a JSON-encoded map is expected on standard output.
 
-The remaining processes require more explanation and we will spend the rest of
-this section describing them with a few examples.
-
-\subsection{Aggregator}
-
-An Aggregator exposees many common aggregations provided by SPEs and databases.  Currently,
-we support Sum, Max, Min, Avg, Count and Histograms.  An Aggregator is defined by 4 components:
+A Transformer process will transform the provided map.  A transformer is
+defined by a list of transformation specifications, each containing
+\code{sourceField}, \code{targetField} and a \code{transformation}.  A transformation can be
+applied to an entire map by leaving the source and target fields empty.  Each
+transformation is defined by its type and type-specified arguments.  There are
+currently seven types of transformation:
 
 \begin{itemize}
-\item{{\bfseries State Store}} This specifies the external system used to store
+\item[]{\bfseries Copy} will simply perform a deep copy of the value
+\item[]{\bfseries Map} takes a path argument identifying the mapping function
+\item[]{\bfseries MapAdd/Mult} takes a value argument that will apply a constant operation
+\item[]{\bfseries MapRegex} will apply a provided regex
+\item[]{\bfseries FoldLeft/Right} will apply the appropriate fold using the provided function
+\end{itemize}
+
+A Tee process will write the input map to the configured external system and
+return the input map as output.  The input map can optionally be transformed,
+using a transformer, prior to writing to the external system.  In both cases,
+the original input map is always returned as the output of the process.  
+
+The Tee process is very powerful in that it can be used to send events to
+external webhooks, internal microservices, or other binge processes in response
+to an event.  This allows the basic directed list topology of a single binge
+process to extend to a tree-like topology.  This allows system designers to
+deliberately place some processes close to the event generation and others
+closer to centralized systems.
+
+\subsubsection{Stateful Processes}
+
+An Aggregator exposes many common aggregations provided by SPEs and databases.
+Currently, we support Sum, Max, Min, Avg, Count and Histograms.  An Aggregator
+is defined by 4 components:
+
+\begin{itemize}
+\item[]{\bfseries State Store} This specifies the external system used to store
 the aggregation, which can be anything from a local file system to an external
 key-value store.
-\item{{\bfseries Field Key}} This is the field key that corresponds to the value to aggregate.
-\item{{\bfseries Aggregation Type}} This is the type of aggregatioon to apply.
-\item{{\bfseries Group By}} Group by applies to all but the Histogram aggregation and will aggregate by the keys provided.
+\item[]{\bfseries Field Key} This is the field key that corresponds to the value to aggregate.
+\item[]{\bfseries Aggregation Type} This is the type of aggregation to apply.
+\item[]{\bfseries Group By} Group by applies to all but the Histogram aggregation and will aggregate by the keys provided.
 \end{itemize}
 
 Figure~\ref{fig:aggregation} shows an example snapshot of a pipeline run
@@ -390,14 +430,36 @@ used by downstream processes to conditionally run processes, to further
 aggregate or make other decisions.  The figure also illustrates the use of
 histogram aggregations and a simple count.
 
-This example also highlights another well-known issue with stateful stream
-processes: tracking consistent state.  There are three main tradeoffs that arise
-with respect to stateful processes:
+A Completion is a special process that listens for matching values of a set of
+fields.  The first time a value is seen for a set of fields, a completion is
+triggered.  Once that value is seen for all fields in the set, the completion
+is complete.  This can be seen as a very simple online join of events.  A completion
+if defined by two components:
 
 \begin{itemize}
-\item{{\bfseries Consistency}} Maintaining consistent state requires coordination or centralization.
-\item{{\bfseries Performance}} Requiring consistent stateful processes will negatively impact latency.
-\item{{\bfseries Starvation}} Requiring consistent stateful processes could lead to starvation.
+\item[]{\bfseries State Fields} A list of fields to extract and include in the
+completion's state \footnote{ToDo: need to add this functionality}
+\item[]{{\bfseries JoinKeys}} The field keys that define the set of fields to watch
+\item[]{{\bfseries Timeout}} A timer is started the first time a value is seen.
+If the timer exceeds the time-out, we cancel the completion for the value.
+\end{itemize}
+
+Figure~\ref{fig:completion} shows an example completion from getting triggered
+to being completed.  In this example, the JoinKeys are \code{commit.repo},
+\code{dev-deploy.origin} and \code{unit-tests.origin}.  In this example, a event sourced
+from GitHub arrives first, followed by a deployer event and finally a tester
+event.  As shown in the figure, an annotation is added whenever a completion is
+triggered or completed, which allows downstream processes to conditionally act
+on the current state of a completion.
+
+These examples highlight well-known issue with stateful stream processes:
+tracking consistent state.  There are three main tradeoffs that arise with
+respect to stateful processes:
+
+\begin{itemize}
+\item[]{{\bfseries Consistency}} Maintaining consistent state requires coordination or centralization.
+\item[]{{\bfseries Performance}} Requiring consistent stateful processes will negatively impact latency.
+\item[]{{\bfseries Starvation}} Requiring consistent stateful processes could lead to starvation.
 \end{itemize}
 
 There are two modes of operation here:
@@ -405,37 +467,35 @@ There are two modes of operation here:
 \begin{itemize}
 \item{Use a centralized key-value store to maintain state.  At minimum we would
 want atomic put and delete to ensure consistency.}
-\item{Rely on a local persistent store (file system or local key-vallue store)
+\item{Rely on a local persistent store (file system or local key-value store)
 and aggregate the aggregations at a binge sink that is close to a centralized
 key-value store.}
 \end{itemize}
 
 The first option is the easiest to reason about, since we simply specify an
 external system to use.  The major cloud providers have a variety of options
-that can be deployed at the push of a button.  Here, the conceern is
+that can be deployed at the push of a button.  Here, the concern is
 performance: increase in latency due to round-trip time and contention.
-Contention could be mitigated using higih-performance key-value stores, such as
+Contention could be mitigated using high-performance key-value stores, such as
 Anna~\cite{ANNA}.  In either case, the distance between the binge process and
 the centralized key-value store will largely dictate the performance overhead.
 
-The second option relies on the existance of a binge-mesh, where a pipeline
+The second option relies on the existence of a binge-mesh, where a pipeline
 maintains local aggregation state and relies on a downstream binge process to
 perform the final aggregation.  In this case, the final aggregation could be
 performed closer to a centralized key-value store.  Note that here the
 round-trip time doesn't change, but our throughput will likely be higher than
-the first option.  The main disadvatage to this approach is managing the mesh
+the first option.  The main disadvantage to this approach is managing the mesh
 of binge processes.  We will cover this in Section~\ref{sec:orchestration}.
 
-\begin{figure*}
-\centering
-\includegraphics{figures/aggregation.pdf}
-\caption{Figure}
-\label{fig:aggregation}
-\end{figure*}
-
-
-\section{Binge Implementaion}\label{binge:implementation}
+\section{Binge Implementation}\label{binge:implementation}
 \section{Orchestration}\label{sec:orchestration}
+\section{Operations}\label{sec:operations}
+
+The discussion of any infrastructure service or distributed system is incomplete
+without discussing how it is monitored and managed.  We have built binge with
+operations in mind.
+
 \section{Example Use Cases}\label{usecases}
 \section{Performance Evaluation}\label{evaluation}
 \section{Previous work}\label{previous:work}
@@ -446,5 +506,29 @@ We worked hard, and achieved very little.
 \bibliographystyle{abbrv}
 \bibliography{main}
 
+\section{Appendix}\label{sec:appendix}
+\section{Process Examples}\label{sec:appendix:process}
+
+\begin{figure*}
+\centering
+\includegraphics{figures/aggregation.pdf}
+\caption{Figure}
+\label{fig:aggregation}
+\end{figure*}
+
+
+\begin{figure*}
+\centering
+\includegraphics{figures/completion.pdf}
+\caption{Figure}
+\label{fig:completion}
+\end{figure*}
+
+\begin{figure*}
+\centering
+\includegraphics{figures/tee.pdf}
+\caption{Figure}
+\label{fig:tee}
+\end{figure*}
+
 \end{document}
-This is never printed
