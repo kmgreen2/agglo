@@ -380,6 +380,58 @@ key-value store.
 \item{{\bfseries Group By}} Group by applies to all but the Histogram aggregation and will aggregate by the keys provided.
 \end{itemize}
 
+Figure~\ref{fig:aggregation} shows an example snapshot of a pipeline run
+containing three aggregation processes.  First, we see the output map of the
+previous process passed into the Sum aggregation.  The Aggregator process will
+try to fetch state for this aggregation.  If there is no state, it will create
+new state.  In either case, a new annotation is added to the map containing the
+current state of the aggregation after it is updated.  These annotations can be
+used by downstream processes to conditionally run processes, to further
+aggregate or make other decisions.  The figure also illustrates the use of
+histogram aggregations and a simple count.
+
+This example also highlights another well-known issue with stateful stream
+processes: tracking consistent state.  There are three main tradeoffs that arise
+with respect to stateful processes:
+
+\begin{itemize}
+\item{{\bfseries Consistency}} Maintaining consistent state requires coordination or centralization.
+\item{{\bfseries Performance}} Requiring consistent stateful processes will negatively impact latency.
+\item{{\bfseries Starvation}} Requiring consistent stateful processes could lead to starvation.
+\end{itemize}
+
+There are two modes of operation here:
+
+\begin{itemize}
+\item{Use a centralized key-value store to maintain state.  At minimum we would
+want atomic put and delete to ensure consistency.}
+\item{Rely on a local persistent store (file system or local key-vallue store)
+and aggregate the aggregations at a binge sink that is close to a centralized
+key-value store.}
+\end{itemize}
+
+The first option is the easiest to reason about, since we simply specify an
+external system to use.  The major cloud providers have a variety of options
+that can be deployed at the push of a button.  Here, the conceern is
+performance: increase in latency due to round-trip time and contention.
+Contention could be mitigated using higih-performance key-value stores, such as
+Anna~\cite{ANNA}.  In either case, the distance between the binge process and
+the centralized key-value store will largely dictate the performance overhead.
+
+The second option relies on the existance of a binge-mesh, where a pipeline
+maintains local aggregation state and relies on a downstream binge process to
+perform the final aggregation.  In this case, the final aggregation could be
+performed closer to a centralized key-value store.  Note that here the
+round-trip time doesn't change, but our throughput will likely be higher than
+the first option.  The main disadvatage to this approach is managing the mesh
+of binge processes.  We will cover this in Section~\ref{sec:orchestration}.
+
+\begin{figure*}
+\centering
+\includegraphics{figures/aggregation.pdf}
+\caption{Figure}
+\label{fig:aggregation}
+\end{figure*}
 
 
 \section{Binge Implementaion}\label{binge:implementation}
