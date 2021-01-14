@@ -96,18 +96,18 @@ conclude in Section~\ref{conclusions}.
 The high-level components of Binge are illustrated in
 Figure~\ref{fig:binge-daemon}.  Opposed to most SPEs and microservice
 architectures, which require a great deal of configuration and moving parts,
-Binge is composed of a single binary that can run as a  command (e.g.
-process a single event in a Lambda for use in a server-less architecture, for
-testing or debugging) or as a daemon.  The figure shows the components used for
-daemon mode.  Binge exposes a HTTP endpoint that accepts POST requests
-containing JSON-formatted content, each representing an event.  All events
-consumed by the daemon are persisted to a durable queue, which are consumed by
-workers.  Each event will be processed by a worker in one or more pipelines
-defined in the configuration.  Once a worker has completed processing an event,
-it will ack the event and pick up more work.  This in combination with
-checkpointing (discussed later) allows the each daemon to be killed without
-losing events or processing state.  Later we will discuss tradeoffs with the
-various durability configurations. 
+Binge core is a single binary that can run as a command (e.g.  process a single
+event in a Lambda for use in a server-less architecture, for testing or
+debugging) or as a daemon.  The figure shows the components used for daemon
+mode.  Binge exposes a HTTP endpoint that accepts POST requests containing
+JSON-formatted content, each representing an event.  All events consumed by the
+daemon are persisted to a durable queue, which are consumed by workers.  Each
+event will be processed by a worker in one or more pipelines defined in the
+configuration.  Once a worker has completed processing an event, it will ack
+the event and pick up more work.  This in combination with checkpointing
+(discussed later) allows the each daemon to be killed without losing events or
+processing state.  Later we will discuss tradeoffs with the various durability
+configurations. 
 
 \begin{figure}[h]
 \centering
@@ -361,9 +361,6 @@ All but two of the processes apply updates to the map.  Note that the input map
 left untouched and an update simply means the output map is a transformed copy
 of the input map.
 
-\subsubsection{Checkpoint Processes}
-
-Talk about checkpoints.
 
 \subsubsection{Stateless Processes}
 
@@ -482,14 +479,17 @@ the centralized key-value store will largely dictate the performance overhead.
 
 The second option relies on the existence of a binge-mesh, where a pipeline
 maintains local aggregation state and relies on a downstream binge process to
-perform the final aggregation.  In this case, the final aggregation could be
-performed closer to a centralized key-value store.  Note that here the
-round-trip time doesn't change, but our throughput will likely be higher than
-the first option.  The main disadvantage to this approach is managing the mesh
-of binge processes.  We will cover this in Section~\ref{sec:orchestration}.
+perform the final aggregation.  In this case, the final aggregation or
+completion could be performed closer to a centralized key-value store.  Note
+that here the round-trip time doesn't change, but our throughput will likely be
+higher than the first option.  The main disadvantage to this approach is
+managing the mesh of binge processes.  We will cover this in
+Section~\ref{sec:orchestration}.
 
-\section{Binge Implementation}\label{binge:implementation}
+\subsubsection{Checkpointing}
+
 \section{Orchestration}\label{sec:orchestration}
+
 \section{Operations}\label{sec:operations}
 
 The discussion of any infrastructure service or distributed system is incomplete
