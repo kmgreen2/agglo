@@ -16,7 +16,7 @@ import (
 	"reflect"
 )
 
-var TeeMetadataKey string = "agglo:tee:output"
+var TeeMetadataKey string = string(common.TeeMetadataKey)
 
 // Tee is a process processor that will send a provided mapping to
 // a system (i.e. KVStore, Pubsub, etc.) and return the map

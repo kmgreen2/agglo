@@ -3,6 +3,7 @@ package process_test
 import (
 	"fmt"
 	gUuid "github.com/google/uuid"
+	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/core"
 	"github.com/kmgreen2/agglo/pkg/core/process"
 	"github.com/kmgreen2/agglo/pkg/kvs"
@@ -22,8 +23,8 @@ func TestPipelineBasic(t *testing.T) {
 	// partitionID is meant to separate different organizations or departments
 	// name is meant to partition different classes of messages (e.g. CI/CD, messaging, etc.)
 	annotatorBuilder := process.NewAnnotatorBuilder()
-	annotatorBuilder.Add(core.NewAnnotation("agglo:internal:partitionID", partitionID.String(), core.TrueCondition))
-	annotatorBuilder.Add(core.NewAnnotation("agglo:internal:name", name, core.TrueCondition))
+	annotatorBuilder.Add(core.NewAnnotation(string(common.PartitionIDKey), partitionID.String(), core.TrueCondition))
+	annotatorBuilder.Add(core.NewAnnotation(string(common.ResourceNameKey), name, core.TrueCondition))
 	builder.Add(annotatorBuilder.Build())
 
 	// Annotate the different types of maps based on the existence of
@@ -83,7 +84,8 @@ func TestPipelineBasic(t *testing.T) {
 		spawnOutput = append(spawnOutput, arg["githash"].(string))
 	})
 
-	condition, err = core.NewCondition(core.NewComparatorExpression(core.Variable("agglo:completion:default"),
+	condition, err = core.NewCondition(core.NewComparatorExpression(core.Variable(common.InternalKeyFromPrefix(
+		common.CompletionStatusPrefix, "default")),
 		"complete",	core.Equal))
 
 	builder.Add(process.NewSpawner(core.NewLocalJob(runnable), condition, -1, true))

@@ -22,8 +22,8 @@ func TestKVCheckPointer(t *testing.T) {
 	checkpointer := NewKVCheckPointer(kvStore)
 
 	in := map[string]interface{} {
-		"agglo:internal:name": pipelineName,
-		"agglo:messageID": messageID.String(),
+		string(common.ResourceNameKey): pipelineName,
+		string(common.MessageIDKey): messageID.String(),
 	}
 
 	for i := 0; i < 10; i++ {
@@ -70,8 +70,8 @@ func TestLocalFileCheckPointer(t *testing.T) {
 	}
 
 	in := map[string]interface{} {
-		"agglo:internal:name": pipelineName,
-		"agglo:messageID": messageID.String(),
+		string(common.ResourceNameKey): pipelineName,
+		string(common.MessageIDKey): messageID.String(),
 	}
 
 	for i := 0; i < 10; i++ {

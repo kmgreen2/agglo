@@ -164,7 +164,8 @@ func (d *StatelessDaemon) Run() error {
 			return
 		}
 
-		in["agglo:messageID"] = messageID.String()
+		common.MustSetUsingInternalKey(common.MessageIDKey, messageID.String(), in)
+
 		err = RunPipelines(in, d.pipelines)
 		if err != nil {
 			resp.WriteHeader(500)
@@ -419,7 +420,8 @@ func (d *DurableDaemon) Run() error {
 			return
 		}
 
-		in["agglo:messageID"] = messageID.String()
+		common.MustSetUsingInternalKey(common.MessageIDKey, messageID.String(), in)
+
 		inBytes, err := common.MapToJson(in)
 		if err != nil {
 			resp.WriteHeader(500)

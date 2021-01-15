@@ -419,8 +419,8 @@ func GetAggMapsWithFloats(numMaps int, paths [][]string, partitionID gUuid.UUID,
 
 	for i := 0; i < numMaps; i++ {
 		m, values := GenRandomMapWithAddedKeysWithFloats(paths)
-		m["agglo:internal:partitionID"] = partitionID.String()
-		m["agglo:internal:name"] = name
+		common.MustSetUsingInternalKey(common.PartitionIDKey, partitionID.String(), m)
+		common.MustSetUsingInternalKey(common.ResourceNameKey, name, m)
 		mapValues = append(mapValues, values)
 		maps = append(maps, m)
 	}
@@ -435,8 +435,8 @@ func GetAggMapsWithStrings(numMaps int, paths [][]string, partitionID gUuid.UUID
 
 	for i := 0; i < numMaps; i++ {
 		m, values := GenRandomMapWithAddedKeysWithStrings(paths, maxStrLen)
-		m["agglo:internal:partitionID"] = partitionID.String()
-		m["agglo:internal:name"] = name
+		common.MustSetUsingInternalKey(common.PartitionIDKey, partitionID.String(), m)
+		common.MustSetUsingInternalKey(common.ResourceNameKey, name, m)
 		mapValues = append(mapValues, values)
 		maps = append(maps, m)
 	}
@@ -451,8 +451,8 @@ func GetJoinedMaps(numMaps, numJoined int, partitionID gUuid.UUID, name string) 
 
 	for i := 0; i < numMaps; i++ {
 		m, flattenedKeys := GenRandomMap(5, 16)
-		m["agglo:internal:partitionID"] = partitionID.String()
-		m["agglo:internal:name"] = name
+		common.MustSetUsingInternalKey(common.PartitionIDKey, partitionID.String(), m)
+		common.MustSetUsingInternalKey(common.ResourceNameKey, name, m)
 		if currJoined < numJoined {
 			keys := strings.Split(flattenedKeys[0], ".")
 			curr := m

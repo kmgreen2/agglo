@@ -3,7 +3,6 @@ package process
 import (
 	"context"
 	"errors"
-	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/core"
@@ -135,7 +134,10 @@ func (a Aggregator) Process(ctx context.Context, in map[string]interface{}) (map
 		updatedMap[updatedKeys[i]] = updatedValues[i]
 	}
 
-	out[fmt.Sprintf("agglo:aggregation:%s", name)] = updatedMap
+	err = common.SetUsingInternalPrefix(common.AggregationDataPrefix, name, updatedMap, out, true)
+	if err != nil {
+		return nil, err
+	}
 
 	return out, nil
 }

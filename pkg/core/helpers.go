@@ -7,22 +7,22 @@ import (
 )
 
 func GetPartitionID(in map[string]interface{}) (gUuid.UUID, error) {
-	if partitionIDRaw, ok := in["agglo:internal:partitionID"]; ok {
+	if partitionIDRaw, ok := common.GetFromInternalKey(common.PartitionIDKey, in); ok {
 		if partitionID, ok := partitionIDRaw.(string); ok {
 			return gUuid.Parse(partitionID)
 		}
 	}
-	msg := fmt.Sprintf("could not find valid 'agglo:internal:partitionID' in payload")
+	msg := fmt.Sprintf("could not find valid 'partitionID' in payload")
 	return gUuid.Nil, common.NewInvalidError(msg)
 }
 
 func GetName(in map[string]interface{}) (string, error) {
-	if nameRaw, ok := in["agglo:internal:name"]; ok {
+	if nameRaw, ok := common.GetFromInternalKey(common.ResourceNameKey, in); ok {
 		if name, ok := nameRaw.(string); ok {
 			return name, nil
 		}
 	}
-	msg := fmt.Sprintf("could not find valid 'agglo:internal:name' in payload")
+	msg := fmt.Sprintf("could not find valid 'resource name' in payload")
 	return "", common.NewInvalidError(msg)
 }
 

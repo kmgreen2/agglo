@@ -14,8 +14,8 @@ import (
 	"reflect"
 )
 
-var CheckpointIdxKey string = "agglo:checkpoint:idx"
-var CheckpointDataKey string = "agglo:checkpoint:data"
+var CheckpointIdxKey string = string(common.CheckpointIndexKey)
+var CheckpointDataKey string = string(common.CheckpointDataKey)
 
 type Finalizer interface {
 	Finalize(ctx context.Context, in map[string]interface{}) error
@@ -154,7 +154,7 @@ func NewLocalFileCheckPointer(path string) (*CheckPointer, error) {
 }
 
 func getIndexFromCheckpoint(checkpoint map[string]interface{}) (int64, error) {
-	if idx, ok := checkpoint["agglo:checkpoint:idx"]; ok {
+	if idx, ok := common.GetFromInternalKey(common.CheckpointIndexKey, checkpoint); ok {
 		numericIdx, err := core.GetNumeric(idx)
 		if err != nil {
 			return -1, err
@@ -165,7 +165,7 @@ func getIndexFromCheckpoint(checkpoint map[string]interface{}) (int64, error) {
 }
 
 func getDataFromCheckpoint(checkpoint map[string]interface{}) (map[string]interface{}, error) {
-	if rawData, rawOk := checkpoint["agglo:checkpoint:data"]; rawOk {
+	if rawData, rawOk := common.GetFromInternalKey(common.CheckpointDataKey, checkpoint); rawOk {
 		if data, ok := rawData.(map[string]interface{}); ok {
 			return data, nil
 		} else {
@@ -205,8 +205,8 @@ func (c CheckPointer) GetCheckpointWithIndexFromMap(ctx context.Context, in map[
 	// is no checkpoint
 	err = common.NewNotFoundError("no checkpoint")
 
-	if pipelineName, nameOk := in["agglo:internal:name"]; nameOk {
-		if messageID, messageOk := in["agglo:messageID"]; messageOk {
+	if pipelineName, nameOk := common.GetFromInternalKey(common.ResourceNameKey, in); nameOk {
+		if messageID, messageOk := common.GetFromInternalKey(common.MessageIDKey, in); messageOk {
 			var checkpoint map[string]interface{}
 			checkpointStateKey := fmt.Sprintf("%s:%s", pipelineName, messageID)
 			checkpoint, err = c.fetchFunc(ctx, checkpointStateKey)
@@ -234,8 +234,8 @@ func (c CheckPointer) GetCheckpointWithIndexFromMap(ctx context.Context, in map[
 }
 
 func (c CheckPointer) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
-	if pipelineName, nameOk := in["agglo:internal:name"]; nameOk {
-		if messageID, messageOk := in["agglo:messageID"]; messageOk {
+	if pipelineName, nameOk := common.GetFromInternalKey(common.ResourceNameKey, in); nameOk {
+		if messageID, messageOk := common.GetFromInternalKey(common.MessageIDKey, in); messageOk {
 			checkpointStateKey := fmt.Sprintf("%s:%s", pipelineName, messageID)
 			checkpoint, err := c.fetchFunc(ctx, checkpointStateKey)
 			if err != nil {
@@ -246,23 +246,23 @@ func (c CheckPointer) Process(ctx context.Context, in map[string]interface{}) (m
 				return nil, err
 			}
 		} else {
-			return nil, common.NewInternalError("could not find 'agglo:messageID' to checkpoint")
+			return nil, common.NewInternalError("could not find messageID to checkpoint")
 		}
 	} else {
-		return nil, common.NewInternalError("could not find 'agglo:internal:name' to checkpoint")
+		return nil, common.NewInternalError("could not find resource name to checkpoint")
 	}
 	return in, nil
 }
 
 func (c CheckPointer) Finalize(ctx context.Context, in map[string]interface{}) error {
-	if pipelineName, nameOk := in["agglo:internal:name"]; nameOk {
-		if messageID, messageOk := in["agglo:messageID"]; messageOk {
+	if pipelineName, nameOk := common.GetFromInternalKey(common.ResourceNameKey, in); nameOk {
+		if messageID, messageOk := common.GetFromInternalKey(common.MessageIDKey, in); messageOk {
 			checkpointStateKey := fmt.Sprintf("%s:%s", pipelineName, messageID)
 			return c.removeFunc(ctx, checkpointStateKey)
 		} else {
-			return common.NewInternalError("could not find 'agglo:messageID' to remove checkpoint")
+			return common.NewInternalError("could not find messageID to remove checkpoint")
 		}
 	} else {
-		return common.NewInternalError("could not find 'agglo:internal:name' to remove checkpoint")
+		return common.NewInternalError("could not find resource name to remove checkpoint")
 	}
 }

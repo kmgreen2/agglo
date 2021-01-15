@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	gUuid "github.com/google/uuid"
+	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/core"
 	"github.com/kmgreen2/agglo/pkg/core/process"
 	"github.com/kmgreen2/agglo/pkg/kvs"
@@ -35,7 +36,7 @@ name string, partitionID gUuid.UUID, aggPath string, evalValAt EvaluateValAt) (i
 
 		val, err := core.GetMap(out,
 			[]string{
-				fmt.Sprintf("agglo:aggregation:%s", name),
+				common.InternalKeyFromPrefix(common.AggregationDataPrefix, name),
 				fmt.Sprintf("%s:%s", fieldAggregation.Key, aggType.String()),
 			})
 

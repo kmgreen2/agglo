@@ -103,11 +103,8 @@ func NewExecLeftFoldTransformation(path string) *LeftFoldTransformation {
 		func (acc, in interface{}) (interface{}, error) {
 			switch val := in.(type) {
 			case map[string]interface{}:
-				if _, ok := val["agglo:acc"]; !ok {
-					val["agglo:acc"] = acc
-				} else {
-					msg := fmt.Sprintf("reserved key 'agglo:acc' should not be set in args to fold")
-					return nil, common.NewInvalidError(msg)
+				if err := common.SetUsingInternalKey(common.AccumulatorKey, acc, val, false); err != nil {
+					return nil, common.NewInvalidError(err.Error())
 				}
 			default:
 				msg := fmt.Sprintf("expected map[string]interface{} argument to fold.  Got %v",
@@ -152,11 +149,8 @@ func NewExecRightFoldTransformation(path string) *RightFoldTransformation {
 		func (acc, in interface{}) (interface{}, error) {
 			switch val := in.(type) {
 			case map[string]interface{}:
-				if _, ok := val["agglo:acc"]; !ok {
-					val["agglo:acc"] = acc
-				} else {
-					msg := fmt.Sprintf("reserved key 'agglo:acc' should not be set in args to fold")
-					return nil, common.NewInvalidError(msg)
+				if err := common.SetUsingInternalKey(common.AccumulatorKey, acc, val, false); err != nil {
+					return nil, common.NewInvalidError(err.Error())
 				}
 			default:
 				msg := fmt.Sprintf("expected map[string]interface{} argument to fold.  Got %v",

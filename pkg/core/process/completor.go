@@ -3,7 +3,6 @@ package process
 import (
 	"context"
 	"errors"
-	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/core"
@@ -107,20 +106,34 @@ func (c Completer) Process(ctx context.Context, in map[string]interface{}) (map[
 		if err != nil {
 			return out, err
 		}
-		out[fmt.Sprintf("agglo:completion:%s", name)] = "complete"
+		err = common.SetUsingInternalPrefix(common.CompletionStatusPrefix, c.name, "complete", out, true)
+		if err != nil {
+			return out, err
+		}
 		stateMap, err := common.JsonToMap(newCompletionBytes)
 		if err != nil {
 			return out, err
 		}
-		out[fmt.Sprintf("agglo:completion:state:%s", name)] = stateMap
+		err = common.SetUsingInternalPrefix(common.CompletionStatePrefix, c.name, stateMap, out, true)
+		if err != nil {
+			return out, err
+		}
 	} else if completionState.CompletionDeadline > 0 && time.Now().UnixNano() > completionState.CompletionDeadline {
-			out[fmt.Sprintf("agglo:completion:%s", name)] = "timedout"
+			err = common.SetUsingInternalPrefix(common.CompletionStatusPrefix, c.name, "timedout", out,
+				true)
+			if err != nil {
+				return out, err
+			}
 	} else {
 		err = c.completionStateStore.AtomicPut(ctx, stateKey, completionStateBytes, newCompletionBytes)
 		if err != nil {
 			return out, err
 		}
-		out[fmt.Sprintf("agglo:completion:%s", name)] = "triggered"
+		err = common.SetUsingInternalPrefix(common.CompletionStatusPrefix, c.name, "triggered", out,
+			true)
+		if err != nil {
+			return out, err
+		}
 	}
 
 	return out, nil

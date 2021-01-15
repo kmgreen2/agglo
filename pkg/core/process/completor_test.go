@@ -3,6 +3,7 @@ package process_test
 import (
 	"context"
 	gUuid "github.com/google/uuid"
+	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/core"
 	"github.com/kmgreen2/agglo/pkg/core/process"
 	"github.com/kmgreen2/agglo/pkg/kvs"
@@ -41,7 +42,7 @@ func DoCompleter(numMaps, numJoined int, timeout time.Duration, missingJoinKey s
 		if err != nil {
 			return 0, 0, 0, nil
 		}
-		if val, ok := out["agglo:completion:foo"]; ok {
+		if val, ok := out[common.InternalKeyFromPrefix(common.CompletionStatusPrefix, "foo")]; ok {
 
 			// Timeout clock starts after first keepMatched for a join set
 			if forceTimeout {

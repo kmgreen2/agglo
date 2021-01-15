@@ -466,8 +466,9 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*process.Pipelines, error) {
 		}
 		// Each pipeline must set annotations to ensure there are no conflicts in the state stores
 		annotatorBuilder := process.NewAnnotatorBuilder()
-		annotatorBuilder.Add(core.NewAnnotation("agglo:internal:partitionID", partitionUuid.String(), core.TrueCondition))
-		annotatorBuilder.Add(core.NewAnnotation("agglo:internal:name", pipeline.Name, core.TrueCondition))
+		annotatorBuilder.Add(core.NewAnnotation(string(common.PartitionIDKey), partitionUuid.String(),
+			core.TrueCondition))
+		annotatorBuilder.Add(core.NewAnnotation(string(common.ResourceNameKey), pipeline.Name, core.TrueCondition))
 
 		pipelineBuilder.Add(annotatorBuilder.Build())
 
