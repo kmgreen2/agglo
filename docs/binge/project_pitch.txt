@@ -191,11 +191,11 @@ generation of stream processing problems.
 
 I am currently working solo on the project and hope to secure funding to
 recruit someone else to help and cover the cost of testing our hyptheses in a
-could environment.  Much of my 15+ year career has been spent working in
-distributed systems research (20+ peer-reviewed publications and 8 patents) and
-building production distributed and storage systems (3 years at EMC, 6 years at
-Box and 3 years at other start-ups).  Much of my career has been spent building
-and leading teams that maintain large-scale, customer-facing, distributed
-systems.  The combination of these experiments makes me well suited for leading
-a project of this scope and sophistication.
+cloud environment.  Much of my 15+ year career has been spent working in
+distributed systems research (BS/MS/PhD in CS, 20+ peer-reviewed publications
+and 8 patents), building production distributed systems and leading teams that
+maintain large-scale, customer-facing, distributed systems (3 years at EMC, 6
+years at Box and 3 years at other start-ups).  The combination of these
+experiences makes me well suited for leading a project of this scope and
+sophistication.
 
