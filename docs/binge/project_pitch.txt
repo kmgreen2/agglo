@@ -1,7 +1,7 @@
 Question #1: Briefly Describe the Technology Innovation.  Up to 500 words
 describing the technical innovation that would be the focus of a Phase 1
 project, including a brief discussion of the origins of the innovation as well
-as an explanation as to why it meets the program’s mandate to focus on
+as an explanation as to why it meets the program's mandate to focus on
 supporting research and development (R&D) of unproven, high-impact innovations.
 
 Stream processing has become ubiquitous in almost every aspect of cloud
@@ -9,11 +9,11 @@ computing.  What began as a foundational technology for batch-based and
 real-time analytics systems is finding a place in many performance sensitive
 integration-based application architectures (iPaaS) and emerging
 Internet-of-Things (IoT) applications.  Most stream and event processing is
-done using popular Stream Processing Engines (SPE), such as Apache Storm, or
-using event-based design patterns within a custom application stack on reliable
-event buses, such as Apache Kafka.  While all modern stream processing systems
-are distributed systems, these systems are typically deployed in a central
-location, such as a virtual private cloud (VPC).
+done using popular Stream Processing Engines (SPE), such as Spark, or using
+event-based design patterns within a custom application stack on reliable event
+buses, such as Kafka.  While all modern stream processing systems are
+distributed systems, each instance is deployed to a central location, such as a
+virtual private cloud (VPC).
 
 The continued innovation in IoT platforms, such as AWS Greengrass, and increase
 in devices connecting to the Internet will also increase the dependence of
@@ -33,31 +33,31 @@ sites hosting the SPEs, and as a result, cost will increase and
 performance-sensitive applications will suffer.
 
 3. Many stream processing tasks do not require the complexities introduced by
-SPEs, but pay the cost of running SPEs to do a bulk of the processing.
+clustered SPEs, but pay the cost of processing in a SPE.
 
 The goal of this project is to simplify the placement of stream processing
 tasks as a globally distributed system.  The goal is not to usurp existing SPEs
 or event based architectures, but to compliment them in a way that performs
 processing in the most appropriate tier (at the edge, at a point-of-presence,
 on a load balancer or in a centralized SPE) depending on cost, resources and
-performance.  For example, a simple transformation, aggregation or filter
-operation can occur close to where the event is generated, freeing up resources
-in the more expensive SPE for deep learning and sophisticated analytics.
+performance.  For example, many transformations, aggregations and filters can
+occur close to where the event is generated, freeing up resources in the more
+expensive SPEs.
 
 This goal will be accomplished in two ways.  First, we will create a novel
 architecture that manages a federation of lightweight, independent processors
 that can run directly on commodity hardware, within modern container
-orchestration systems, such as Kubernetes, and serverless frameworks, such as
-AWS Lambda.  Second, we will provide tools for performing "what-if" analysis,
-so researchers and practitioners can experimentally determine optimal placement
-of processing under specific constraints.  
+orchestration systems and serverless frameworks.  In all cases, the processor
+will be the same single binary.  Second, we will provide tools for performing
+"what-if" analysis, so researchers and practitioners can experimentally
+determine optimal placement of processing under specific constraints.
 
 Most state-of-the-art improvements in stream processing are focused on running
 a distributed stream processing system within a VPC or deploying lightweight
-versions of existing stream processing systems to the edge.  Here we are
-redefining the stream processing architecture as a globally distributed system
-and providing the experimental tools for optimizing placement under a set of
-constraints, such as cost, performance and consistency.
+versions of existing clustered stream processing systems to the edge.  Here we
+are redefining the stream processing architecture as a globally distributed
+system and providing the experimental tools for optimizing placement under a
+set of constraints, such as cost, performance and consistency.
 
 Question #2: Briefly Describe the Technical Objectives and Challenges.  Up to
 500 words describing the R&D or technical work to be done in a Phase I project,
@@ -70,22 +70,24 @@ rather than straightforward engineering or incremental product development
 tasks.
 
 We believe that a successful Phase 1 implementation will mostly be focused on
-defining the new architecture, building a reference implementation of the
-architecture and building an experimental framework for analyzing the reference
-implementation.  The end of Phase 1 will have the following deliverables:
+defining the new architecture, building a reference implementation and building
+an experimental framework for analyzing the reference implementation.  The end
+of Phase 1 will have the following deliverables:
 
-1. An open source implementation of the processor, which will be the kernel of
-the new architecture that performs the stream processing tasks.
+1. An open source implementation of the processor as a single binary, capable
+of performing many stream processing tasks, which is the core of the new
+architecture.
 
 2. Reference configurations of the new architecture deployed in a public cloud
 setting, across a variety of runtimes, such as Linux VMs, Kubernetes
-deployments, Kubernetes Jobs and Lambda functions.
+deployments, Kubernetes Jobs and serverless functions.
 
 3. Empirical comparison of the reference configurations that utilize the new
-architecture to that of existing stream processing systems, such as Storm or
-Spark, as the core processors.  It is important to determine the efficacy of
-the new architecture against the state-of-the-art.  We plan to not only
-evaluate performance, durability and cost, but also expected development time.
+architecture to that of existing stream processing systems on their own, such
+as Flink or Spark, as the core processors.  It is important to determine the
+efficacy of the new architecture against the state-of-the-art.  We plan to not
+only evaluate performance, durability and cost, but also expected development
+time.
 
 Most of the technical challenges will come as part of #1 and #3, as reference
 configurations are obtained using well-known benchmarks and referencing
@@ -131,7 +133,7 @@ processing tasks typically performed by cluster-based SPEs to a globally
 distributed mesh of processes.  In short, it is a paradigm shift.
 
 2. The project involves a great deal of empirical evidence and experimentation
-to prove out the new approach. 
+to validate the approach.
 
 3. The project aims to provide methodologies for further analysis in
 globally-distributed stream processing.
@@ -140,20 +142,6 @@ globally-distributed stream processing.
 Question #3: Briefly Describe the Market Opportunity.  Up to 250 words
 describing the customer profile and pain point(s) that will be the near-term
 commercial focus related to this technical project.
-
-The global iPaaS market is expected to reach USD 10.3 billion by 2025, largely
-driven by challenges with application integration, data transformation and
-cloud service orchestration.  This project is aligned with the expected drivers
-of iPaaS in the following ways:
-
-1. Processors can be deployed across load balancers to serve as a common data
-transformation layer.
-
-2. The cost of performing many stream processing tasks in SPEs can be reduced
-by processing in a higher tier, such as load balancers.
-
-3. The project provides a control plane that manages orchestration of the
-processors.
 
 The IoT market is expected to grow to USD 1.4 trillion by 2027, with more than
 75 billion IoT devices connected to the Internet by 2025.  Two big challenges
@@ -169,6 +157,20 @@ gateways), processors and private clouds.
 2. The flexibility of the processors will provide those administering the IoT
 infrastructure with the tools to perform processing at the appropriate tier.
 
+The global iPaaS market is expected to reach USD 10.3 billion by 2025, largely
+driven by challenges with application integration, data transformation and
+cloud service orchestration.  This project is aligned with the expected drivers
+of iPaaS in the following ways:
+
+1. Processors can be deployed across load balancers to serve as a common data
+transformation layer.
+
+2. The cost of performing many stream processing tasks in SPEs can be reduced
+by processing in a higher tier, such as load balancers.
+
+3. The project provides a control plane that manages orchestration of the
+processors.
+
 The platform is expected to shine most in the converged use cases.  That is
 organizations leveraging both IoT and iPaaS can use the same tool to manage all
 of their stream processing.
@@ -179,7 +181,7 @@ team members related to the technical and/or commercial efforts discussed in
 this Project Pitch.
 
 The work on this project started in mid-2020 as an open source project.  My
-last two jobs required building, leading and working in iPaaS environemnts.  I
+last two jobs required building, leading and working in iPaaS environments.  I
 noticed that the many companies doing iPaaS were re-inventing the wheel.  That
 is, writing the same integration functionality over and over.  In addition, the
 integration platforms rely on centralized deployments (e.g. SPEs) to do stream
@@ -190,7 +192,7 @@ As a result, it seemed obvious that a new approach is needed to solve the next
 generation of stream processing problems. 
 
 I am currently working solo on the project and hope to secure funding to
-recruit someone else to help and cover the cost of testing our hyptheses in a
+recruit someone else to help and cover the cost of testing our hypotheses in a
 cloud environment.  Much of my 15+ year career has been spent working in
 distributed systems research (BS/MS/PhD in CS, 20+ peer-reviewed publications
 and 8 patents), building production distributed systems and leading teams that
