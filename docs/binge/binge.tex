@@ -486,7 +486,18 @@ higher than the first option.  The main disadvantage to this approach is
 managing the mesh of binge processes.  We will cover this in
 Section~\ref{sec:orchestration}.
 
+\subsubsection{Cummutative Updates}
+
+As discussed in the previous section, providing highly reliable and performant
+stateful updates is quite challenging.  Fortunately, we can exploit properties
+of the updates to provide mechanisms to support lock-free contention using a
+standard key-value store interface.  We accomplish this with commutative
+updates.
+
 \subsubsection{Checkpointing}
+
+We use a two-level checkpointing mechanism to provide reliable replay crashed
+or failed  pipelines.
 
 \section{Orchestration}\label{sec:orchestration}
 
@@ -498,6 +509,29 @@ operations in mind.
 
 \section{Example Use Cases}\label{usecases}
 \section{Performance Evaluation}\label{evaluation}
+
+Interesting things to measure:
+
+Environment: 
+
+Single host: EC2 micro, small, large and xlarge
+
+Microbenchmarks: single-host
+
+\begin{itemize}
+    \item[] Singleton pipelines of each type, use in-memoery dependencies
+    \item[] Singleton aggregations with KVSTore  with latency injected, simulate high contention to compare contention policies
+    \item[] PIpelines up of size 2-10 with and without persistence (in-memory dependencies)
+\end{itemize}
+
+Microbenchmarks: Use cases (mileagle kinda varies, but microbenchmarks can inform decisions)
+
+\begin{itemize}
+    \item[] Edge pipeline connected to non-edge pipeline, compare sensitivity of operations at each
+    \item[] Mesh case where multiple edge binge instances aggregate at sink binge instance(s)
+\end{itemize}
+
+
 \section{Previous work}\label{previous:work}
 \section{Limitations and Future Work}\label{future:work}
 \section{Conclusions}\label{conclusions}
