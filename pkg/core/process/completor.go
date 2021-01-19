@@ -13,6 +13,7 @@ import (
 type Completer struct {
 	name string
 	completion *core.Completion
+	checkPointer IntraProcessCheckPointer
 	completionStateStore kvs.KVStore
 }
 

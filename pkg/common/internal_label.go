@@ -26,6 +26,7 @@ const (
 	AggregationDataPrefix  InternalKeyPrefix = "internal:aggregation"
 	CompletionStatusPrefix InternalKeyPrefix = "internal:completion"
 	CompletionStatePrefix  InternalKeyPrefix = "internal:completion:state"
+	ProcessCheckpointPrefix InternalKeyPrefix = "internal:process:checkpoint"
 )
 
 func (k InternalKeyPrefix) String()string {

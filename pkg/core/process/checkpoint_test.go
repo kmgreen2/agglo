@@ -19,21 +19,46 @@ func TestKVCheckPointer(t *testing.T) {
 	}
 	pipelineName := "foo"
 	kvStore := kvs.NewMemKVStore()
-	checkpointer := NewKVCheckPointer(kvStore)
+	interCheckPointer := NewKVCheckPointer(kvStore)
+	var intraCheckPointer IntraProcessCheckPointer = interCheckPointer
 
 	in := map[string]interface{} {
 		string(common.ResourceNameKey): pipelineName,
 		string(common.MessageIDKey): messageID.String(),
 	}
 
-	for i := 0; i < 10; i++ {
+	ctx := context.Background()
 
-		_, err = checkpointer.Process(context.Background(), in)
+	for i := 0; i < 10; i++ {
+		intraCheckpoint := NewIntraProcessCheckpoint(nil, map[string]interface{}{"foo": i},
+			"intracheckpointkey")
+		ctx, err = intraCheckPointer.SetIntraProcessCheckpoint(ctx, intraCheckpoint)
 		if err != nil {
 			assert.FailNow(t, err.Error())
 		}
 
-		stateBytes, err := kvStore.Get(context.Background(), fmt.Sprintf("%s:%s", pipelineName, messageID))
+		intraStateBytes, err := kvStore.Get(ctx, "intracheckpointkey")
+		if err != nil {
+			assert.FailNow(t, err.Error())
+		}
+
+		storedIntraCheckpoint, err := NewIntraProcessCheckpointFromBytes(intraStateBytes)
+		if err != nil {
+			assert.FailNow(t, err.Error())
+		}
+		assert.Equal(t, float64(i), storedIntraCheckpoint.Update["foo"])
+
+		_, err = interCheckPointer.Process(ctx, in)
+		if err != nil {
+			assert.FailNow(t, err.Error())
+		}
+
+		_, err = kvStore.Get(ctx, "intracheckpointkey")
+		if err == nil {
+			assert.FailNow(t, "intra checkpoint state should have been cleared")
+		}
+
+		stateBytes, err := kvStore.Get(ctx, fmt.Sprintf("%s:%s", pipelineName, messageID))
 		if err != nil {
 			assert.FailNow(t, err.Error())
 		}
@@ -44,7 +69,7 @@ func TestKVCheckPointer(t *testing.T) {
 		}
 		assert.Equal(t, float64(i), m[CheckpointIdxKey].(float64))
 	}
-	err = checkpointer.Finalize(context.Background(), in)
+	err = interCheckPointer.Finalize(context.Background(), in)
 	assert.Nil(t, err)
 }
 
@@ -64,20 +89,45 @@ func TestLocalFileCheckPointer(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	checkpointer, err := NewLocalFileCheckPointer(path)
+	interCheckPointer, err := NewLocalFileCheckPointer(path)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
+	var intraCheckPointer IntraProcessCheckPointer = interCheckPointer
 
 	in := map[string]interface{} {
 		string(common.ResourceNameKey): pipelineName,
 		string(common.MessageIDKey): messageID.String(),
 	}
 
+	ctx := context.Background()
+
 	for i := 0; i < 10; i++ {
-		_, err = checkpointer.Process(context.Background(), in)
+		intraCheckpoint := NewIntraProcessCheckpoint(nil, map[string]interface{}{"foo": i},
+			"intracheckpointkey")
+		ctx, err = intraCheckPointer.SetIntraProcessCheckpoint(ctx, intraCheckpoint)
 		if err != nil {
 			assert.FailNow(t, err.Error())
+		}
+
+		intraStateBytes, err := ioutil.ReadFile(fmt.Sprintf("%s/%s.json", path, "intracheckpointkey"))
+		if err != nil {
+			assert.FailNow(t, err.Error())
+		}
+
+		storedIntraCheckpoint, err := NewIntraProcessCheckpointFromBytes(intraStateBytes)
+		if err != nil {
+			assert.FailNow(t, err.Error())
+		}
+		assert.Equal(t, float64(i), storedIntraCheckpoint.Update["foo"])
+		_, err = interCheckPointer.Process(ctx, in)
+		if err != nil {
+			assert.FailNow(t, err.Error())
+		}
+
+		_, err = ioutil.ReadFile(fmt.Sprintf("%s/%s.json", path, "intracheckpointkey"))
+		if err == nil {
+			assert.FailNow(t, "intra checkpoint state should have been cleared")
 		}
 
 		stateBytes, err := ioutil.ReadFile(fmt.Sprintf("%s/%s:%s.json", path, pipelineName, messageID))
@@ -91,6 +141,6 @@ func TestLocalFileCheckPointer(t *testing.T) {
 		}
 		assert.Equal(t, float64(i), m[CheckpointIdxKey].(float64))
 	}
-	err = checkpointer.Finalize(context.Background(), in)
+	err = interCheckPointer.Finalize(context.Background(), in)
 	assert.Nil(t, err)
 }

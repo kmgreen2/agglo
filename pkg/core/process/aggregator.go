@@ -12,6 +12,7 @@ import (
 type Aggregator struct {
 	aggregation *core.Aggregation
 	condition *core.Condition
+	checkPointer IntraProcessCheckPointer
 	aggregatorStateStore kvs.KVStore
 }
 
@@ -57,10 +58,13 @@ func (a Aggregator) Process(ctx context.Context, in map[string]interface{}) (map
 		return out, err
 	}
 
-	// ToDo(KMG): Aggregations are maintained as follows:
+	// ToDo(KMG): Implement so-called Commutative Updates, which will allow us to do lock-free contention
+	//            and do easier recovery.
+	//
+	// Aggregations are maintained as follows:
 	//
 	// 1. Get the current aggregation state (stored in a KVStore), create if does not exist
-	// 2. Conditionally update the aggregation
+	// 2. Conditionally Update the aggregation
 	// 3. Serialize and do an atomic put to the KVStore
 	// 4. Annotate the output map with the updated aggregation
 	//
@@ -78,7 +82,7 @@ func (a Aggregator) Process(ctx context.Context, in map[string]interface{}) (map
 	// === Future work ===
 	//
 	// The ultimate solution is to use the underlying KVStore to maintain a log of deltas and ensure an Aggregation
-	// implements a `Delta(other Aggregation) Aggregation` function, which would ensure that any update could be
+	// implements a `Delta(other Aggregation) Aggregation` function, which would ensure that any Update could be
 	// applied in any order after an initial attempt.
 	//
 	// NOTE: The delta value *must* be computed against the current aggregation state.  All we are doing is deriving the

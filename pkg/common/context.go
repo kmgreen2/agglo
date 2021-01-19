@@ -13,6 +13,7 @@ const (
 	SpanContext Key = "agglo.io/spanContext"
 	ProcessSpan Key = "agglo.io/processSpan"
 	ProcessStartTime = "agglo.io/processStartTime"
+	IntraProcessCheckpoint = "agglo.io/intraProcessCheckpoint"
 )
 
 func ExtractPubSubContext(payload []byte) context.Context {
@@ -65,3 +66,4 @@ func ExtractProcessStartTime(processKey string, ctx context.Context) time.Time {
 	}
 	return InvalidTime
 }
+
