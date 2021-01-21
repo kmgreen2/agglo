@@ -43,11 +43,6 @@ name string, partitionID gUuid.UUID, aggPath string, evalValAt EvaluateValAt) (i
 			return nil, err
 		}
 
-		err = aggregator.Checkpoint(context.Background(), m)
-		if err != nil {
-			return nil, err
-		}
-
 		val, err := core.GetMap(out,
 			[]string{
 				common.InternalKeyFromPrefix(common.AggregationDataPrefix, name),
@@ -80,6 +75,18 @@ name string, partitionID gUuid.UUID, aggPath string, evalValAt EvaluateValAt) (i
 	return val, nil
 }
 
+func getAggregationFromMap(key string, in interface{}) (interface{}, error) {
+	if m, mapOk := in.(map[string]interface{}); !mapOk {
+		return nil, fmt.Errorf("in is not a map")
+	} else {
+		if val, ok := m[key]; !ok {
+			return nil, fmt.Errorf("cannot find key='%s' in map=%v", key, m)
+		} else {
+			return val, nil
+		}
+	}
+}
+
 func TestBasicCount(t *testing.T) {
 	numMaps := 16
 	var paths [][]string = [][]string{
@@ -95,12 +102,16 @@ func TestBasicCount(t *testing.T) {
 
 	maps, _ := test.GetAggMapsWithFloats(numMaps, paths, partitionID, name)
 	evalFunc := func(val interface{}, index int) error {
+		val, err := getAggregationFromMap("value", val)
+		if err != nil {
+			return err
+		}
 		switch v := val.(type) {
-		case int64:
-			if int64(index+1) == v {
+		case float64:
+			if int64(index+1) == int64(v) {
 				return nil
 			}
-			return fmt.Errorf("%d != %d", v, index+1)
+			return fmt.Errorf("%d != %d", int64(v), index+1)
 		default:
 			return fmt.Errorf("invalid type for val: %v", reflect.TypeOf(v))
 		}
@@ -134,6 +145,10 @@ func TestBasicSum(t *testing.T) {
 
 	maps, mapValues := test.GetAggMapsWithFloats(numMaps, paths, partitionID, name)
 	evalFunc := func(val interface{}, index int) error {
+		val, err := getAggregationFromMap("value", val)
+		if err != nil {
+			return err
+		}
 		sum := float64(0)
 		for i := 0; i <= index; i++ {
 			sum += mapValues[i][0]
@@ -183,6 +198,10 @@ func TestBasicMax(t *testing.T) {
 
 	maps, mapValues := test.GetAggMapsWithFloats(numMaps, paths, partitionID, name)
 	evalFunc := func(val interface{}, index int) error {
+		val, err := getAggregationFromMap("value", val)
+		if err != nil {
+			return err
+		}
 		switch v := val.(type) {
 		case float64:
 			if mapValues[index][0] <= v {
@@ -230,6 +249,10 @@ func TestBasicMin(t *testing.T) {
 
 	maps, mapValues := test.GetAggMapsWithFloats(numMaps, paths, partitionID, name)
 	evalFunc := func(val interface{}, index int) error {
+		val, err := getAggregationFromMap("value", val)
+		if err != nil {
+			return err
+		}
 		switch v := val.(type) {
 		case float64:
 			if mapValues[index][0] >= v {
@@ -278,20 +301,37 @@ func TestBasicAvg(t *testing.T) {
 	maps, mapValues := test.GetAggMapsWithFloats(numMaps, paths, partitionID, name)
 
 	evalFunc := func(val interface{}, index int) error {
+		var aggNum, aggSum float64
+		var ok bool
+		sumVal, err := getAggregationFromMap("sum", val)
+		if err != nil {
+			return err
+		}
+
+		if aggSum, ok = sumVal.(float64); !ok {
+			return fmt.Errorf("invalid type for val: %v", reflect.TypeOf(aggSum))
+		}
+
+		numVal, err := getAggregationFromMap("num", val)
+		if err != nil {
+			return err
+		}
+
+		if aggNum, ok = numVal.(float64); !ok {
+			return fmt.Errorf("invalid type for val: %v", reflect.TypeOf(aggNum))
+		}
+
+		aggAvg := aggSum / aggNum
+
 		sum := float64(0)
 		for i := 0; i <= index; i++ {
 			sum += mapValues[i][0]
 		}
 		avg := sum / float64(index+1)
-		switch v := val.(type) {
-		case float64:
-			if avg == v {
-				return nil
-			}
-			return fmt.Errorf("%f != %f", v, avg)
-		default:
-			return fmt.Errorf("invalid type for val: %v", reflect.TypeOf(v))
+		if avg == aggAvg {
+			return nil
 		}
+		return fmt.Errorf("%f != %f", aggAvg, avg)
 	}
 
 
@@ -330,20 +370,22 @@ func TestBasicDiscreteHistogram(t *testing.T) {
 
 	buckets := make(map[string]int)
 	evalFunc := func(val interface{}, index int) error {
+		aggState, err := core.AggregationDiscreteHistogramStateFromMap(val.(map[string]interface{}))
+		if err != nil {
+			return err
+		}
+
 		buckets[mapValues[index][0]]++
-		switch v := val.(type) {
-		case map[string]int:
-			if len(buckets) == len(v) {
-				for k, _ := range buckets {
-					if buckets[k] != v[k] {
-						return fmt.Errorf("%v != %v", v, buckets)
-					}
+		if len(buckets) == len(aggState.Buckets) {
+			for k, _ := range buckets {
+				if buckets[k] != aggState.Buckets[k] {
+					return fmt.Errorf("%v != %v", aggState.Buckets, buckets)
 				}
 			}
-			return nil
-		default:
-			return fmt.Errorf("invalid type for val: %v", reflect.TypeOf(v))
+		} else {
+			return fmt.Errorf("%v != %v", aggState.Buckets, buckets)
 		}
+		return nil
 	}
 
 

@@ -54,7 +54,7 @@ func doBasicCompleter(numMaps, numJoined int, timeout time.Duration, missingJoin
 		if val, ok := out[common.InternalKeyFromPrefix(common.CompletionStatusPrefix, "foo")]; ok {
 			// Timeout clock starts after first keepMatched for a join set
 			if forceTimeout {
-				time.Sleep(timeout*2)
+				time.Sleep(timeout)
 				forceTimeout = false
 			}
 
@@ -68,14 +68,10 @@ func doBasicCompleter(numMaps, numJoined int, timeout time.Duration, missingJoin
 				numTimedOut++
 			}
 		}
-		_, matchedVal, err := completion.Match(m)
+		_, _, err = completion.Match(m)
 		if err != nil && errors.Is(err, &common.NotFoundError{}){
 			continue
 		} else if err != nil {
-			return 0, 0, 0, err
-		}
-		err = completer.Checkpoint(context.Background(), m, matchedVal)
-		if err != nil {
 			return 0, 0, 0, err
 		}
 	}
@@ -100,7 +96,6 @@ func TestCompleterHappyPath(t *testing.T) {
 	}
 }
 
-/** ToDo(KMG): Put this back in once Process() is refactored.  It is too messy and confusing right now.
 func TestCompleterTimeoutNotify(t *testing.T) {
 	numRuns := 4
 	maxMaps := 128
@@ -120,7 +115,6 @@ func TestCompleterTimeoutNotify(t *testing.T) {
 		assert.Equal(t, numMaps-1, numTimedOut)
 	}
 }
- */
 
 func TestCompleterIncomplete(t *testing.T) {
 	numRuns := 64

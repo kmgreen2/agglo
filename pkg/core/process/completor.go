@@ -95,7 +95,7 @@ func (c Completer) Process(ctx context.Context, in map[string]interface{}) (map[
 	}
 	name := c.name
 
-	matchedKey, matchedVal, err := c.completion.Match(in)
+	_, matchedVal, err := c.completion.Match(in)
 	if err != nil {
 		if errors.Is(err, &common.NotFoundError{}) {
 			return out, nil
@@ -103,43 +103,44 @@ func (c Completer) Process(ctx context.Context, in map[string]interface{}) (map[
 		return out, err
 	}
 
-	completionStateBytes, err := c.getCompletionState(ctx, partitionID, name, matchedVal)
-	if err != nil {
-		return out, err
-	}
-
-	if completionStateBytes != nil {
-		completionState, err = core.NewCompletionStateFromBytes(completionStateBytes)
-		if err != nil {
-			return out, err
-		}
-	}
-
-	if completionState == nil {
-		var completionDeadline int64 = -1
-		if c.completion.Timeout > 0 {
-			completionDeadline = time.Now().Add(c.completion.Timeout).UnixNano()
-		}
-		resolved := make(map[string]bool)
-		for _, key := range c.completion.JoinKeys {
-			resolved[key] = false
-		}
-		completionState = core.NewCompletionState(matchedVal, resolved, completionDeadline)
-	}
-
-	completionState.Resolved[matchedKey] = true
-
 	stateKey, err := core.CompletionStateKey(partitionID, name, matchedVal)
 	if err != nil {
 		return out, err
 	}
 
-	newCompletionBytes, err := completionState.Bytes()
+	mapBytes, err := common.MapToJson(in)
 	if err != nil {
 		return out, err
 	}
 
-	if completionState.IsDone() {
+	err = c.completionStateStore.Append(ctx, stateKey, mapBytes)
+	if err != nil {
+		return out, err
+	}
+
+	err = c.Checkpoint(ctx, in, matchedVal)
+	if err != nil {
+		return nil, err
+	}
+
+	completionStateBytes, err := c.getCompletionState(ctx, partitionID, name, matchedVal)
+	if err != nil {
+		return out, err
+	}
+
+
+	completionState, err = core.NewCompletionStateFromBytes(completionStateBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	if completionState.CompletionDeadline > 0 && time.Now().UnixNano() > completionState.CompletionDeadline {
+		err = common.SetUsingInternalPrefix(common.CompletionStatusPrefix, c.name, "timedout", out,
+			true)
+		if err != nil {
+			return out, err
+		}
+	} else if completionState.IsDone() {
 		err = c.completionStateStore.AtomicDelete(ctx, stateKey, completionStateBytes)
 		if err != nil {
 			return out, err
@@ -148,7 +149,7 @@ func (c Completer) Process(ctx context.Context, in map[string]interface{}) (map[
 		if err != nil {
 			return out, err
 		}
-		stateMap, err := common.JsonToMap(newCompletionBytes)
+		stateMap, err := common.JsonToMap(completionStateBytes)
 		if err != nil {
 			return out, err
 		}
@@ -156,22 +157,7 @@ func (c Completer) Process(ctx context.Context, in map[string]interface{}) (map[
 		if err != nil {
 			return out, err
 		}
-	} else if completionState.CompletionDeadline > 0 && time.Now().UnixNano() > completionState.CompletionDeadline {
-			err = common.SetUsingInternalPrefix(common.CompletionStatusPrefix, c.name, "timedout", out,
-				true)
-			if err != nil {
-				return out, err
-			}
 	} else {
-		mapBytes, err := common.MapToJson(in)
-		if err != nil {
-			return out, err
-		}
-
-		err = c.completionStateStore.Append(ctx, stateKey, mapBytes)
-		if err != nil {
-			return out, err
-		}
 		err = common.SetUsingInternalPrefix(common.CompletionStatusPrefix, c.name, "triggered", out,
 			true)
 		if err != nil {
@@ -179,12 +165,6 @@ func (c Completer) Process(ctx context.Context, in map[string]interface{}) (map[
 		}
 	}
 
-	// ToDo(KMG): We need a standard way to control the checkpoint calls...
-	go func() {
-		<- time.NewTimer(100 * time.Millisecond).C
-		// ToDo(KMG): Log and mark checkpoint failure
-		_ = c.Checkpoint(ctx, in, matchedVal)
-	}()
 
 	return out, nil
 }
@@ -194,11 +174,7 @@ func (c Completer) Checkpoint(ctx context.Context, in map[string]interface{}, ma
 	if err != nil {
 		return err
 	}
-	name, err := core.GetName(in)
-	if err != nil {
-		return err
-	}
-	stateKey, err := core.CompletionStateKey(partitionID, name, matchedVal)
+	stateKey, err := core.CompletionStateKey(partitionID, c.name, matchedVal)
 	if err != nil {
 		return err
 	}
