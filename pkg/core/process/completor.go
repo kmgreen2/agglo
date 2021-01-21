@@ -13,14 +13,14 @@ import (
 type Completer struct {
 	name string
 	completion *core.Completion
-	completionStateStore kvs.KVStore
+	completionStateStore kvs.StateStore
 }
 
 func NewCompleter(name string, completion *core.Completion, kvStore kvs.KVStore) *Completer {
 	return &Completer{
 		name: name,
 		completion: completion,
-		completionStateStore: kvStore,
+		completionStateStore: kvs.NewKvStateStore(kvStore),
 	}
 }
 
@@ -41,6 +41,45 @@ func (c Completer) getCompletionState(ctx context.Context, partitionID gUuid.UUI
 	return stateBytes, nil
 }
 
+func (c Completer) checkpointMapFunc() (func(curr, val []byte) ([]byte, error)) {
+	return func(curr, val []byte) ([]byte, error) {
+		var completionState *core.CompletionState
+		var err error
+		if curr != nil {
+			completionState, err = core.NewCompletionStateFromBytes(curr)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		valMap, err := common.JsonToMap(val)
+		if err != nil {
+			return nil, err
+		}
+
+		matchedKey, matchedVal, err := c.completion.Match(valMap)
+		if err != nil {
+			return nil, err
+		}
+
+		if curr == nil {
+			var completionDeadline int64 = -1
+			if c.completion.Timeout > 0 {
+				completionDeadline = time.Now().Add(c.completion.Timeout).UnixNano()
+			}
+			resolved := make(map[string]bool)
+			for _, key := range c.completion.JoinKeys {
+				resolved[key] = false
+			}
+			completionState = core.NewCompletionState(matchedVal, resolved, completionDeadline)
+		}
+
+		completionState.Resolved[matchedKey] = true
+
+		return completionState.Bytes()
+	}
+}
+
 func (c Completer) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
 	var completionState *core.CompletionState
 
@@ -50,11 +89,6 @@ func (c Completer) Process(ctx context.Context, in map[string]interface{}) (map[
 	if err != nil {
 		return out, err
 	}
-	/*name, err := core.GetName(in)
-	if err != nil {
-		return out, err
-	}
-	*/
 	name := c.name
 
 	matchedKey, matchedVal, err := c.completion.Match(in)
@@ -125,10 +159,11 @@ func (c Completer) Process(ctx context.Context, in map[string]interface{}) (map[
 				return out, err
 			}
 	} else {
-		err = c.completionStateStore.AtomicPut(ctx, stateKey, completionStateBytes, newCompletionBytes)
+		err = c.completionStateStore.Append(ctx, stateKey, newCompletionBytes)
 		if err != nil {
 			return out, err
 		}
+		// ToDo(KMG): We need a standard way to control the checkpoint calls...
 		err = common.SetUsingInternalPrefix(common.CompletionStatusPrefix, c.name, "triggered", out,
 			true)
 		if err != nil {

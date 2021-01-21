@@ -7,19 +7,20 @@ import (
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/core"
 	"github.com/kmgreen2/agglo/pkg/kvs"
+	"time"
 )
 
 type Aggregator struct {
 	aggregation *core.Aggregation
 	condition *core.Condition
-	aggregatorStateStore kvs.KVStore
+	aggregatorStateStore kvs.StateStore
 }
 
-func NewAggregator(aggregation *core.Aggregation, condition *core.Condition, kvStore kvs.KVStore) *Aggregator {
+func NewAggregator(aggregation *core.Aggregation, condition *core.Condition, stateStore kvs.StateStore) *Aggregator {
 	return &Aggregator{
 		aggregation: aggregation,
 		condition: condition,
-		aggregatorStateStore: kvStore,
+		aggregatorStateStore: stateStore,
 	}
 }
 
@@ -34,14 +35,32 @@ func (a Aggregator) getAggregationState(ctx context.Context, partitionID gUuid.U
 	return stateBytes, nil
 }
 
-func (a Aggregator) updateAggregationState(ctx context.Context, partitionID gUuid.UUID, name string, prev,
-	newState []byte) error {
-	return a.aggregatorStateStore.AtomicPut(ctx, core.AggregationStateKey(partitionID, name), prev, newState)
+func (a Aggregator) checkpointMapFunc() (func(curr, val []byte) ([]byte, error)) {
+	return func(curr, val []byte) ([]byte, error) {
+		var aggregationState *core.AggregationState
+		var err error
+		if curr == nil {
+			aggregationState = core.NewAggregationState(make(map[string]interface{}))
+		} else {
+			aggregationState, err = core.NewAggregationStateFromBytes(curr)
+			if err != nil {
+				return nil, err
+			}
+		}
+		valMap, err := common.JsonToMap(val)
+		if err != nil {
+			return nil, err
+		}
+
+		_, _, err = a.aggregation.Update(valMap, aggregationState)
+		if err != nil {
+			return nil, err
+		}
+		return aggregationState.Bytes()
+	}
 }
 
 func (a Aggregator) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
-	var aggregationState *core.AggregationState
-
 	if shouldProcess, err := a.condition.Evaluate(in); !shouldProcess || err != nil {
 		return in, err
 	}
@@ -98,38 +117,45 @@ func (a Aggregator) Process(ctx context.Context, in map[string]interface{}) (map
 	// Notice that the differences should only 1 for the count-based aggregations.  Without this, the delta cannot
 	// be replayed with any other future aggregation state.
 	//
-	stateBytes, err := a.getAggregationState(ctx, partitionID, name)
+
+	inBytes, err := common.MapToJson(in)
 	if err != nil {
-		return out, err
+		return nil, err
 	}
 
-	if stateBytes == nil {
-		aggregationState = core.NewAggregationState(make(map[string]interface{}))
-	} else {
-		aggregationState, err = core.NewAggregationStateFromBytes(stateBytes)
-		if err != nil {
-			return out, err
-		}
+	err = a.aggregatorStateStore.Append(ctx, core.AggregationStateKey(partitionID, name), inBytes)
+	if err != nil {
+		return nil, err
 	}
 
-	updatedKeys, updatedValues, err := a.aggregation.Update(in, aggregationState)
-	if err != nil {
-		return out, err
-	}
-
-	newStateBytes, err := aggregationState.Bytes()
-	if err != nil {
-		return out, err
-	}
-
-	// Note: If there are any errors after this step, we should do a *hard* failure, since the process
-	// cannot be retried.  Probably best to always call this function last
-	err = a.updateAggregationState(ctx, partitionID, name, stateBytes, newStateBytes)
-	if err != nil {
-		return out, err
-	}
+	// ToDo(KMG): We need a standard way to control the checkpoint calls...
+	go func() {
+		<- time.NewTimer(100 * time.Millisecond).C
+		// ToDo(KMG): Log and mark checkpoint failure
+		_ = a.Checkpoint(ctx, in)
+	}()
 
 	updatedMap := make(map[string]interface{})
+
+	aggregationStateBytes, err := a.getAggregationState(ctx, partitionID, name)
+	if err != nil {
+		return nil, err
+	}
+
+	var aggregationState *core.AggregationState
+
+	if aggregationStateBytes == nil {
+		aggregationState = core.NewAggregationState(make(map[string]interface{}))
+	} else {
+		aggregationState, err = core.NewAggregationStateFromBytes(aggregationStateBytes)
+		if err != nil {
+			return nil, err
+		}
+	}
+	updatedKeys, updatedValues, err := a.aggregation.Update(in, aggregationState)
+	if err != nil {
+		return nil, err
+	}
 	for i, _ := range updatedKeys {
 		updatedMap[updatedKeys[i]] = updatedValues[i]
 	}
@@ -140,4 +166,16 @@ func (a Aggregator) Process(ctx context.Context, in map[string]interface{}) (map
 	}
 
 	return out, nil
+}
+
+func (a Aggregator) Checkpoint(ctx context.Context, in map[string]interface{}) error {
+	partitionID, err := core.GetPartitionID(in)
+	if err != nil {
+		return err
+	}
+	name, err := core.GetName(in)
+	if err != nil {
+		return err
+	}
+	return a.aggregatorStateStore.Checkpoint(ctx, core.AggregationStateKey(partitionID, name), a.checkpointMapFunc())
 }

@@ -41,6 +41,12 @@ func (err *ConflictError) Error() string {
 	return err.msg
 }
 
+// Is
+func (err *ConflictError) Is(other error) bool {
+	_, ok := other.(*ConflictError)
+	return ok
+}
+
 // NewConflictError will return a ConflictError object
 func NewConflictError(msg string) *ConflictError {
 	return &ConflictError{
@@ -96,6 +102,12 @@ type InvalidError struct {
 // Error returns the error message
 func (err *InvalidError) Error() string {
 	return err.msg
+}
+
+// Is
+func (err *InvalidError) Is(other error) bool {
+	_, ok := other.(*InvalidError)
+	return ok
 }
 
 // NewInvalidError will return a InvalidError object
@@ -181,6 +193,12 @@ type TimedOutError struct {
 // Error returns the error message
 func (err *TimedOutError) Error() string {
 	return err.msg
+}
+
+// Is
+func (err *TimedOutError) Is(other error) bool {
+	_, ok := other.(*TimedOutError)
+	return ok
 }
 
 // NewTimedOutError will return a TimedOutError object

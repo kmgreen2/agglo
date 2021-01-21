@@ -16,20 +16,34 @@ import (
 	"testing"
 )
 
+
+
 type EvaluateValAt func(val interface{}, index int) error
 
+/**
+ * NOTE: All of the aggregation tests run using doBasicAggregation intentionally test the aggregation
+ * functions by serially calling Process() and Checkpoint().  This allows us to test the basic functionality.
+ *
+ * ToDo(KMG): Add doConcurrentAggregation, which will process maps in parallel, then call Checkpoint() and check the
+ * final result.
+ */
 func doBasicAggregation(maps []map[string]interface{}, aggType core.AggregationType,
 name string, partitionID gUuid.UUID, aggPath string, evalValAt EvaluateValAt) (interface{}, error) {
-	kvStore := kvs.NewMemKVStore()
+	stateStore := kvs.NewMemStateStore()
 
 	fieldAggregation := core.NewFieldAggregation(aggPath, aggType, []string{})
 
 	aggregation := core.NewAggregation(fieldAggregation)
 
-	aggregator := process.NewAggregator(aggregation, core.TrueCondition, kvStore)
+	aggregator := process.NewAggregator(aggregation, core.TrueCondition, stateStore)
 
 	for i, m := range maps {
 		out, err := aggregator.Process(context.Background(), m)
+		if err != nil {
+			return nil, err
+		}
+
+		err = aggregator.Checkpoint(context.Background(), m)
 		if err != nil {
 			return nil, err
 		}
@@ -45,7 +59,7 @@ name string, partitionID gUuid.UUID, aggPath string, evalValAt EvaluateValAt) (i
 		}
 	}
 
-	stateBytes, err := kvStore.Get(context.Background(), core.AggregationStateKey(partitionID, name))
+	stateBytes, err := stateStore.Get(context.Background(), core.AggregationStateKey(partitionID, name))
 	if err != nil {
 		return nil, err
 	}

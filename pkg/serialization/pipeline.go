@@ -353,7 +353,8 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*process.Pipelines, error) {
 				if err != nil {
 					return nil, err
 				}
-				processes[procDef.Aggregator.Name] = process.NewAggregator(aggregation, condition, kvStore)
+				processes[procDef.Aggregator.Name] = process.NewAggregator(aggregation, condition,
+					kvs.NewKvStateStore(kvStore))
 			} else {
 				msg := fmt.Sprintf("unknown kvStore for %s: %s", procDef.Aggregator.Name, procDef.Aggregator.StateStore)
 				return nil, common.NewInvalidError(msg)

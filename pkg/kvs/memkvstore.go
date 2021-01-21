@@ -198,6 +198,9 @@ func (kvStore *MemKVStore) List(ctx context.Context, prefix string) ([]string, e
 
 	prefixLength := len(prefix)
 	for s, _ := range kvStore.values {
+		if len(s) < prefixLength {
+			continue
+		}
 		if strings.Compare(prefix, s[:prefixLength]) == 0 {
 			result = append(result, s)
 		}

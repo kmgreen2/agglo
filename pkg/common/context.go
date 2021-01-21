@@ -13,6 +13,7 @@ const (
 	SpanContext Key = "agglo.io/spanContext"
 	ProcessSpan Key = "agglo.io/processSpan"
 	ProcessStartTime = "agglo.io/processStartTime"
+	DistributedLockKey = "agglo.io/distributedLockKey"
 )
 
 func ExtractPubSubContext(payload []byte) context.Context {
@@ -64,4 +65,17 @@ func ExtractProcessStartTime(processKey string, ctx context.Context) time.Time {
 		}
 	}
 	return InvalidTime
+}
+
+func InjectDistributedLockIndex(ctx context.Context, index int) context.Context {
+	return context.WithValue(ctx, DistributedLockKey, index)
+}
+
+func ExtractDistributedLockIndex(ctx context.Context) int {
+	if value := ctx.Value(DistributedLockKey); value != nil {
+		if idx, ok := value.(int); ok {
+			return idx
+		}
+	}
+	return -1
 }
