@@ -11,7 +11,15 @@ import (
 	"time"
 )
 
-var lockSuffix = "lock"
+func lockPrefix(id string) string {
+	prefixFromIdLen := 4
+
+	if len(id) < prefixFromIdLen {
+		prefixFromIdLen = len(id)
+	}
+
+	return fmt.Sprintf("%slock:%s", id[:prefixFromIdLen], id)
+}
 
 type DistributedLock interface {
 	Lock(ctx context.Context, timeout time.Duration) (context.Context, error)
@@ -32,7 +40,7 @@ func NewKVDistributedLock(id string, kvStore KVStore) *KVDistributedLock {
 }
 
 func (l KVDistributedLock) getIndexKey(index int) string {
-	return fmt.Sprintf("%s:%s:%d", l.id, lockSuffix, index)
+	return fmt.Sprintf("%s:%d", lockPrefix(l.id),index)
 }
 
 func (l KVDistributedLock) extractIndex(key string) (int, error) {
@@ -83,7 +91,7 @@ func (l KVDistributedLock) getMinIndex(entries []string) (int, error) {
 }
 
 func (l KVDistributedLock) getWaiters(ctx context.Context) ([]string, error) {
-	lockKey := fmt.Sprintf("%s:%s", l.id, lockSuffix)
+	lockKey := fmt.Sprintf("%s", lockPrefix(l.id))
 
 	// Get a listing of the current waiters
 	entries, err := l.kvStore.List(ctx, lockKey)

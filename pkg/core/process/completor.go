@@ -41,7 +41,7 @@ func (c Completer) getCompletionState(ctx context.Context, partitionID gUuid.UUI
 	return stateBytes, nil
 }
 
-func (c Completer) checkpointMapFunc() (func(curr, val []byte) ([]byte, error)) {
+func (c Completer) checkpointMapFunc() func(curr, val []byte) ([]byte, error) {
 	return func(curr, val []byte) ([]byte, error) {
 		var completionState *core.CompletionState
 		var err error
@@ -58,8 +58,12 @@ func (c Completer) checkpointMapFunc() (func(curr, val []byte) ([]byte, error)) 
 		}
 
 		matchedKey, matchedVal, err := c.completion.Match(valMap)
-		if err != nil {
+		if err != nil && !errors.Is(err, &common.NotFoundError{}){
 			return nil, err
+		} else if err != nil && completionState == nil {
+			return nil, nil
+		} else if err != nil {
+			return completionState.Bytes()
 		}
 
 		if curr == nil {
@@ -159,11 +163,15 @@ func (c Completer) Process(ctx context.Context, in map[string]interface{}) (map[
 				return out, err
 			}
 	} else {
-		err = c.completionStateStore.Append(ctx, stateKey, newCompletionBytes)
+		mapBytes, err := common.MapToJson(in)
 		if err != nil {
 			return out, err
 		}
-		// ToDo(KMG): We need a standard way to control the checkpoint calls...
+
+		err = c.completionStateStore.Append(ctx, stateKey, mapBytes)
+		if err != nil {
+			return out, err
+		}
 		err = common.SetUsingInternalPrefix(common.CompletionStatusPrefix, c.name, "triggered", out,
 			true)
 		if err != nil {
@@ -171,5 +179,28 @@ func (c Completer) Process(ctx context.Context, in map[string]interface{}) (map[
 		}
 	}
 
+	// ToDo(KMG): We need a standard way to control the checkpoint calls...
+	go func() {
+		<- time.NewTimer(100 * time.Millisecond).C
+		// ToDo(KMG): Log and mark checkpoint failure
+		_ = c.Checkpoint(ctx, in, matchedVal)
+	}()
+
 	return out, nil
+}
+
+func (c Completer) Checkpoint(ctx context.Context, in map[string]interface{}, matchedVal interface{}) error {
+	partitionID, err := core.GetPartitionID(in)
+	if err != nil {
+		return err
+	}
+	name, err := core.GetName(in)
+	if err != nil {
+		return err
+	}
+	stateKey, err := core.CompletionStateKey(partitionID, name, matchedVal)
+	if err != nil {
+		return err
+	}
+	return c.completionStateStore.Checkpoint(ctx, stateKey, c.checkpointMapFunc())
 }

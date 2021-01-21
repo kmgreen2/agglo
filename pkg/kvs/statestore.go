@@ -1,9 +1,7 @@
 package kvs
 
 import (
-	"bytes"
 	"context"
-	"encoding/gob"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/pkg/errors"
@@ -76,30 +74,22 @@ func (store *KvStateStore) needsCheckpoint(ctx context.Context, key string) (boo
 func (store *KvStateStore) Checkpoint(ctx context.Context, key string,
 	mapFn func(currCheckpoint, val []byte)([]byte, error)) error {
 
-	elementKeys, err := store.kvStore.List(ctx, key + AppendEntryDelimiter)
-	if err != nil {
-		return err
-	}
-
-	byteBuffer := bytes.NewBuffer([]byte{})
-	gobEncoder := gob.NewEncoder(byteBuffer)
-
-	err = gobEncoder.Encode(elementKeys)
-	if err != nil {
-		return err
-	}
-
 	/*
 	 * Acquire a lock to do the checkpoint.  If this fails, assume someone else is doing it
 	 */
 	lock := NewKVDistributedLock(key, store.kvStore)
-	ctx, err = lock.Lock(ctx, -1)
+	ctx, err := lock.Lock(ctx, -1)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		_ = lock.Unlock(ctx)
 	}()
+
+	elementKeys, err := store.kvStore.List(ctx, key + AppendEntryDelimiter)
+	if err != nil {
+		return err
+	}
 
 	/*
 	 * Get the latest checkpoint value
@@ -118,12 +108,12 @@ func (store *KvStateStore) Checkpoint(ctx context.Context, key string,
 	for _, elementKey := range elementKeys {
 		valueBytes, err := store.kvStore.Get(ctx, elementKey)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "state store 1")
 		}
 
 		newCheckpoint, err = mapFn(newCheckpoint, valueBytes)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "state store 2")
 		}
 	}
 
@@ -132,7 +122,7 @@ func (store *KvStateStore) Checkpoint(ctx context.Context, key string,
 	 */
 	err = store.kvStore.AtomicPut(ctx, key, currCheckpoint, newCheckpoint)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "state store 3")
 	}
 
 	/*
@@ -141,22 +131,37 @@ func (store *KvStateStore) Checkpoint(ctx context.Context, key string,
 	for _, elementKey := range elementKeys {
 		err = store.kvStore.Delete(ctx, elementKey)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "state store 4")
 		}
 	}
 
 	return nil
 }
 
-
 func (store *KvStateStore)  Get(ctx context.Context, key string) ([]byte, error) {
 	return store.kvStore.Get(ctx, key)
 }
 
 func (store *KvStateStore)  Delete(ctx context.Context, key string) error {
+	lock := NewKVDistributedLock(key, store.kvStore)
+	ctx, err := lock.Lock(ctx, -1)
+	if err != nil {
+		return errors.Wrap(err, "state store 5")
+	}
+	defer func() {
+		_ = lock.Unlock(ctx)
+	}()
 	return store.kvStore.Delete(ctx, key)
 }
 
 func (store *KvStateStore)  AtomicDelete(ctx context.Context, key string, prev []byte) error {
+	lock := NewKVDistributedLock(key, store.kvStore)
+	ctx, err := lock.Lock(ctx, -1)
+	if err != nil {
+		return errors.Wrap(err, "state store 6")
+	}
+	defer func() {
+		_ = lock.Unlock(ctx)
+	}()
 	return store.kvStore.AtomicDelete(ctx, key, prev)
 }
