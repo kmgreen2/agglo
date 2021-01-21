@@ -163,6 +163,8 @@ message Aggregator {
     Condition condition = 2;
     string stateStore = 3;
     Aggregation aggregation = 4;
+    bool asyncCheckpoint = 5;
+    bool forwardState = 6;
 }
 
 message Aggregation {

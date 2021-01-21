@@ -59,7 +59,7 @@ func TestPipelineBasic(t *testing.T) {
 		core.AggDiscreteHistogram, []string{}))
 	condition, err = core.NewCondition(core.NewComparatorExpression(core.Variable("version-control"), "git-dev",
 		core.Equal))
-	builder.Add(process.NewAggregator(aggregation, condition, kvs.NewKvStateStore(kvStore)))
+	builder.Add(process.NewAggregator(aggregation, condition, kvs.NewKvStateStore(kvStore), false, true))
 
 	// Create a completion that joins on commit hash
 	completion := core.NewCompletion([]string{"hash", "githash"}, -1)

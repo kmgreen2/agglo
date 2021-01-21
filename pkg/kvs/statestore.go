@@ -75,7 +75,7 @@ func (store *KvStateStore) Checkpoint(ctx context.Context, key string,
 	mapFn func(currCheckpoint, val []byte)([]byte, error)) error {
 
 	/*
-	 * Acquire a lock to do the checkpoint.  If this fails, assume someone else is doing it
+	 * Acquire a lock to do the checkpoint.  This will block if someone else is doing it
 	 */
 	lock := NewKVDistributedLock(key, store.kvStore)
 	ctx, err := lock.Lock(ctx, -1)
@@ -89,6 +89,11 @@ func (store *KvStateStore) Checkpoint(ctx context.Context, key string,
 	elementKeys, err := store.kvStore.List(ctx, key + AppendEntryDelimiter)
 	if err != nil {
 		return err
+	}
+
+	// There is no work to do
+	if len(elementKeys) == 0 {
+		return nil
 	}
 
 	/*

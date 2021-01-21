@@ -135,6 +135,8 @@
       "aggregator": {
         "name": "count-repo",
         "stateStore": "memKVStore",
+        "asyncCheckpoint": false,
+        "forwardState": true,
         "condition": {
           "exists": {
             "ops": [
@@ -156,6 +158,8 @@
       "aggregator": {
         "name": "aggregate-author",
         "stateStore": "memKVStore",
+        "asyncCheckpoint": false,
+        "forwardState": true,
         "condition": {
           "expression": {
             "comparator": {

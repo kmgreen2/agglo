@@ -18,11 +18,14 @@ type Aggregator struct {
 	forwardState bool
 }
 
-func NewAggregator(aggregation *core.Aggregation, condition *core.Condition, stateStore kvs.StateStore) *Aggregator {
+func NewAggregator(aggregation *core.Aggregation, condition *core.Condition, stateStore kvs.StateStore,
+	asyncCheckpoint, forwardState bool) *Aggregator {
 	return &Aggregator{
 		aggregation: aggregation,
 		condition: condition,
 		aggregatorStateStore: stateStore,
+		asyncCheckpoint: asyncCheckpoint,
+		forwardState: forwardState,
 	}
 }
 
@@ -102,7 +105,7 @@ func (a Aggregator) Process(ctx context.Context, in map[string]interface{}) (map
 		}
 	}
 
-	if !a.forwardState {
+	if a.forwardState {
 		var aggregationState *core.AggregationState
 
 		aggregationStateBytes, err := a.getAggregationState(ctx, partitionID, name)

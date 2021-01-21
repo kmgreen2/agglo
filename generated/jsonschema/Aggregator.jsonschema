@@ -94,6 +94,12 @@
             },
             "additionalProperties": true,
             "type": "object"
+        },
+        "asyncCheckpoint": {
+            "type": "boolean"
+        },
+        "forwardState": {
+            "type": "boolean"
         }
     },
     "additionalProperties": true,
