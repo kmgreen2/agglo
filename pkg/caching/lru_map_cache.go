@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"container/heap"
 	"fmt"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"strings"
 	"time"
 )
@@ -183,7 +183,7 @@ func (lruMapCache *LRUMapCache) Get(key LRUKey) (LRUEntry, error) {
 			lruMapCache.lruQueue.Delete(lruItem)
 			delete(lruMapCache.cache, key.ToString())
 			delete(lruMapCache.keys, key.ToString())
-			return nil, common.WithStack(common.NewEvictedError(fmt.Sprintf("key: %s", key.ToString())))
+			return nil, util.WithStack(util.NewEvictedError(fmt.Sprintf("key: %s", key.ToString())))
 		}
 
 		lruKey := lruMapCache.keys[key.ToString()]
@@ -192,7 +192,7 @@ func (lruMapCache *LRUMapCache) Get(key LRUKey) (LRUEntry, error) {
 		return elem, nil
 	}
 
-	return nil, common.WithStack(common.NewNotFoundError(fmt.Sprintf("key: %s", key.ToString())))
+	return nil, util.WithStack(util.NewNotFoundError(fmt.Sprintf("key: %s", key.ToString())))
 }
 
 // Delete will delete a key and entry from the LRU caching
@@ -203,10 +203,10 @@ func (lruMapCache *LRUMapCache) Delete(key LRUKey) error {
 			delete(lruMapCache.keys, key.ToString())
 			lruMapCache.lruQueue.Delete(lruItem)
 		} else {
-			return common.NewNotFoundError(fmt.Sprintf("Could not find key in LRU queue: %s", key.ToString()))
+			return util.NewNotFoundError(fmt.Sprintf("Could not find key in LRU queue: %s", key.ToString()))
 		}
 	} else {
-		return common.NewNotFoundError(fmt.Sprintf("Could not find key in caching: %s", key.ToString()))
+		return util.NewNotFoundError(fmt.Sprintf("Could not find key in caching: %s", key.ToString()))
 	}
 	return nil
 }

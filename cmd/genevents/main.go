@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/kmgreen2/agglo/generated/proto"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"io/ioutil"
 	"math"
 	"math/rand"
@@ -154,7 +154,7 @@ func (r *ReferenceValues) Num() int {
 
 func (r *ReferenceValues) Pop() (interface{}, error) {
 	if r.Num() == 0 {
-		return nil, common.NewInvalidError(fmt.Sprintf("no available references"))
+		return nil, util.NewInvalidError(fmt.Sprintf("no available references"))
 	}
 	val := r.values[0].value
 	r.values[0].refCount--
@@ -180,7 +180,7 @@ func (r *SchemaReferences) Pop(path string) (interface{}, error) {
 	if _, ok := r.pathValues[path]; ok {
 		return r.pathValues[path].Pop()
 	}
-	return nil, common.NewInvalidError(fmt.Sprintf("references do not exist for %s", path))
+	return nil, util.NewInvalidError(fmt.Sprintf("references do not exist for %s", path))
 }
 
 func (r *SchemaReferences) HasPath(path string) bool {
@@ -287,7 +287,7 @@ func (g *GeneratorState) generateValue(value *api.Value, eventLocalstate map[str
 			if prefix, ok := g.schemas.StringPrefixes[val.RandomString.PrefixName]; ok {
 				s = prefix+s
 			} else {
-				return nil, common.NewInvalidError(fmt.Sprintf("prefix does not exist: %s",
+				return nil, util.NewInvalidError(fmt.Sprintf("prefix does not exist: %s",
 					val.RandomString.PrefixName))
 			}
 		}
@@ -295,7 +295,7 @@ func (g *GeneratorState) generateValue(value *api.Value, eventLocalstate map[str
 			if suffix, ok := g.schemas.StringSuffixes[val.RandomString.SuffixName]; ok {
 				s += suffix
 			} else {
-				return nil, common.NewInvalidError(fmt.Sprintf("suffix does not exist: %s",
+				return nil, util.NewInvalidError(fmt.Sprintf("suffix does not exist: %s",
 					val.RandomString.SuffixName))
 			}
 		}
@@ -328,7 +328,7 @@ func (g *GeneratorState) generateValue(value *api.Value, eventLocalstate map[str
 			if prefix, ok := g.schemas.StringPrefixes[val.VocabString.PrefixName]; ok {
 				s = prefix+s
 			} else {
-				return nil, common.NewInvalidError(fmt.Sprintf("prefix does not exist: %s",
+				return nil, util.NewInvalidError(fmt.Sprintf("prefix does not exist: %s",
 					val.VocabString.PrefixName))
 			}
 		}
@@ -336,7 +336,7 @@ func (g *GeneratorState) generateValue(value *api.Value, eventLocalstate map[str
 			if suffix, ok := g.schemas.StringSuffixes[val.VocabString.SuffixName]; ok {
 				s += suffix
 			} else {
-				return nil, common.NewInvalidError(fmt.Sprintf("suffix does not exist: %s",
+				return nil, util.NewInvalidError(fmt.Sprintf("suffix does not exist: %s",
 					val.VocabString.SuffixName))
 			}
 		}
@@ -387,7 +387,7 @@ func (g *GeneratorState) generateValue(value *api.Value, eventLocalstate map[str
 		return slice, nil
 	case *api.Value_Reference:
 		if _, ok := g.references[val.Reference.SchemaName]; !ok {
-			return nil, common.NewInvalidError(fmt.Sprintf("schema '%s' has no valid references",
+			return nil, util.NewInvalidError(fmt.Sprintf("schema '%s' has no valid references",
 				val.Reference.SchemaName))
 		}
 		return g.references[val.Reference.SchemaName].Pop(val.Reference.Path)
@@ -689,7 +689,7 @@ func isUrl(url string) bool {
 
 func NewHttpSender(url string) (*HttpSender, error) {
 	if !isUrl(url) {
-		return nil, common.NewInvalidError(fmt.Sprintf("'%s' is not a valid URL", url))
+		return nil, util.NewInvalidError(fmt.Sprintf("'%s' is not a valid URL", url))
 	}
 
 	return &HttpSender{
@@ -771,7 +771,7 @@ func generator(threadNum int, args *CommandState) error {
 			return err
 		}
 
-		rawJson, err := common.MapToJson(out)
+		rawJson, err := util.MapToJson(out)
 		if err != nil {
 			return err
 		}

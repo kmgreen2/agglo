@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jinzhu/gorm"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 )
 
 // Database is the interface to be implemented by all relational databases
@@ -43,7 +43,7 @@ func NewDatabaseImpl(config *DatabaseConfig) (*DatabaseImpl, error) {
 		}
 		return database, nil
 	}
-	return nil, common.NewInvalidError(fmt.Sprintf("NewDatabase - invalid database type: %s",
+	return nil, util.NewInvalidError(fmt.Sprintf("NewDatabase - invalid database type: %s",
 		config.databaseType))
 }
 

@@ -3,7 +3,7 @@ package streaming
 import (
 	"errors"
 	"fmt"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"sync"
 )
 
@@ -65,7 +65,7 @@ func (memTopic *MemTopic) Publish(payload []byte) error {
 func (memTopic *MemTopic) Get(index int64) ([]byte, error) {
 	numMessages := len(memTopic.messageQueue)
 	if numMessages <= int(index) {
-		return nil, common.NewOutOfBoundsError(fmt.Sprintf("MemPubSub - index out of bounds: %d >= %d", index,
+		return nil, util.NewOutOfBoundsError(fmt.Sprintf("MemPubSub - index out of bounds: %d >= %d", index,
 			numMessages))
 	}
 	return memTopic.messageQueue[index], nil
@@ -77,7 +77,7 @@ func (pubSub *MemPubSub) CreateTopic(name string) error {
 	defer pubSub.lock.Unlock()
 
 	if _, ok := pubSub.memTopics[name]; ok {
-		return common.NewConflictError(fmt.Sprintf("MemPubSub - cannot create topic that exists: %s", name))
+		return util.NewConflictError(fmt.Sprintf("MemPubSub - cannot create topic that exists: %s", name))
 	}
 	pubSub.memTopics[name] = NewMemTopic()
 	return nil
@@ -86,7 +86,7 @@ func (pubSub *MemPubSub) CreateTopic(name string) error {
 // Publish will publish a message to the specified topic
 func (pubSub *MemPubSub) Publish(topic string, payload []byte) error {
 	if _, ok := pubSub.memTopics[topic]; !ok {
-		return common.NewNotFoundError(fmt.Sprintf("MemPubSub - cannot publish to non-existent topic: %s",
+		return util.NewNotFoundError(fmt.Sprintf("MemPubSub - cannot publish to non-existent topic: %s",
 			topic))
 	}
 	err := pubSub.memTopics[topic].Publish(payload)
@@ -106,14 +106,14 @@ func (pubSub *MemPubSub) HasTopic(topic string) bool {
 // Next will get the next message based on the provided context and topic
 func (pubSub *MemPubSub) Next(ctx *SubscriberContext) ([]byte, error) {
 	if _, ok := pubSub.memTopics[ctx.topic]; !ok {
-		return nil, common.NewNotFoundError(fmt.Sprintf("MemPubSub - cannot subscribe from non-existent topic: %s",
+		return nil, util.NewNotFoundError(fmt.Sprintf("MemPubSub - cannot subscribe from non-existent topic: %s",
 			ctx.topic))
 	}
 	if ctx.offset > ctx.maxOffset {
-		return nil, common.NewEndOfStreamError(fmt.Sprintf("MemPubSub - end of stream"))
+		return nil, util.NewEndOfStreamError(fmt.Sprintf("MemPubSub - end of stream"))
 	}
 	message, err := pubSub.memTopics[ctx.topic].Get(ctx.offset)
-	if errors.Is(err, &common.OutOfBoundsError{}) {
+	if errors.Is(err, &util.OutOfBoundsError{}) {
 		pubSub.memTopics[ctx.topic].cond.Wait()
 	}
 	if err != nil {

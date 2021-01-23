@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	gUuid "github.com/google/uuid"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"strings"
 )
 
@@ -39,7 +39,7 @@ func NameKeyPrefix(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	hasher := common.InitHash(common.MD5)
+	hasher := util.InitHash(util.MD5)
 	_, err = hasher.Write([]byte(name))
 	if err != nil {
 		return "", err
@@ -62,7 +62,7 @@ func TagKeyPrefix(tag string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	hasher := common.InitHash(common.MD5)
+	hasher := util.InitHash(util.MD5)
 	_, err = hasher.Write([]byte(tag))
 	if err != nil {
 		return "", err
@@ -111,7 +111,7 @@ func ProofIdentifierPrefix(subStreamID SubStreamID) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	hasher := common.InitHash(common.MD5)
+	hasher := util.InitHash(util.MD5)
 	_, err = hasher.Write([]byte(subStreamID))
 	if err != nil {
 		return "", err

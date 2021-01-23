@@ -3,7 +3,7 @@ package streaming
 import (
 	"context"
 	"fmt"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 )
 
 // MemSubscriber is an object used to subscribe to a single topic
@@ -33,7 +33,7 @@ func NewMemReplayer(memPubSub *MemPubSub, topic string, start, end int64) (*MemR
 		}, nil
 	}
 
-	return nil, common.NewInvalidError(fmt.Sprintf(
+	return nil, util.NewInvalidError(fmt.Sprintf(
 		"MemReplayer - cannot create replayer for non-existent topic: %s", topic))
 }
 

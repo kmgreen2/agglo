@@ -5,12 +5,13 @@ import (
 	"context"
 	gocrypto "crypto"
 	"encoding/json"
+	"github.com/kmgreen2/agglo/internal/common"
 	gorand "math/rand"
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
 	gUuid "github.com/google/uuid"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/entwine"
 	"github.com/kmgreen2/agglo/pkg/kvs"
@@ -90,7 +91,7 @@ func GetSubStream(subStreamID entwine.SubStreamID, numMessages int, defaultObjec
 	anchorUuid := gUuid.New()
 	i := 0
 	if prevMessage == nil {
-		messages[0], err = entwine.NewStreamGenesisMessage(subStreamID, common.SHA1, signer, anchorUuid)
+		messages[0], err = entwine.NewStreamGenesisMessage(subStreamID, util.SHA1, signer, anchorUuid)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -121,7 +122,7 @@ func GetSubStream(subStreamID entwine.SubStreamID, numMessages int, defaultObjec
 	for key, _ := range objectMap {
 		objectDescriptor := storage.NewObjectDescriptor(objectStoreParams, key)
 		messages[i], err = entwine.NewStreamImmutableMessage(subStreamID, objectDescriptor, key, []string{},
-			common.SHA1, signer, time.Now().Unix(), prevMessage, anchorUuid)
+			util.SHA1, signer, time.Now().Unix(), prevMessage, anchorUuid)
 		prevMessage = messages[i]
 		i++
 	}
@@ -138,7 +139,7 @@ func GetTickerStream(numMessages int) ([]*entwine.TickerImmutableMessage, crypto
 
 	var prevMessage *entwine.TickerImmutableMessage = nil
 	for i := 0; i < numMessages; i++ {
-		messages[i], err = entwine.NewTickerImmutableMessage(common.SHA1, signer, int64(i), prevMessage)
+		messages[i], err = entwine.NewTickerImmutableMessage(util.SHA1, signer, int64(i), prevMessage)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -155,9 +156,9 @@ func GetKVStreamStore(numMessages int, subStreamID entwine.SubStreamID, signer c
 	objects := make(map[string]*bytes.Buffer)
 	uuidToName := make(map[string]string)
 	kvStore := kvs.NewMemKVStore()
-	kvStreamStore := entwine.NewKVStreamStore(kvStore, common.SHA1)
+	kvStreamStore := entwine.NewKVStreamStore(kvStore, util.SHA1)
 
-	err := kvStreamStore.Create(subStreamID, common.SHA1, signer, currAnchorUuid)
+	err := kvStreamStore.Create(subStreamID, util.SHA1, signer, currAnchorUuid)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -192,7 +193,7 @@ func GetKVStreamStore(numMessages int, subStreamID entwine.SubStreamID, signer c
 
 func GetTickerStore(numMessages int) (*entwine.KVTickerStore, crypto.Signer, error) {
 	kvStore := kvs.NewMemKVStore()
-	kvTickerStore := entwine.NewKVTickerStore(kvStore, common.SHA1)
+	kvTickerStore := entwine.NewKVTickerStore(kvStore, util.SHA1)
 	signer, _, _, err := GetSignerAuthenticator(gocrypto.SHA1)
 	if err != nil {
 		return nil, nil, err
@@ -213,7 +214,7 @@ func GetProof(messages []*entwine.StreamImmutableMessage, subStreamID entwine.Su
 		return nil, err
 	}
 
-	tickerMessage, err := entwine.NewTickerImmutableMessage(common.SHA1, signer, int64(1), nil)
+	tickerMessage, err := entwine.NewTickerImmutableMessage(util.SHA1, signer, int64(1), nil)
 	if err != nil {
 		return nil, err
 	}

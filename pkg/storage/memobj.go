@@ -6,7 +6,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/pkg/config"
 	"io"
 	"strings"
@@ -30,7 +30,7 @@ type MemObjectStoreBackendParams struct {
 func NewMemObjectStoreBackendParams(backendType BackendType, instanceName string) (*MemObjectStoreBackendParams,
 	error) {
 	if backendType != MemObjectStoreBackend {
-		return nil, common.NewInvalidError(fmt.Sprintf("NewMemObjectStoreBackendParams - Invalid backendType: %v",
+		return nil, util.NewInvalidError(fmt.Sprintf("NewMemObjectStoreBackendParams - Invalid backendType: %v",
 			backendType))
 	}
 	return &MemObjectStoreBackendParams {
@@ -120,7 +120,7 @@ func NewMemObjectStore(params ObjectStoreBackendParams) (*MemObjectStore, error)
 
 	memObjectStoreParams, ok := params.(*MemObjectStoreBackendParams)
 	if !ok {
-		return nil, common.NewInvalidError(fmt.Sprintf("NewMemObjectStore - invalid params"))
+		return nil, util.NewInvalidError(fmt.Sprintf("NewMemObjectStore - invalid params"))
 	}
 
 	if _, ok := memObjectStoreInstance[memObjectStoreParams.instanceName]; !ok  {
@@ -146,7 +146,7 @@ func (objStore *MemObjectStore) Put(ctx context.Context, key string, reader io.R
 	length := 0
 	buf := make([]byte, objStore.config.streamingBufferSize)
 	if _, ok := objStore.blobs[key]; ok {
-		return common.NewConflictError(fmt.Sprintf("MemObjectStore - key exists: %s", key))
+		return util.NewConflictError(fmt.Sprintf("MemObjectStore - key exists: %s", key))
 	}
 	byteBuffer := bytes.NewBuffer(make([]byte, 0))
 	for {
@@ -162,7 +162,7 @@ func (objStore *MemObjectStore) Put(ctx context.Context, key string, reader io.R
 			return err
 		}
 		if numWritten != numRead {
-			return common.NewInternalError(fmt.Sprintf("MemObjectStore - error writing key: %s", key))
+			return util.NewInternalError(fmt.Sprintf("MemObjectStore - error writing key: %s", key))
 		}
 		length += numRead
 	}
@@ -177,7 +177,7 @@ func (objStore *MemObjectStore) Get(ctx context.Context, key string) (io.Reader,
 	if payload, ok := objStore.blobs[key]; ok {
 		return bytes.NewBuffer(payload), nil
 	}
-	return nil, common.NewNotFoundError(fmt.Sprintf("MemObjectStore - key: %s", key))
+	return nil, util.NewNotFoundError(fmt.Sprintf("MemObjectStore - key: %s", key))
 }
 
 // Head will return nil if the key maps a blob exists and an error otherwise
@@ -187,7 +187,7 @@ func (objStore *MemObjectStore) Head(ctx context.Context, key string) error {
 	if _, ok := objStore.blobs[key]; ok {
 		return nil
 	}
-	return common.NewNotFoundError(fmt.Sprintf("MemObjectStore - key: %s", key))
+	return util.NewNotFoundError(fmt.Sprintf("MemObjectStore - key: %s", key))
 }
 
 // Delete will delete the key and blob from the underlying map
@@ -198,7 +198,7 @@ func (objStore *MemObjectStore) Delete(ctx context.Context, key string) error {
 		delete(objStore.blobs, key)
 		return nil
 	}
-	return common.NewNotFoundError(fmt.Sprintf("MemObjectStore - key: %s", key))
+	return util.NewNotFoundError(fmt.Sprintf("MemObjectStore - key: %s", key))
 }
 
 // List will return a slice of keys that are prefixed on the provided prefix

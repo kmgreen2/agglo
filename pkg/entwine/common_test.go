@@ -3,7 +3,7 @@ package entwine_test
 import (
 	"encoding/hex"
 	gUuid "github.com/google/uuid"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/pkg/entwine"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -30,7 +30,7 @@ func TestAnchorNodeKey(t *testing.T) {
 
 func TestNameKeyPrefix(t *testing.T) {
 	testName := "foobarbaz"
-	hasher := common.InitHash(common.MD5)
+	hasher := util.InitHash(util.MD5)
 	_, err := hasher.Write([]byte(testName))
 	if err != nil {
 		assert.FailNow(t, err.Error())
@@ -82,7 +82,7 @@ func TestTagEntry(t *testing.T) {
 
 func TestTagKeyPrefix(t *testing.T) {
 	testTag := "foobarbaz"
-	hasher := common.InitHash(common.MD5)
+	hasher := util.InitHash(util.MD5)
 	_, err := hasher.Write([]byte(testTag))
 	if err != nil {
 		assert.FailNow(t, err.Error())
@@ -119,7 +119,7 @@ func TestBytesToUUIDError(t *testing.T) {
 
 func TestProofIdentifierPrefix(t *testing.T) {
 	subStreamID := entwine.SubStreamID("myssid")
-	hasher := common.InitHash(common.MD5)
+	hasher := util.InitHash(util.MD5)
 	_, err := hasher.Write([]byte(subStreamID))
 	if err != nil {
 		assert.FailNow(t, err.Error())

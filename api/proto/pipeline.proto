@@ -4,6 +4,19 @@ option go_package = ".;api";
 
 package pipeline;
 
+message PipelinesCreateRequest {
+    Pipelines pipelines = 1;
+}
+
+message PipelinesCreateResponse {
+    string response = 1;
+}
+
+service ConfigBuilder {
+    rpc Create(PipelinesCreateRequest) returns (PipelinesCreateResponse) {
+    }
+}
+
 enum ProcessType {
     UnknownProcess = 0;
     AnnotatorProcess = 1;

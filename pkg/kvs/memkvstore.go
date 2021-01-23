@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/pkg/observability"
 	"strings"
 	"sync"
@@ -61,7 +61,7 @@ func (kvStore *MemKVStore) AtomicPut(ctx context.Context, key string, prev, valu
 		kvStore.values[key] = value
 	} else {
 		msg := fmt.Sprintf("state has changed for '%s', cannot apply atomic update", key)
-		err = common.NewConflictError(msg)
+		err = util.NewConflictError(msg)
 		return err
 	}
 
@@ -93,7 +93,7 @@ func (kvStore *MemKVStore) AtomicDelete(ctx context.Context, key string, prev []
 		return nil
 	} else {
 		msg := fmt.Sprintf("state has changed for '%s', cannot apply atomic update", key)
-		err = common.NewConflictError(msg)
+		err = util.NewConflictError(msg)
 		return err
 	}
 }
@@ -130,7 +130,7 @@ func (kvStore *MemKVStore) Get(ctx context.Context, key string) ([]byte, error) 
 	}
 
 	if _, ok := kvStore.values[key]; !ok {
-		err = common.NewNotFoundError(fmt.Sprintf("MemKVStore - key does not exist: %s", key))
+		err = util.NewNotFoundError(fmt.Sprintf("MemKVStore - key does not exist: %s", key))
 		return nil, err
 	}
 	return kvStore.values[key], nil
@@ -153,7 +153,7 @@ func (kvStore *MemKVStore) Head(ctx context.Context, key string) error {
 	}
 
 	if _, ok := kvStore.values[key]; !ok {
-		err = common.NewNotFoundError(fmt.Sprintf("MemKVStore - key does not exist: %s", key))
+		err = util.NewNotFoundError(fmt.Sprintf("MemKVStore - key does not exist: %s", key))
 		return err
 	}
 	return nil
@@ -176,7 +176,7 @@ func (kvStore *MemKVStore) Delete(ctx context.Context, key string) error {
 	}
 
 	if _, ok := kvStore.values[key]; !ok {
-		err = common.NewNotFoundError(fmt.Sprintf("MemKVStore - key does not exist: %s", key))
+		err = util.NewNotFoundError(fmt.Sprintf("MemKVStore - key does not exist: %s", key))
 		return err
 	}
 	delete(kvStore.values, key)

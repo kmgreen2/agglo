@@ -3,8 +3,8 @@ package main
 import (
 	gocrypto "crypto"
 	"fmt"
-	"github.com/kmgreen2/agglo/internal/usecase/voting"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/old/usecase/voting"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/entwine"
 	"github.com/kmgreen2/agglo/pkg/kvs"
@@ -157,7 +157,7 @@ func peopleDoVote(voters []*voting.Voter, registrar *voting.Registrar, ledger *v
 
 func startTickerStore() (entwine.TickerStore, error) {
 	kvStore := kvs.NewMemKVStore()
-	kvTickerStore := entwine.NewKVTickerStore(kvStore, common.SHA1)
+	kvTickerStore := entwine.NewKVTickerStore(kvStore, util.SHA1)
 	signer, _, _, err := test.GetSignerAuthenticator(gocrypto.SHA1)
 	if err != nil {
 		return nil, err
@@ -196,7 +196,7 @@ func runMunicipality(name string, numPeople int, ticker entwine.TickerStore,
 		return nil, nil, err
 	}
 
-	err = streamStore.Create(entwine.SubStreamID(name), common.SHA1, signer, genesisProof.TickerUuid())
+	err = streamStore.Create(entwine.SubStreamID(name), util.SHA1, signer, genesisProof.TickerUuid())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -241,7 +241,7 @@ func main() {
 
 	kvStore := kvs.NewMemKVStore()
 
-	streamStore := entwine.NewKVStreamStore(kvStore, common.SHA1)
+	streamStore := entwine.NewKVStreamStore(kvStore, util.SHA1)
 
 	objectStoreInstance := "default"
 	storageParams, err := storage.NewMemObjectStoreBackendParams(storage.MemObjectStoreBackend, objectStoreInstance)

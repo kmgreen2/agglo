@@ -142,7 +142,7 @@
         },
         "job": {
           "runnable": {
-            "pathToExec": "../../bin/printvals",
+            "pathToExec": "../../../bin/printvals",
             "cmdArgs": [
               "/tmp/testPipelinesBasic",
               "githash"

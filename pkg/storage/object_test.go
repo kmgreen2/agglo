@@ -1,7 +1,6 @@
 package storage_test
 
 import (
-	"github.com/kmgreen2/agglo/pkg/serialization"
 	"github.com/kmgreen2/agglo/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -14,7 +13,7 @@ func TestNewObjectDescriptorFromBytes(t *testing.T) {
 	}
 	objectDesc := storage.NewObjectDescriptor(objectDescParams, "foobar")
 
-	objectDescBytes, err := serialization.Serialize(objectDesc)
+	objectDescBytes, err := storage.Serialize(objectDesc)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
