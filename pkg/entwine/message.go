@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/storage"
 	"io"
@@ -33,13 +33,13 @@ func NewUncommittedMessage(objectDescriptor *storage.ObjectDescriptor, name stri
 
 // BaseImmutableMessage is the base message for all streams
 type BaseImmutableMessage struct {
-	signature   []byte
-	digest      []byte
-	digestType  common.DigestType
-	uuid        gUuid.UUID
-	prevUuid    gUuid.UUID
-	idx         int64
-	ts          int64
+	signature  []byte
+	digest     []byte
+	digestType util.DigestType
+	uuid       gUuid.UUID
+	prevUuid   gUuid.UUID
+	idx        int64
+	ts         int64
 }
 
 // StreamImmutableMessage is the message type for the main streams and sub-streams
@@ -209,7 +209,7 @@ func DeserializeStreamImmutableMessage(messageBytes []byte, message *StreamImmut
 	return nil
 }
 
-func NewStreamGenesisMessage(subStreamID SubStreamID, digestType common.DigestType,
+func NewStreamGenesisMessage(subStreamID SubStreamID, digestType util.DigestType,
 	signer crypto.Signer, anchorTickerUuid gUuid.UUID) (*StreamImmutableMessage, error) {
 	var err error
 	message := &StreamImmutableMessage{}
@@ -239,7 +239,7 @@ func NewStreamGenesisMessage(subStreamID SubStreamID, digestType common.DigestTy
 // NewStreamImmutableMessage will create a new immutable message, which includes signing and hashing with the previous
 // message in the chain
 func NewStreamImmutableMessage(subStreamID SubStreamID, objectDescriptor *storage.ObjectDescriptor, name string,
-	tags []string, digestType common.DigestType, signer crypto.Signer, ts int64, prevMessage *StreamImmutableMessage,
+	tags []string, digestType util.DigestType, signer crypto.Signer, ts int64, prevMessage *StreamImmutableMessage,
 	anchorTickerUuid gUuid.UUID) (*StreamImmutableMessage, error) {
 	message := &StreamImmutableMessage{}
 	message.uuid = gUuid.New()
@@ -258,7 +258,7 @@ func NewStreamImmutableMessage(subStreamID SubStreamID, objectDescriptor *storag
 	if err != nil {
 		return nil, err
 	}
-	hasher := common.InitHash(digestType)
+	hasher := util.InitHash(digestType)
 	byteBuf := make([]byte, 8192)
 	for {
 		n, err := dataReader.Read(byteBuf)
@@ -320,7 +320,7 @@ func (message *StreamImmutableMessage) SubStream() SubStreamID {
 }
 
 // DigestType will return the digest type used to compute the message and data digest
-func (message *StreamImmutableMessage) DigestType() common.DigestType {
+func (message *StreamImmutableMessage) DigestType() util.DigestType {
 	return message.digestType
 }
 
@@ -452,7 +452,7 @@ func (message *StreamImmutableMessage) ComputeChainHash(prev *StreamImmutableMes
 				message.uuid.String()))
 		}
 	}
-	digest := common.InitHash(message.digestType)
+	digest := util.InitHash(message.digestType)
 	if prevDigest != nil {
 		_, err = digest.Write(append(prevDigest, message.signature...))
 	} else {
@@ -541,7 +541,7 @@ func DeserializeTickerImmutableMessage(messageBytes []byte, message *TickerImmut
 
 // NewTickerImmutableMessage will create a new immutable message, which includes signing and hashing with the previous
 // message in the chain
-func NewTickerImmutableMessage(digestType common.DigestType, signer crypto.Signer,
+func NewTickerImmutableMessage(digestType util.DigestType, signer crypto.Signer,
 	ts int64, prevMessage *TickerImmutableMessage) (*TickerImmutableMessage, error) {
 	var err error
 
@@ -591,7 +591,7 @@ func (message *TickerImmutableMessage) Digest() []byte {
 }
 
 // DigestType will return the digest type used to compute the message
-func (message *TickerImmutableMessage) DigestType() common.DigestType {
+func (message *TickerImmutableMessage) DigestType() util.DigestType {
 	return message.digestType
 }
 
@@ -712,7 +712,7 @@ func (message *TickerImmutableMessage) ComputeChainHash(prev *TickerImmutableMes
 				message.uuid.String()))
 		}
 	}
-	digest := common.InitHash(message.digestType)
+	digest := util.InitHash(message.digestType)
 	if prevDigest != nil {
 		_, err = digest.Write(append(prevDigest, message.signature...))
 	} else {

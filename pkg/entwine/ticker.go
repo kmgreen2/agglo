@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"math"
@@ -40,17 +40,17 @@ type TickerStore interface {
 
 // KVStreamStore is an implementation of TickerStore that is backed by an in-memory map
 type KVTickerStore struct {
-	kvStore kvs.KVStore
-	head *TickerImmutableMessage
-	tickerLock *sync.Mutex
+	kvStore      kvs.KVStore
+	head         *TickerImmutableMessage
+	tickerLock   *sync.Mutex
 	proofIndexes map[string]int
-	proofLocks map[string]*sync.Mutex
-	digestType common.DigestType
+	proofLocks   map[string]*sync.Mutex
+	digestType   util.DigestType
 }
 
 // NewKVTickerStore returns a new KVStreamStore backed by the provided KVStore
 // ToDo(KMG): Need to init heads, write locks from state in the backing KVStore
-func NewKVTickerStore(kvStore kvs.KVStore, digestType common.DigestType) *KVTickerStore {
+func NewKVTickerStore(kvStore kvs.KVStore, digestType util.DigestType) *KVTickerStore {
 	return &KVTickerStore{
 		kvStore: kvStore,
 		digestType: digestType,
@@ -113,7 +113,7 @@ func (tickerStore *KVTickerStore) GetHistory(start gUuid.UUID, end gUuid.UUID) (
 		prevBytes, err := tickerStore.kvStore.Get(context.Background(), PreviousNodeKey(curr))
 		// No previous message, assumes we have reached the first
 		// ToDo(KMG): Do we care?  Should we check the first message and return an error?
-		if errors.Is(err, &common.NotFoundError{}) {
+		if errors.Is(err, &util.NotFoundError{}) {
 			break
 		} else if err != nil {
 			return nil, err
@@ -221,7 +221,7 @@ func (tickerStore *KVTickerStore) GetLatestProofKey(subStreamID SubStreamID) (st
 
 	// No proofs have been stored yet, return not found.  Caller should create a genesis proof
 	if len(keys) == 0 {
-		return "", common.NewNotFoundError(fmt.Sprintf(
+		return "", util.NewNotFoundError(fmt.Sprintf(
 			"GetProofStartUuid - cannot find previous proof for substream: %s", subStreamID))
 	}
 
@@ -250,7 +250,7 @@ func (tickerStore *KVTickerStore) GetLatestProofKey(subStreamID SubStreamID) (st
 // such proof can be found, it returns a NotFound error
 func (tickerStore *KVTickerStore) GetProofForStreamIndex(subStreamID SubStreamID, streamIdx int64) (Proof, error) {
 	if _, ok := tickerStore.proofIndexes[string(subStreamID)]; !ok {
-		return nil, common.NewNotFoundError(fmt.Sprintf(
+		return nil, util.NewNotFoundError(fmt.Sprintf(
 			"GetProofForStreamIndex - Cannot find proof for message at index '%d' for substream '%s'",
 			streamIdx, subStreamID))
 	}
@@ -280,7 +280,7 @@ func (tickerStore *KVTickerStore) GetProofForStreamIndex(subStreamID SubStreamID
 			return midProof, nil
 		}
 	}
-	return nil, common.NewNotFoundError(fmt.Sprintf(
+	return nil, util.NewNotFoundError(fmt.Sprintf(
 		"GetProofForStreamIndex - Cannot find proof for message at index '%d' for substream '%s'",
 		streamIdx, subStreamID))
 }

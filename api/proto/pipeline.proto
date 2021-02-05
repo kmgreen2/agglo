@@ -4,6 +4,19 @@ option go_package = ".;api";
 
 package pipeline;
 
+message PipelinesCreateRequest {
+    Pipelines pipelines = 1;
+}
+
+message PipelinesCreateResponse {
+    string response = 1;
+}
+
+service ConfigBuilder {
+    rpc Create(PipelinesCreateRequest) returns (PipelinesCreateResponse) {
+    }
+}
+
 enum ProcessType {
     UnknownProcess = 0;
     AnnotatorProcess = 1;
@@ -163,6 +176,8 @@ message Aggregator {
     Condition condition = 2;
     string stateStore = 3;
     Aggregation aggregation = 4;
+    bool asyncCheckpoint = 5;
+    bool forwardState = 6;
 }
 
 message Aggregation {
@@ -190,8 +205,7 @@ message Filter {
 }
 
 message Checkpoint {
-    string outputConnector = 1;
-    ExternalType externalType = 2;
+    string outputConnectorRef = 1;
 }
 
 message Spawner {
@@ -215,9 +229,8 @@ message Job {
 message Tee {
     string name = 1;
     Condition condition = 2;
-    repeated TransformerSpec transformerSpecs = 3;
-    string outputConnector = 4;
-    ExternalType externalType = 5;
+    string transformerRef = 3;
+    string outputConnectorRef = 4;
 }
 
 message Transformer {

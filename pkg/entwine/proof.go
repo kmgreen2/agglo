@@ -5,7 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	gUuid "github.com/google/uuid"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"sort"
 	"strings"
 )
@@ -13,10 +13,10 @@ import (
 // MessageFingerprint is the fingerprint used to prove historical timelines of sub streams.  A fingerprint is
 // derived from a StreamImmutableMessage
 type MessageFingerprint struct {
-	Signature []byte
-	Digest []byte
-	DigestType common.DigestType
-	Uuid gUuid.UUID
+	Signature  []byte
+	Digest     []byte
+	DigestType util.DigestType
+	Uuid       gUuid.UUID
 	AnchorUuid gUuid.UUID
 }
 
@@ -279,7 +279,7 @@ func (proof *ProofImpl) Validate() bool {
 	var prevDigest []byte
 	for i, fingerprint := range proof.messageFingerprints {
 		if i > 0 {
-			digest := common.InitHash(fingerprint.DigestType)
+			digest := util.InitHash(fingerprint.DigestType)
 			digest.Write(prevDigest)
 			digest.Write(fingerprint.Signature)
 			if bytes.Compare(digest.Sum(nil), fingerprint.Digest) != 0 {

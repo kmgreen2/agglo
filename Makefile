@@ -3,6 +3,7 @@
 PROTOC=protoc  -I=api/proto
 
 PKG_SOURCES = $(filter-out %_test.go,$(wildcard pkg/**/*.go))
+INTERNAL_SOURCES = $(filter-out %_test.go,$(wildcard internal/**/*.go))
 export GOOS ?= darwin
 
 define _mockgen
@@ -23,11 +24,11 @@ build:
 	CGO_ENABLED=1 go build -o bin/printvals cmd/printvals/main.go
 	CGO_ENABLED=1 go build -o bin/binge cmd/binge/main.go
 	CGO_ENABLED=1 go build -o bin/genevents cmd/genevents/main.go
-	CGO_ENABLED=0 go build -o bin/scratch cmd/scratch/main.go
 
 .PHONY: genmocks
 genmocks:
 	$(foreach  mock_source,$(PKG_SOURCES), $(call _mockgen,$(mock_source)))
+	$(foreach  mock_source,$(INTERNAL_SOURCES), $(call _mockgen,$(mock_source)))
 	$(call _clean_empty_mocks)
 
 .PHONY: clean
@@ -42,7 +43,7 @@ clean-test: ## remove test and coverage artifacts
 	rm -f coverage.out coverage.html
 
 .PHONY: lint
-lint: setup ## check style with flake8
+lint:
 	go list ./... | xargs golint -set_exit_status
 
 .PHONY: test
@@ -57,6 +58,6 @@ coverage: setup genmocks ## check code coverage
 
 .PHONY: proto
 proto: api/proto/pipeline.proto api/proto/genevents.proto
-	$(PROTOC) --jsonschema_out=generated/jsonschema --go_out=generated/proto api/proto/pipeline.proto 
-	$(PROTOC) --jsonschema_out=generated/jsonschema --go_out=generated/proto api/proto/genevents.proto
+	$(PROTOC) --go_out=generated/proto api/proto/pipeline.proto 
+	$(PROTOC) --go_out=generated/proto api/proto/genevents.proto
 

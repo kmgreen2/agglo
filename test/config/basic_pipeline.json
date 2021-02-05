@@ -81,6 +81,8 @@
       "aggregator": {
         "name": "aggregate-author",
         "stateStore": "memKVStore",
+        "asyncCheckpoint": false,
+        "forwardState": true,
         "condition": {
           "expression": {
             "comparator": {
@@ -140,13 +142,34 @@
         },
         "job": {
           "runnable": {
-            "pathToExec": "../../bin/printvals",
+            "pathToExec": "../../../bin/printvals",
             "cmdArgs": [
               "/tmp/testPipelinesBasic",
               "githash"
             ]
           }
         }
+      }
+    },
+    {
+      "transformer": {
+        "name": "git-transform",
+        "specs": [
+          {
+            "sourceField": "author",
+            "targetField": "gitAuthor",
+            "transformation": {
+              "transformationType": "TransformCopy"
+            }
+          },
+          {
+            "sourceField": "hash",
+            "targetField": "gitHash",
+            "transformation": {
+              "transformationType": "TransformCopy"
+            }
+          }
+        ]
       }
     },
     {
@@ -167,24 +190,8 @@
             }
           }
         },
-        "outputConnector": "memKVStore",
-        "externalType": "ExternalKVStore",
-        "transformerSpecs": [
-          {
-            "sourceField": "author",
-            "targetField": "gitAuthor",
-            "transformation": {
-              "transformationType": "TransformCopy"
-            }
-          },
-          {
-            "sourceField": "hash",
-            "targetField": "gitHash",
-            "transformation": {
-              "transformationType": "TransformCopy"
-            }
-          }
-        ]
+        "outputConnectorRef": "memKVStore",
+        "transformerRef": "git-transform"
       }
     }
   ],

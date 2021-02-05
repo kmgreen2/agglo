@@ -5,7 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/rand"
 	"crypto/x509"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"hash"
 	"reflect"
 )
@@ -66,9 +66,9 @@ func (a *RSAAuthenticator) Verify(message []byte, signature Signature) bool {
 
 	switch(a.hashAlgorithm) {
 	case crypto.SHA1:
-		hash = common.InitHash(common.SHA1)
+		hash = util.InitHash(util.SHA1)
 	case crypto.SHA256:
-		hash = common.InitHash(common.SHA256)
+		hash = util.InitHash(util.SHA256)
 	}
 	hash.Write(message)
 	digest = hash.Sum(nil)
@@ -90,9 +90,9 @@ func (s *RSASigner) Sign(message []byte) (Signature, error) {
 
 	switch(s.hashAlgorithm) {
 	case crypto.SHA1:
-		hash = common.InitHash(common.SHA1)
+		hash = util.InitHash(util.SHA1)
 	case crypto.SHA256:
-		hash = common.InitHash(common.SHA256)
+		hash = util.InitHash(util.SHA256)
 	}
 	hash.Write(message)
 	digest = hash.Sum(nil)

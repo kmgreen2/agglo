@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/kmgreen2/agglo/pkg/core"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"io/ioutil"
 	"os"
 	"regexp"
@@ -27,7 +27,7 @@ func main() {
 		panic(err)
 	}
 
-	outMap = core.CopyableMap(inMap).DeepCopy()
+	outMap = util.CopyableMap(inMap).DeepCopy()
 
 	if len(os.Args) < 4 {
 		panic(fmt.Sprintf("expected at least 4 args: <regex> <replace> [k1, k2, ...], got %d", len(os.Args)))

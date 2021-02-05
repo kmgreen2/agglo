@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"io"
 )
 
@@ -115,7 +115,7 @@ func SerializeObjectDescriptor(desc *ObjectDescriptor) ([]byte, error) {
 			return nil, err
 		}
 	} else {
-		return nil, common.NewInvalidError(fmt.Sprintf("Deserialize - invalid backend params type: %T",
+		return nil, util.NewInvalidError(fmt.Sprintf("Deserialize - invalid backend params type: %T",
 			desc.backendParams))
 	}
 	return byteBuffer.Bytes(), nil
@@ -154,7 +154,7 @@ func DeserializeObjectDescriptor(descBytes []byte, desc *ObjectDescriptor) error
 			return err
 		}
 	} else {
-		return common.NewInvalidError(fmt.Sprintf("Deserialize - invalid backend type: %d", backendType))
+		return util.NewInvalidError(fmt.Sprintf("Deserialize - invalid backend type: %d", backendType))
 	}
 	return nil
 }
@@ -169,7 +169,7 @@ func NewObjectStore(params ObjectStoreBackendParams) (ObjectStore, error) {
 			return nil, err
 		}
 	} else {
-		return nil, common.NewInvalidError(fmt.Sprintf("NewObjectStore - invalid backendType: %d",
+		return nil, util.NewInvalidError(fmt.Sprintf("NewObjectStore - invalid backendType: %d",
 			params.GetBackendType()))
 	}
 	return objectStore, nil

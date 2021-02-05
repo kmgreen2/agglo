@@ -3,7 +3,7 @@ package streaming
 import (
 	"context"
 	"fmt"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"time"
 )
 
@@ -22,7 +22,7 @@ func NewMemPublisher(memPubSub *MemPubSub, topic string) (*MemPublisher, error) 
 		}, nil
 	}
 
-	return nil, common.NewInvalidError(fmt.Sprintf(
+	return nil, util.NewInvalidError(fmt.Sprintf(
 		"MemPublisher - cannot create publisher for non-existent topic: %s", topic))
 }
 

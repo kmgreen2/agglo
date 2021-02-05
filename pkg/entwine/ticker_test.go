@@ -3,8 +3,8 @@ package entwine_test
 import (
 	"errors"
 	gUuid "github.com/google/uuid"
-	"github.com/kmgreen2/agglo/pkg/common"
 	"github.com/kmgreen2/agglo/pkg/entwine"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -230,7 +230,7 @@ func TestKVTickerStore_GetProofForStreamIndex(t *testing.T) {
 			assert.True(t, message.Index() <= proof.EndIdx())
 			assert.True(t, message.Index() >= proof.StartIdx())
 		} else {
-			assert.True(t, errors.Is(err, &common.NotFoundError{}))
+			assert.True(t, errors.Is(err, &util.NotFoundError{}))
 		}
 
 	}

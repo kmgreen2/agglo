@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"strings"
@@ -33,7 +33,7 @@ type StreamStore interface {
 	GetHistoryToLastAnchor(uuid gUuid.UUID) ([]*StreamImmutableMessage, error)
 	Append(message *UncommittedMessage, subStreamID SubStreamID, anchorTickerUuid gUuid.UUID) (gUuid.UUID, error)
 	Head(subStreamID SubStreamID) (*StreamImmutableMessage, error)
-	Create(subStreamID SubStreamID, digestType common.DigestType,
+	Create(subStreamID SubStreamID, digestType util.DigestType,
 		signer crypto.Signer, anchorTickerUuid gUuid.UUID) error
 
 	// This function needs to be at a higher level
@@ -44,16 +44,16 @@ type StreamStore interface {
 
 // KVStreamStore is an implementation of StreamStore that is backed by an in-memory map
 type KVStreamStore struct {
-	kvStore kvs.KVStore
-	heads map[string]*StreamImmutableMessage
-	digestType common.DigestType
+	kvStore    kvs.KVStore
+	heads      map[string]*StreamImmutableMessage
+	digestType util.DigestType
 	writeLocks map[string]*sync.Mutex
 	streamLock *sync.Mutex
 }
 
 // NewKVStreamStore returns a new KVStreamStore backed by the provided KVStore
 // ToDo(KMG): Need to init heads, write locks from state in the backing KVStore
-func NewKVStreamStore(kvStore kvs.KVStore, digestType common.DigestType) *KVStreamStore {
+func NewKVStreamStore(kvStore kvs.KVStore, digestType util.DigestType) *KVStreamStore {
 	return &KVStreamStore{
 		kvStore: kvStore,
 		digestType: digestType,
@@ -68,11 +68,11 @@ func (streamStore *KVStreamStore) Head(subStreamID SubStreamID) (*StreamImmutabl
 	if head, ok := streamStore.heads[string(subStreamID)]; ok {
 		return head, nil
 	}
-	return nil, common.NewNotFoundError(fmt.Sprintf("Head - substream not found: %s", subStreamID))
+	return nil, util.NewNotFoundError(fmt.Sprintf("Head - substream not found: %s", subStreamID))
 }
 
 // Create will create a new substream
-func (streamStore *KVStreamStore) Create(subStreamID SubStreamID, digestType common.DigestType,
+func (streamStore *KVStreamStore) Create(subStreamID SubStreamID, digestType util.DigestType,
 	signer crypto.Signer, anchorTickerUuid gUuid.UUID) error {
 	genesisMessage, err := NewStreamGenesisMessage(subStreamID, digestType, signer,
 		anchorTickerUuid)
@@ -99,7 +99,7 @@ func (streamStore *KVStreamStore) GetMessagesByName(name string) ([]*StreamImmut
 	}
 
 	if len(keys) == 0 {
-		return nil, common.NewNotFoundError(fmt.Sprintf("GetMessagesByName - not found: %s", name))
+		return nil, util.NewNotFoundError(fmt.Sprintf("GetMessagesByName - not found: %s", name))
 	}
 
 	messages := make([]*StreamImmutableMessage, len(keys))
@@ -137,7 +137,7 @@ func (streamStore *KVStreamStore) GetMessagesByTags(tags []string) ([]*StreamImm
 	}
 
 	if len(allKeys) == 0 {
-		return nil, common.NewNotFoundError(fmt.Sprintf("GetMessagesByTags - not found: %v", tags))
+		return nil, util.NewNotFoundError(fmt.Sprintf("GetMessagesByTags - not found: %v", tags))
 	}
 
 	messages := make([]*StreamImmutableMessage, len(allKeys))
@@ -207,7 +207,7 @@ func (streamStore *KVStreamStore) GetHistory(start gUuid.UUID, end gUuid.UUID) (
 
 		// No previous message, assumes we have reached the first
 		// ToDo(KMG): Do we care?  Should we check the first message and return an error?
-		if errors.Is(err, &common.NotFoundError{}) {
+		if errors.Is(err, &util.NotFoundError{}) {
 			break
 		} else if err != nil {
 			return nil, err
@@ -260,7 +260,7 @@ func (streamStore *KVStreamStore) GetHistoryToLastAnchor(uuid gUuid.UUID) ([]*St
 		prevBytes, err := streamStore.kvStore.Get(context.Background(), PreviousNodeKey(curr))
 		// No previous message, assumes we have reached the first
 		// ToDo(KMG): Do we care?  Should we check the first message and return an error?
-		if errors.Is(err, &common.NotFoundError{}) {
+		if errors.Is(err, &util.NotFoundError{}) {
 			break
 		} else if err != nil {
 			return nil, err
@@ -288,7 +288,7 @@ func (streamStore *KVStreamStore) getHead(subStreamID SubStreamID) (*StreamImmut
 	if head, ok := streamStore.heads[string(subStreamID)]; ok {
 		return head , nil
 	}
-	return nil, common.NewNotFoundError(fmt.Sprintf("GetHead - cannot find substream: %s", subStreamID))
+	return nil, util.NewNotFoundError(fmt.Sprintf("GetHead - cannot find substream: %s", subStreamID))
 }
 
 // setHead will set the head of a specific substream; otherwise, return an error

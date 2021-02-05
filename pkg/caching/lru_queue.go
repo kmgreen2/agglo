@@ -3,7 +3,7 @@ package caching
 import (
 	"container/heap"
 	"fmt"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 )
 
 // LRUItem will implement the functions needed to maintain an item
@@ -69,17 +69,17 @@ func (lruQueue *LRUQueue) Delete(item LRUItem) error {
 	n := len(*lruQueue)
 
 	if n == 0 || idx > n - 1 {
-		return common.WithStack(common.NewNotFoundError(fmt.Sprintf("No iten at index: %d", idx)))
+		return util.WithStack(util.NewNotFoundError(fmt.Sprintf("No iten at index: %d", idx)))
 	}
 
 	if item != (*lruQueue)[idx] {
-		return common.WithStack(common.NewInconsistentStateError(fmt.Sprintf("Incorrect state at %d", idx)))
+		return util.WithStack(util.NewInconsistentStateError(fmt.Sprintf("Incorrect state at %d", idx)))
 	}
 
 	removedItem := heap.Remove(lruQueue, idx)
 
 	if removedItem != item {
-		return common.WithStack(common.NewInconsistentStateError(fmt.Sprintf("Mismatch pop item at %d", idx)))
+		return util.WithStack(util.NewInconsistentStateError(fmt.Sprintf("Mismatch pop item at %d", idx)))
 	}
 
 	return nil

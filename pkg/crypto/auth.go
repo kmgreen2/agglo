@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"bytes"
 	"encoding/gob"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 )
 
 // A signature is a byte array and the algorithms used to construct and verify it
@@ -64,7 +64,7 @@ func DeserializeSignature(sigBytes []byte) (Signature, error) {
 	case x509.RSA:
 		return NewRSASignatureBytes(signature, hashAlgorithm), nil
 	default:
-		return nil, common.NewSignatureError("Currently only support RSA signatures")
+		return nil, util.NewSignatureError("Currently only support RSA signatures")
 	}
 }
 

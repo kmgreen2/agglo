@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"hash"
@@ -58,7 +58,7 @@ type BadReader struct {
 }
 
 func (reader *BadReader) Read(b []byte) (int ,error) {
-	return -1, &common.InternalError{}
+	return -1, &util.InternalError{}
 }
 
 func RandomMemObjectStoreInstanceParams() (*storage.MemObjectStoreBackendParams, error) {

@@ -4,7 +4,6 @@ import (
 	"context"
 	gocrypto "crypto"
 	"github.com/kmgreen2/agglo/pkg/entwine"
-	"github.com/kmgreen2/agglo/pkg/serialization"
 	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -73,7 +72,7 @@ func TestNewStreamImmutableMessageFromBuffer(t *testing.T) {
 	}
 
 	for i, message := range messages {
-		messageBytes, err := serialization.Serialize(message)
+		messageBytes, err := entwine.Serialize(message)
 		if err != nil {
 			assert.FailNow(t, err.Error())
 		}
@@ -180,7 +179,7 @@ func TestNewTickerImmutableMessageFromBuffer(t *testing.T) {
 	}
 
 	for i, message := range messages {
-		messageBytes, err := serialization.Serialize(message)
+		messageBytes, err := entwine.Serialize(message)
 		if err != nil {
 			assert.FailNow(t, err.Error())
 		}

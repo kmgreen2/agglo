@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/pkg/observability"
-	"github.com/kmgreen2/agglo/pkg/serialization"
-	"github.com/kmgreen2/agglo/pkg/server"
+	"github.com/kmgreen2/agglo/internal/core/process"
+	"github.com/kmgreen2/agglo/internal/server"
 	"io"
 	"io/ioutil"
 	"os"
@@ -163,7 +163,7 @@ func main() {
 		panic(err)
 	}
 
-	pipelines, err := serialization.PipelinesFromJson(configBytes)
+	pipelines, err := process.PipelinesFromJson(configBytes)
 	if err != nil {
 		panic(err)
 	}
@@ -183,7 +183,7 @@ func main() {
 			panic(err)
 		}
 
-		in, err = common.JsonToMap(payloadBytes)
+		in, err = util.JsonToMap(payloadBytes)
 		if err != nil {
 			panic(err)
 		}
@@ -193,7 +193,7 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
-			outBytes, err := common.MapToJson(out)
+			outBytes, err := util.MapToJson(out)
 
 			_, err = io.WriteString(args.outfile, string(outBytes))
 			if err != nil {
@@ -203,14 +203,14 @@ func main() {
 		_ = pipelines.Shutdown()
 	} else if args.runType == RunPersistentDaemon {
 		recoverFunc := func(inBytes []byte) error {
-			in, err := common.JsonToMap(inBytes)
+			in, err := util.JsonToMap(inBytes)
 			if err != nil {
 				return nil
 			}
 			return server.RunPipelines(in, pipelines)
 		}
 
-		dQueue, err := common.OpenDurableQueue(args.stateDbPath, recoverFunc, args.force)
+		dQueue, err := util.OpenDurableQueue(args.stateDbPath, recoverFunc, args.force)
 		if err != nil {
 			panic(err)
 		}

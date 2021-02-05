@@ -3,8 +3,8 @@ package caching_test
 import (
 	"container/heap"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"github.com/kmgreen2/agglo/pkg/caching"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 

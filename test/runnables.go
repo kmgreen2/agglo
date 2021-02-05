@@ -3,7 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/kmgreen2/agglo/pkg/common"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"time"
 	"reflect"
 )
@@ -28,7 +28,7 @@ func (r *SquareRunnable) SetInData(inData interface{}) error {
 		r.value = rv
 	default:
 		msg := fmt.Sprintf("SquareRunnable should have an int arg, found %v", reflect.TypeOf(rv))
-		return common.NewInvalidError(msg)
+		return util.NewInvalidError(msg)
 	}
 	return nil
 }
@@ -66,7 +66,7 @@ func (r SleepAndFailRunnable) Run(ctx context.Context) (interface{}, error) {
 	if r.value > 0 {
 		time.Sleep(time.Duration(r.value) * time.Second)
 	}
-	return nil, common.NewInvalidError("Failed")
+	return nil, util.NewInvalidError("Failed")
 }
 
 func (r *SleepAndFailRunnable) SetInData(inData interface{}) error {
@@ -75,7 +75,7 @@ func (r *SleepAndFailRunnable) SetInData(inData interface{}) error {
 		r.value = rv
 	default:
 		msg := fmt.Sprintf("SleepAndFailRunnable should have an int arg, found %v", reflect.TypeOf(rv))
-		return common.NewInvalidError(msg)
+		return util.NewInvalidError(msg)
 	}
 	return nil
 }
@@ -89,7 +89,7 @@ func NewFailRunnable() *FailRunnable {
 }
 
 func (r FailRunnable) Run(ctx context.Context) (interface{}, error) {
-	return nil, common.NewInvalidError("Failed")
+	return nil, util.NewInvalidError("Failed")
 }
 
 func (r *FailRunnable) SetInData(inData interface{}) error {
@@ -110,7 +110,7 @@ func NewFailThenSucceedRunnable(numFails int) *FailThenSucceedRunnable {
 func (r *FailThenSucceedRunnable) Run(ctx context.Context) (interface{}, error) {
 	r.currCalls++
 	if r.currCalls <= r.numFails {
-		return nil, common.NewInvalidError("Failed")
+		return nil, util.NewInvalidError("Failed")
 	}
 	return r.numFails, nil
 }
@@ -135,7 +135,7 @@ func (r *FuncRunnable) SetInData(inData interface{}) error {
 		r.arg = rv
 	default:
 		msg := fmt.Sprintf("FuncRunnable should have an map[string]interface{} arg, found %v", reflect.TypeOf(rv))
-		return common.NewInvalidError(msg)
+		return util.NewInvalidError(msg)
 	}
 	return nil
 }
