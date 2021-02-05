@@ -298,6 +298,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 	externalKVStores := make(map[string]kvs.KVStore)
 	externalPublisher := make(map[string]streaming.Publisher)
 	externalHttp := make(map[string]string)
+	externalLocalFile := make(map[string]string)
 	processes := make(map[string]PipelineProcess)
 
 	// Get Uuid
@@ -321,6 +322,8 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			shutdownFns = append(shutdownFns, externalPublisher[externalSystem.Name].Close)
 		case api.ExternalType_ExternalHttp:
 			externalHttp[externalSystem.Name] = externalSystem.ConnectionString
+		case api.ExternalType_ExternalLocalFile:
+			externalLocalFile[externalSystem.Name] = externalSystem.ConnectionString
 		}
 	}
 
@@ -399,9 +402,19 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 				msg := fmt.Sprintf("name conflict in process definitions: %s", procDef.Tee.Name)
 				return nil, util.NewInvalidError(msg)
 			}
-			transformer, err := buildTransformer(procDef.Tee.TransformerSpecs)
-			if err != nil {
-				return nil, err
+
+			var transformer *Transformer = nil;
+
+			if len(procDef.Tee.TransformerRef) > 0 {
+				var ok bool
+				if _, ok = processes[procDef.Tee.TransformerRef]; !ok {
+					msg := fmt.Sprintf("%s is not a valid transformer ref", procDef.Tee.TransformerRef)
+					return nil, util.NewInvalidError(msg)
+				}
+				if transformer, ok = processes[procDef.Tee.TransformerRef].(*Transformer); !ok {
+					msg := fmt.Sprintf("%s is not a transformer process", procDef.Tee.TransformerRef)
+					return nil, util.NewInvalidError(msg)
+				}
 			}
 
 			condition, err := buildCondition(procDef.Tee.Condition)
@@ -409,35 +422,19 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 				return nil, err
 			}
 
-			if procDef.Tee.ExternalType == api.ExternalType_ExternalKVStore {
-				if external, ok := externalKVStores[procDef.Tee.OutputConnector]; ok {
-					processes[procDef.Tee.Name] = NewKVTee(external, condition, transformer)
-				} else {
-					msg := fmt.Sprintf("%s is not a valid KVStore", procDef.Tee.OutputConnector)
-					return nil, util.NewInvalidError(msg)
-				}
-			} else if procDef.Tee.ExternalType == api.ExternalType_ExternalPubSub {
-				if external, ok := externalPublisher[procDef.Tee.OutputConnector]; ok {
-					processes[procDef.Tee.Name] = NewPubSubTee(external, condition, transformer)
-				} else {
-					msg := fmt.Sprintf("%s is not a valid Publisher", procDef.Tee.OutputConnector)
-					return nil, util.NewInvalidError(msg)
-				}
-			} else if procDef.Tee.ExternalType == api.ExternalType_ExternalHttp {
-				if external, ok := externalHttp[procDef.Tee.OutputConnector]; ok {
-					processes[procDef.Tee.Name] = NewHttpTee(http.DefaultClient, external, condition, transformer)
-				} else {
-					msg := fmt.Sprintf("%s is not a valid HTTP endpoint", procDef.Tee.OutputConnector)
-					return nil, util.NewInvalidError(msg)
-				}
-			} else if procDef.Tee.ExternalType == api.ExternalType_ExternalLocalFile {
-				if processes[procDef.Tee.Name], err = NewLocalFileTee(procDef.Tee.OutputConnector, condition,
+			if external, ok := externalKVStores[procDef.Tee.OutputConnectorRef]; ok {
+				processes[procDef.Tee.Name] = NewKVTee(external, condition, transformer)
+			} else if external, ok := externalPublisher[procDef.Tee.OutputConnectorRef]; ok {
+				processes[procDef.Tee.Name] = NewPubSubTee(external, condition, transformer)
+			} else if external, ok := externalHttp[procDef.Tee.OutputConnectorRef]; ok {
+				processes[procDef.Tee.Name] = NewHttpTee(http.DefaultClient, external, condition, transformer)
+			} else if external, ok := externalLocalFile[procDef.Tee.OutputConnectorRef]; ok {
+				if processes[procDef.Tee.Name], err = NewLocalFileTee(external, condition,
 					transformer); err != nil {
-					msg := fmt.Sprintf("%s is not a valid path", procDef.Tee.OutputConnector)
-					return nil, util.NewInvalidError(msg)
+					return nil, err
 				}
 			} else {
-				msg := fmt.Sprintf("%v is not a valid external system", procDef.Tee.ExternalType)
+				msg := fmt.Sprintf("%v is not a valid external reference", procDef.Tee.TransformerRef)
 				return nil, util.NewInvalidError(msg)
 			}
 
@@ -488,18 +485,16 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 
 		if pipeline.Checkpoint != nil {
 			var checkPointer *CheckPointer
-			if pipeline.Checkpoint.ExternalType == api.ExternalType_ExternalKVStore {
-				if external, ok := externalKVStores[pipeline.Checkpoint.OutputConnector]; ok {
-					checkPointer = NewKVCheckPointer(external)
-				} else {
-					msg := fmt.Sprintf("%s is not a valid KVStore", pipeline.Checkpoint.OutputConnector)
-					return nil, util.NewInvalidError(msg)
-				}
-			} else if pipeline.Checkpoint.ExternalType == api.ExternalType_ExternalLocalFile {
-				checkPointer, err = NewLocalFileCheckPointer(pipeline.Checkpoint.OutputConnector)
+			if external, ok := externalKVStores[pipeline.Checkpoint.OutputConnectorRef]; ok {
+				checkPointer = NewKVCheckPointer(external)
+			}  else if external, ok := externalLocalFile[pipeline.Checkpoint.OutputConnectorRef]; ok {
+				checkPointer, err = NewLocalFileCheckPointer(external)
 				if err != nil {
 					return nil, util.NewInvalidError(err.Error())
 				}
+			} else {
+				msg := fmt.Sprintf("%s is not a valid KVStore reference", pipeline.Checkpoint.OutputConnectorRef)
+				return nil, util.NewInvalidError(msg)
 			}
 			pipelineBuilder.Checkpoint(checkPointer)
 		}

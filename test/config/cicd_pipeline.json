@@ -4,8 +4,7 @@
     {
       "name": "tester-pipeline",
       "checkpoint": {
-        "outputConnector": "/tmp/checkpoints",
-        "externalType": "ExternalLocalFile"
+        "outputConnectorRef": "checkpointFileStore"
       },
       "enableTracing": true,
       "enableMetrics": true,
@@ -118,17 +117,22 @@
       }
     },
     {
-      "tee": {
-        "name": "tee-out-to-file",
-        "outputConnector": "/tmp/cicd-events",
-        "externalType": "ExternalLocalFile",
-        "transformerSpecs": [
+      "transformer": {
+        "name": "transformer-copy",
+        "specs": [
           {
             "transformation": {
               "transformationType": "TransformCopy"
             }
           }
         ]
+      }
+    },
+    {
+      "tee": {
+        "name": "tee-out-to-file",
+        "outputConnectorRef": "gitEventsFileStore",
+        "transformerRef": "transformer-copy"
       }
     },
     {
@@ -220,15 +224,8 @@
             }
           }
         },
-        "outputConnector": "/tmp/git-events",
-        "externalType": "ExternalLocalFile",
-        "transformerSpecs": [
-          {
-            "transformation": {
-              "transformationType": "TransformCopy"
-            }
-          }
-        ]
+        "outputConnectorRef": "gitEventsFileStore",
+        "transformerRef": "transformer-copy"
       }
     },
     {
@@ -249,15 +246,8 @@
             }
           }
         },
-        "outputConnector": "/tmp/cicd-completion",
-        "externalType": "ExternalLocalFile",
-        "transformerSpecs": [
-          {
-            "transformation": {
-              "transformationType": "TransformCopy"
-            }
-          }
-        ]
+        "outputConnectorRef": "completionFileStore",
+        "transformerRef": "transformer-copy"
       }
     }
   ],
@@ -266,6 +256,26 @@
       "externalType": "ExternalKVStore",
       "name": "memKVStore",
       "connectionString": "local"
+    },
+    {
+      "externalType": "ExternalLocalFile",
+      "name": "checkpointFileStore",
+      "connectionString": "/tmp/checkpoints"
+    },
+    {
+      "externalType": "ExternalLocalFile",
+      "name": "completionFileStore",
+      "connectionString": "/tmp/cicd-completion"
+    },
+    {
+      "externalType": "ExternalLocalFile",
+      "name": "gitEventsFileStore",
+      "connectionString": "/tmp/git-events"
+    },
+    {
+      "externalType": "ExternalLocalFile",
+      "name": "cicdEventsFileStore",
+      "connectionString": "/tmp/cicd-events"
     }
   ]
 }

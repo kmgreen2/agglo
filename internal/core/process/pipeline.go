@@ -322,15 +322,17 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) util.Future {
 	var startTime time.Time
 	var inMap map[string]interface{} = in
 
+	ctx = context.Background()
+
 	// If there are no processes in this pipeline, do nothing and succeed
 	if len(pipeline.processes) == 0 {
 		completable := util.NewCompletable()
-		_ = completable.Success(context.Background(), in)
+		_ = completable.Success(ctx, in)
 		return completable.Future()
 	}
 
 	if pipeline.enableTracing {
-		ctx, span = pipeline.emitter.CreateSpan(context.Background(), "pipeline")
+		ctx, span = pipeline.emitter.CreateSpan(ctx, "pipeline")
 	}
 
 	if pipeline.enableMetrics {

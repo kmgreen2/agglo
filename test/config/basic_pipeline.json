@@ -152,6 +152,27 @@
       }
     },
     {
+      "transformer": {
+        "name": "git-transform",
+        "specs": [
+          {
+            "sourceField": "author",
+            "targetField": "gitAuthor",
+            "transformation": {
+              "transformationType": "TransformCopy"
+            }
+          },
+          {
+            "sourceField": "hash",
+            "targetField": "gitHash",
+            "transformation": {
+              "transformationType": "TransformCopy"
+            }
+          }
+        ]
+      }
+    },
+    {
       "tee": {
         "name": "tee-git-transform",
         "condition": {
@@ -169,24 +190,8 @@
             }
           }
         },
-        "outputConnector": "memKVStore",
-        "externalType": "ExternalKVStore",
-        "transformerSpecs": [
-          {
-            "sourceField": "author",
-            "targetField": "gitAuthor",
-            "transformation": {
-              "transformationType": "TransformCopy"
-            }
-          },
-          {
-            "sourceField": "hash",
-            "targetField": "gitHash",
-            "transformation": {
-              "transformationType": "TransformCopy"
-            }
-          }
-        ]
+        "outputConnectorRef": "memKVStore",
+        "transformerRef": "git-transform"
       }
     }
   ],

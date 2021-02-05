@@ -15,17 +15,23 @@
   ],
   "processDefinitions": [
     {
-      "tee": {
-        "name": "tee-out-to-file",
-        "outputConnector": "/tmp/tweet",
-        "externalType": "ExternalLocalFile",
-        "transformerSpecs": [
+      "transformer": {
+        "name": "transformer-copy",
+        "specs": [
           {
             "transformation": {
               "transformationType": "TransformCopy"
             }
           }
         ]
+      }
+    },
+    {
+      "tee": {
+        "name": "tee-out-to-file",
+        "outputConnectorRef": "tweetFileStore",
+        "externalType": "ExternalLocalFile",
+        "transformerRef": "transformer-copy"
       }
     },
     {
@@ -62,6 +68,11 @@
       "externalType": "ExternalKVStore",
       "name": "memKVStore",
       "connectionString": "local"
+    },
+    {
+      "externalType": "ExternalLocalFile",
+      "name": "tweetFileStore",
+      "connectionString": "/tmp/tweet"
     }
   ]
 }
