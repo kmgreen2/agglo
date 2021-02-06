@@ -4,8 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/jinzhu/gorm"
 	"github.com/kmgreen2/agglo/pkg/util"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 // Database is the interface to be implemented by all relational databases
@@ -37,7 +38,16 @@ func NewDatabaseImpl(config *DatabaseConfig) (*DatabaseImpl, error) {
 		if err != nil {
 			return nil, err
 		}
-		database.gormDb, err = gorm.Open(string(config.databaseType), database.db)
+		database.gormDb, err = gorm.Open(postgres.New(postgres.Config{
+			Conn: database.db,
+		}), &gorm.Config{})
+		if err != nil {
+			return nil, err
+		}
+		return database, nil
+	} else if config.databaseType == PostgresDatabase {
+		database := &DatabaseImpl{}
+		database.gormDb, err = gorm.Open(postgres.Open(config.dataSourceName), &gorm.Config{})
 		if err != nil {
 			return nil, err
 		}
@@ -54,7 +64,11 @@ func (db *DatabaseImpl) Get() *gorm.DB {
 
 // Close will close the underlying database connection
 func (db *DatabaseImpl) Close() error {
-	return db.gormDb.Close()
+	sqlDB, err := db.gormDb.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Close()
 }
 
 // Ping will test the underlying database connection
