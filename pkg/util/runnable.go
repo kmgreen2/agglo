@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pkg/errors"
 	"io"
 	"os/exec"
 	"reflect"
@@ -100,7 +101,7 @@ func (runnable *ExecRunnable) Run(ctx context.Context) (interface{}, error) {
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, string(out))
 	}
 
 	if len(out) == 0 {

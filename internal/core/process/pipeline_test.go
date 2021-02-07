@@ -68,7 +68,7 @@ func TestPipelineBasic(t *testing.T) {
 	builder.Add(completer)
 
 	// Create transformations that set fields to be stored and tee them out to the kvstore
-	transformer := process.NewTransformer(nil, ".", ".")
+	transformer := process.NewTransformer(nil, ".", ".", false)
 	condition, err = core.NewCondition(core.NewComparatorExpression(core.Variable("version-control"), "git-dev",
 		core.Equal))
 	transformationBuilder := core.NewTransformationBuilder()

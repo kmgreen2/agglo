@@ -5,13 +5,25 @@
       "name": "Jira",
       "processes": [
         {
-          "name": "Jira",
+          "name": "JiraAnnotate",
           "retryStrategy": {
             "numRetries": 0,
             "initialBackOffMs": 0
           },
           "instrumentation": {
             "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
+          "name": "Jira",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": true,
             "latency": false,
             "counter": false
           }
@@ -23,19 +35,7 @@
             "initialBackOffMs": 0
           },
           "instrumentation": {
-            "enableTracing": false,
-            "latency": false,
-            "counter": false
-          }
-        },
-        {
-          "name": "JiraAnnotate",
-          "retryStrategy": {
-            "numRetries": 0,
-            "initialBackOffMs": 0
-          },
-          "instrumentation": {
-            "enableTracing": false,
+            "enableTracing": true,
             "latency": false,
             "counter": false
           }
@@ -60,6 +60,18 @@
       "name": "GitHub",
       "processes": [
         {
+          "name": "GithubAnnotate",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
           "name": "Github",
           "retryStrategy": {
             "numRetries": 0,
@@ -82,9 +94,16 @@
             "latency": false,
             "counter": false
           }
-        },
+        }
+      ],
+      "enableTracing": false,
+      "enableMetrics": false
+    },
+    {
+      "name": "CircleCI",
+      "processes": [
         {
-          "name": "GithubAnnotate",
+          "name": "CircleCIAnnotator",
           "retryStrategy": {
             "numRetries": 0,
             "initialBackOffMs": 0
@@ -94,14 +113,7 @@
             "latency": false,
             "counter": false
           }
-        }
-      ],
-      "enableTracing": false,
-      "enableMetrics": false
-    },
-    {
-      "name": "CircleCI",
-      "processes": [
+        },
         {
           "name": "CircleCI",
           "retryStrategy": {
@@ -116,18 +128,6 @@
         },
         {
           "name": "CreateCICD",
-          "retryStrategy": {
-            "numRetries": 0,
-            "initialBackOffMs": 0
-          },
-          "instrumentation": {
-            "enableTracing": false,
-            "latency": false,
-            "counter": false
-          }
-        },
-        {
-          "name": "CircleCIAnnotator",
           "retryStrategy": {
             "numRetries": 0,
             "initialBackOffMs": 0
@@ -236,7 +236,7 @@
           "runnable": {
             "pathToExec": "/Users/kmgreen/Project/go/src/github.com/kmgreen2/agglo/bin/activitytracker",
             "cmdArgs": [
-              "-commandType CreateCICD"
+              "-commandType", "CreateCICD"
             ]
           }
         }
@@ -287,7 +287,7 @@
           "runnable": {
             "pathToExec": "/Users/kmgreen/Project/go/src/github.com/kmgreen2/agglo/bin/activitytracker",
             "cmdArgs": [
-              "-commandType CreateTicket"
+              "-commandType", "CreateTicket"
             ]
           }
         }
@@ -298,7 +298,7 @@
         "name": "Jira",
         "specs": [
           {
-            "sourceField": "status.name",
+            "sourceField": "issue.fields.status.name",
             "targetField": "state",
             "transformation": {
               "transformationType": "TransformCopy",
@@ -320,7 +320,7 @@
             }
           },
           {
-            "sourceField": "assignee.accountId",
+            "sourceField": "issue.fields.assignee.accountId",
             "targetField": "assignee",
             "transformation": {
               "transformationType": "TransformCopy",
@@ -342,7 +342,7 @@
             }
           },
           {
-            "sourceField": "creator.accountId",
+            "sourceField": "issue.fields.creator.accountId",
             "targetField": "creator",
             "transformation": {
               "transformationType": "TransformCopy",
@@ -364,7 +364,7 @@
             }
           },
           {
-            "sourceField": "issue.summary",
+            "sourceField": "issue.fields.summary",
             "targetField": "title",
             "transformation": {
               "transformationType": "TransformCopy",
@@ -385,7 +385,8 @@
               }
             }
           }
-        ]
+        ],
+        "forwardInputFields": true
       }
     },
     {
@@ -428,7 +429,7 @@
           "runnable": {
             "pathToExec": "/Users/kmgreen/Project/go/src/github.com/kmgreen2/agglo/bin/activitytracker",
             "cmdArgs": [
-              "-commandType CreateCommit"
+              "-commandType", "CreateCommit"
             ]
           }
         }

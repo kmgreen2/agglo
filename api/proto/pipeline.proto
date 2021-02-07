@@ -236,6 +236,7 @@ message Tee {
 message Transformer {
     string name = 1;
     repeated TransformerSpec specs = 2;
+    bool forwardInputFields = 3;
 }
 
 message TransformerSpec {

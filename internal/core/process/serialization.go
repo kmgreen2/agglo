@@ -228,8 +228,9 @@ func buildCondition(condition *api.Condition) (*core.Condition, error) {
 	}
 }
 
-func buildTransformer(transformerSpecs []*api.TransformerSpec) (*Transformer, error) {
-	transformer := NewTransformer(nil, ".", ".")
+func buildTransformer(transformerSpec *api.Transformer) (*Transformer, error) {
+	transformerSpecs := transformerSpec.Specs
+	transformer := NewTransformer(nil, ".", ".", transformerSpec.ForwardInputFields)
 	for _, spec := range transformerSpecs {
 		condition, err := buildCondition(spec.Transformation.Condition)
 		if err != nil {
@@ -392,7 +393,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 				msg := fmt.Sprintf("name conflict in process definitions: %s", procDef.Transformer.Name)
 				return nil, util.NewInvalidError(msg)
 			}
-			transformer, err := buildTransformer(procDef.Transformer.Specs)
+			transformer, err := buildTransformer(procDef.Transformer)
 			if err != nil {
 				 return nil, err
 			}

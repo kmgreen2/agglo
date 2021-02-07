@@ -13,7 +13,7 @@ func TestCopyAllTransformer(t *testing.T) {
 	testJson := test.TestJson()
 	builder := core.NewTransformationBuilder()
 	transformation := builder.AddFieldTransformation(core.CopyTransformation{}).Get()
-	transformer := process.NewTransformer(nil, ".", "[]")
+	transformer := process.NewTransformer(nil, ".", "[]", false)
 	transformer.AddSpec("", "", transformation)
 
 	out, err := transformer.Process(context.Background(), testJson)
@@ -25,7 +25,7 @@ func TestCopySomeTransformer(t *testing.T) {
 	testJson := test.TestJson()
 	builder := core.NewTransformationBuilder()
 	transformation := builder.AddFieldTransformation(core.CopyTransformation{}).Get()
-	transformer := process.NewTransformer(nil, ".", "[]")
+	transformer := process.NewTransformer(nil, ".", "[]", false)
 	transformer.AddSpec("a", "foo", transformation)
 	transformer.AddSpec("b", "bar", transformation)
 
@@ -35,11 +35,28 @@ func TestCopySomeTransformer(t *testing.T) {
 	assert.Equal(t, testJson["b"], out["bar"])
 }
 
+func TestCopyAllExplicitTransformer(t *testing.T) {
+	testJson := test.TestJson()
+	builder := core.NewTransformationBuilder()
+	transformation := builder.AddFieldTransformation(core.CopyTransformation{}).Get()
+	transformer := process.NewTransformer(nil, ".", "[]", true)
+	transformer.AddSpec("a", "foo", transformation)
+	transformer.AddSpec("b", "bar", transformation)
+
+	out, err := transformer.Process(context.Background(), testJson)
+	assert.Nil(t, err)
+	assert.Equal(t, testJson["a"], out["foo"])
+	assert.Equal(t, testJson["b"], out["bar"])
+	for k, v := range testJson {
+		assert.Equal(t, v, out[k])
+	}
+}
+
 func TestCopyAllAndTransformTransformer(t *testing.T) {
 	testJson := test.TestJson()
 	builder := core.NewTransformationBuilder()
 	transformation := builder.AddFieldTransformation(core.CopyTransformation{}).Get()
-	transformer := process.NewTransformer(nil, ".", "[]")
+	transformer := process.NewTransformer(nil, ".", "[]", false)
 	transformer.AddSpec("", "", transformation)
 	builder = core.NewTransformationBuilder()
 	transformation = builder.AddFieldTransformation(core.SumTransformation{}).Get()
@@ -58,7 +75,7 @@ func TestCopySomeAndTransformTransformer(t *testing.T) {
 	testJson := test.TestJson()
 	builder := core.NewTransformationBuilder()
 	transformation := builder.AddFieldTransformation(core.CopyTransformation{}).Get()
-	transformer := process.NewTransformer(nil, ".", "[]")
+	transformer := process.NewTransformer(nil, ".", "[]", false)
 	transformer.AddSpec("a", "foo", transformation)
 	transformer.AddSpec("b", "bar", transformation)
 	builder = core.NewTransformationBuilder()
@@ -74,7 +91,7 @@ func TestCopySomeAndTransformTransformer(t *testing.T) {
 
 func TestCopyNoneAndTransformTransformer(t *testing.T) {
 	testJson := test.TestJson()
-	transformer := process.NewTransformer(nil, ".", "[]")
+	transformer := process.NewTransformer(nil, ".", "[]", false)
 	builder := core.NewTransformationBuilder()
 	transformation := builder.AddFieldTransformation(core.SumTransformation{}).Get()
 	transformer.AddSpec("b.d", "bSum", transformation)

@@ -2,6 +2,7 @@ package process
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/internal/core"
@@ -12,6 +13,7 @@ type Transformer struct {
 	specs          []*TransformerSpec
 	fieldSeparator string
 	indexSeparator string
+	forwardInputFields bool
 }
 
 type TransformerSpec struct {
@@ -20,16 +22,18 @@ type TransformerSpec struct {
 	transformation *core.Transformation
 }
 
-func NewTransformer(specs []*TransformerSpec, fieldSeparator, indexSeparator string) *Transformer {
+func NewTransformer(specs []*TransformerSpec, fieldSeparator, indexSeparator string,
+	forwardInputFields bool) *Transformer {
 	return &Transformer{
 		specs,
 		fieldSeparator,
 		indexSeparator,
+		forwardInputFields,
 	}
 }
 
 func DefaultTransformer() *Transformer {
-	return NewTransformer(nil, ".", ".")
+	return NewTransformer(nil, ".", ".", false)
 }
 
 func (t *Transformer) AddSpec(sourceField, targetField string, transformation *core.Transformation) {
@@ -45,7 +49,15 @@ func (t Transformer) dictFromPath(key string, in map[string]interface{}) (map[st
 	var curr map[string]interface{} = in
 	for i, fieldName := range fieldNames {
 		if i != len(fieldNames) - 1 {
-			curr = curr[fieldName].(map[string]interface{})
+			if currValue, ok := curr[fieldName]; ok {
+				curr = currValue.(map[string]interface{})
+			} else {
+				msg := fmt.Sprintf("could not find '%s' in the map", key)
+				return nil, util.NewNotFoundError(msg)
+			}
+		} else if _, ok := curr[fieldName]; !ok {
+			msg := fmt.Sprintf("could not find '%s' in the map", key)
+			return nil, util.NewNotFoundError(msg)
 		}
 	}
 	return curr, nil
@@ -87,6 +99,8 @@ func (t Transformer) createPathAndTransform(sourceField, targetField string, tra
 	if err != nil {
 		return err
 	}
+
+
 	fieldNames := strings.Split(targetField, t.fieldSeparator)
 	var curr map[string]interface{} = out
 	for i, fieldName := range fieldNames {
@@ -117,11 +131,17 @@ func (t Transformer) createPathAndTransform(sourceField, targetField string, tra
 }
 
 func (t Transformer) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
-	out := make(map[string]interface{})
+	var out map[string]interface{}
+	if t.forwardInputFields {
+		out = util.CopyableMap(in).DeepCopy()
+	} else {
+		out = make(map[string]interface{})
+	}
 
 	for _, spec := range t.specs {
 		err := t.createPathAndTransform(spec.sourceField, spec.targetField, spec.transformation, in, out)
-		if err != nil {
+		// This will skip transforming fields when the source field cannot be found in the `in` map
+		if err != nil && !errors.Is(err, &util.NotFoundError{}){
 			return in, err
 		}
 	}

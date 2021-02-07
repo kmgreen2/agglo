@@ -22,7 +22,7 @@ const (
 
 type UserIntegration struct {
 	gorm.Model
-	Type IntegrationType `json:"type"`
+	Type IntegrationType `json:"type" sql:"type:integration_type"`
 	UserId int `json:"userId"`
 	IntegrationUserId string `json:"integrationUserId"`
 }
@@ -39,7 +39,7 @@ type Ticket struct {
 	CreatorUserId int `json:"creatorUserId"`
 	AssigneeUserId int `json:"assigneeUserId"`
 	Title string `json:"title"`
-	State TicketState `json:"state"`
+	State TicketState `json:"state" sql:"type:ticket_state"`
 }
 
 type Commit struct {
@@ -61,7 +61,7 @@ const (
 type CICD struct {
 	SubmitterUserId int `json:"submitterUserId"`
 	CommitDigest string `json:"commitDigest"`
-	Type CICDType `json:"type"`
+	Type CICDType `json:"type" sql:"type:cicd_type"`
 }
 
 type ActivityTrackerModel struct {
@@ -109,7 +109,7 @@ func (model *ActivityTrackerModel) CreateUser(name, email string) error {
 }
 
 func (model *ActivityTrackerModel) GetUserByEmail(email string) (*User, error) {
-	var user *User
+	user := &User{}
 	db := model.db.Get()
 	if err := db.Where("email = ?", email).First(&user).Error; err != nil {
 		return nil, err
@@ -118,7 +118,7 @@ func (model *ActivityTrackerModel) GetUserByEmail(email string) (*User, error) {
 }
 
 func (model *ActivityTrackerModel) GetUsers() ([]*User, error) {
-	var users []*User
+	users := make([]*User, 0)
 	db := model.db.Get()
 	if err := db.Find(&users).Error; err != nil {
 		return nil, err
@@ -138,10 +138,14 @@ func (model *ActivityTrackerModel) CreateUserIntegration(userId int, integration
 
 func (model *ActivityTrackerModel) GetUserFromIntegration(integrationType IntegrationType,
 	integrationUserId string) (*User, error) {
-	var user *User
+	userIntegration := &UserIntegration{}
+	user := &User{}
 	db := model.db.Get()
-	if err := db.Where("integration_user_id = ? and integration_type",
-		integrationUserId, integrationType).First(&user).Error; err != nil {
+	if err := db.Where("integration_user_id = ? and type = ?",
+		integrationUserId, string(integrationType)).First(&userIntegration).Error; err != nil {
+		return nil, err
+	}
+	if err := db.Where("id = ?", userIntegration.UserId).First(&user).Error; err != nil {
 		return nil, err
 	}
 	return user, nil
