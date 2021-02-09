@@ -257,7 +257,7 @@
                 "exists": {
                   "ops": [
                     {
-                      "key": "repository",
+                      "key": "repository.id",
                       "op": "Exists"
                     }
                   ]
@@ -274,7 +274,7 @@
                 "exists": {
                   "ops": [
                     {
-                      "key": "repository",
+                      "key": "repository.id",
                       "op": "Exists"
                     }
                   ]
@@ -291,7 +291,7 @@
                 "exists": {
                   "ops": [
                     {
-                      "key": "repository",
+                      "key": "repository.id",
                       "op": "Exists"
                     }
                   ]
@@ -480,6 +480,32 @@
                 }
               }
             }
+          },
+          {
+            "sourceField": "issue.fields.description",
+            "targetField": "hash",
+            "transformation": {
+              "transformationType": "TransformMapRegex",
+              "condition": {
+                "expression": {
+                  "comparator": {
+                    "lhs": {
+                      "variable": {
+                        "name": "webhookEvent"
+                      }
+                    },
+                    "rhs": {
+                      "literal": "jira:.*"
+                    },
+                    "op": "RegexMatch"
+                  }
+                }
+              },
+              "mapRegexArgs": {
+                "regex": "Hash: ([0-9a-z]{40})",
+                "replace": "$1"
+              }
+            }
           }
         ],
         "forwardInputFields": true
@@ -496,7 +522,7 @@
               "exists": {
                 "ops": [
                   {
-                    "key": "repository",
+                    "key": "repository.id",
                     "op": "Exists"
                   }
                 ]
@@ -528,7 +554,7 @@
           "exists": {
             "ops": [
               {
-                "key": "repository",
+                "key": "repository.id",
                 "op": "Exists"
               }
             ]
