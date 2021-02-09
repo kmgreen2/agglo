@@ -451,6 +451,16 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			}
 			processes[procDef.Spawner.Name] = NewSpawner(job, condition,
 				time.Duration(procDef.Spawner.DelayInMs) * time.Millisecond, procDef.Spawner.DoSync)
+		case *api.ProcessDefinition_Continuation:
+			if _, ok := processes[procDef.Continuation.Name]; ok {
+				msg := fmt.Sprintf("name conflict in process definitions: %s", procDef.Continuation.Name)
+				return nil, util.NewInvalidError(msg)
+			}
+			condition, err := buildCondition(procDef.Continuation.Condition)
+			if err != nil {
+				return nil, err
+			}
+			processes[procDef.Continuation.Name] = NewContinuation(condition)
 		}
 	}
 

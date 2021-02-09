@@ -60,6 +60,18 @@
       "name": "GitHub",
       "processes": [
         {
+          "name": "MustBeGithub",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
           "name": "GithubAnnotate",
           "retryStrategy": {
             "numRetries": 0,
@@ -85,6 +97,18 @@
         },
         {
           "name": "CreateCommit",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
+          "name": "GithubOut",
           "retryStrategy": {
             "numRetries": 0,
             "initialBackOffMs": 0
@@ -137,6 +161,18 @@
             "latency": false,
             "counter": false
           }
+        },
+        {
+          "name": "CircleciOut",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
         }
       ],
       "enableTracing": false,
@@ -147,6 +183,16 @@
     {
       "name": "JiraOut",
       "connectionString": "/tmp/jiraout",
+      "externalType": "ExternalLocalFile"
+    },
+    {
+      "name": "GithubOut",
+      "connectionString": "/tmp/githubout",
+      "externalType": "ExternalLocalFile"
+    },
+    {
+      "name": "CircleciOut",
+      "connectionString": "/tmp/circleciout",
       "externalType": "ExternalLocalFile"
     }
   ],
@@ -214,7 +260,8 @@
               }
             }
           }
-        ]
+        ],
+        "forwardInputFields": true
       }
     },
     {
@@ -236,7 +283,8 @@
           "runnable": {
             "pathToExec": "/Users/kmgreen/Project/go/src/github.com/kmgreen2/agglo/bin/activitytracker",
             "cmdArgs": [
-              "-commandType", "CreateCICD"
+              "-commandType",
+              "CreateCICD"
             ]
           }
         }
@@ -287,10 +335,19 @@
           "runnable": {
             "pathToExec": "/Users/kmgreen/Project/go/src/github.com/kmgreen2/agglo/bin/activitytracker",
             "cmdArgs": [
-              "-commandType", "CreateTicket"
+              "-commandType",
+              "CreateTicket"
             ]
           }
         }
+      }
+    },
+    {
+      "tee": {
+        "name": "GithubOut",
+        "condition": {},
+        "outputConnectorRef": "GithubOut",
+        "transformerRef": ""
       }
     },
     {
@@ -411,6 +468,21 @@
       }
     },
     {
+      "continuation": {
+        "name": "MustBeGithub",
+        "condition": {
+          "exists": {
+            "ops": [
+              {
+                "key": "repository",
+                "op": "Exists"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
       "spawner": {
         "name": "CreateCommit",
         "condition": {
@@ -429,7 +501,8 @@
           "runnable": {
             "pathToExec": "/Users/kmgreen/Project/go/src/github.com/kmgreen2/agglo/bin/activitytracker",
             "cmdArgs": [
-              "-commandType", "CreateCommit"
+              "-commandType",
+              "CreateCommit"
             ]
           }
         }
@@ -490,7 +563,16 @@
               }
             }
           }
-        ]
+        ],
+        "forwardInputFields": true
+      }
+    },
+    {
+      "tee": {
+        "name": "CircleciOut",
+        "condition": {},
+        "outputConnectorRef": "CircleciOut",
+        "transformerRef": ""
       }
     },
     {

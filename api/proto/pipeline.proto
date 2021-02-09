@@ -26,6 +26,7 @@ enum ProcessType {
     SpawnerProcess = 5;
     TeeProcess = 6;
     TransformerProcess = 7;
+    ContinuationProcess = 8;
 }
 
 enum ExternalType {
@@ -157,6 +158,7 @@ message ProcessDefinition {
         Spawner spawner = 5;
         Tee tee = 6;
         Transformer transformer = 7;
+        Continuation continuation = 8;
     }
 }
 
@@ -231,6 +233,11 @@ message Tee {
     Condition condition = 2;
     string transformerRef = 3;
     string outputConnectorRef = 4;
+}
+
+message Continuation {
+    string name = 1;
+    Condition condition = 2;
 }
 
 message Transformer {

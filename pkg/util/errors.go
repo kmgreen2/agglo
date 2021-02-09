@@ -304,3 +304,24 @@ func (err *EmptyQueue) Is(other error) bool {
 	return ok
 }
 
+// ContinuationNotSatisfied represents a condition when a continuation is false
+type ContinuationNotSatisfied struct {
+	msg string
+}
+
+// NewContinuationNotSatisfied is the constructor for ContinuationNotSatisfied
+func NewContinuationNotSatisfied(msg string) *ContinuationNotSatisfied {
+	return &ContinuationNotSatisfied{msg}
+}
+
+// Error returns the string representation of the ContinuationNotSatisfied
+func (e *ContinuationNotSatisfied) Error() string {
+	return e.msg
+}
+
+// Is
+func (err *ContinuationNotSatisfied) Is(other error) bool {
+	_, ok := other.(*ContinuationNotSatisfied)
+	return ok
+}
+
