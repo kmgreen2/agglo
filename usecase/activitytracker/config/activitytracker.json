@@ -5,6 +5,18 @@
       "name": "Jira",
       "processes": [
         {
+          "name": "MustBeJira",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
           "name": "JiraAnnotate",
           "retryStrategy": {
             "numRetries": 0,
@@ -127,6 +139,18 @@
       "name": "CircleCI",
       "processes": [
         {
+          "name": "MustBeCircleCI",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
           "name": "CircleCIAnnotator",
           "retryStrategy": {
             "numRetries": 0,
@@ -203,6 +227,21 @@
         "condition": {},
         "outputConnectorRef": "JiraOut",
         "transformerRef": ""
+      }
+    },
+    {
+      "continuation": {
+        "name": "MustBeCircleCI",
+        "condition": {
+          "exists": {
+            "ops": [
+              {
+                "key": "reponame",
+                "op": "Exists"
+              }
+            ]
+          }
+        }
       }
     },
     {
@@ -474,7 +513,7 @@
           "exists": {
             "ops": [
               {
-                "key": "repository",
+                "key": "repository.id",
                 "op": "Exists"
               }
             ]
@@ -573,6 +612,21 @@
         "condition": {},
         "outputConnectorRef": "CircleciOut",
         "transformerRef": ""
+      }
+    },
+    {
+      "continuation": {
+        "name": "MustBeJira",
+        "condition": {
+          "exists": {
+            "ops": [
+              {
+                "key": "issue.fields.summary",
+                "op": "Exists"
+              }
+            ]
+          }
+        }
       }
     },
     {

@@ -28,7 +28,7 @@ func RunPipelines(in map[string]interface{}, pipelines *process.Pipelines) error
 	for _, pipeline := range pipelines.Underlying() {
 		future := pipeline.RunAsync(in)
 		result := future.Get()
-		if result.Error() != nil {
+		if result.Error() != nil && !errors.Is(result.Error(), &util.ContinuationNotSatisfied{}) {
 			return result.Error()
 		}
 	}

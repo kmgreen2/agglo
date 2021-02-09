@@ -131,6 +131,20 @@ func (expr *ExistsExpression) VariablesExist(in map[string]interface{}) bool {
 			component = component[1:]
 			notExistOp = true
 		}
+
+		/*
+		 * ToDo(KMG): This will only resolve to true if the key is equal to a flattened key.  This
+		 * means that it currently does not work for paths in the map.  For example:
+		 *
+		 * - map[string]interface{} {
+		 *     "foo" : { "bar": { "baz": 1 } }
+		 *   }
+		 *
+		 * - Exists("foo.bar") and Exists("foo") would be false, while Exists("foo.bar.baz") would be true
+		 *
+		 * This can be fixed by doing a tree-based search.  We cannot rely on simple prefix matching, because
+		 * flattened keys, such as "foo.ba" would evaluate to true
+		 */
 		if _, ok := flattened[component]; ok {
 			if notExistOp {
 				return false
