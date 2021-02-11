@@ -6,6 +6,7 @@ import (
 	gocrypto "crypto"
 	"encoding/json"
 	"github.com/kmgreen2/agglo/internal/common"
+	"io"
 	gorand "math/rand"
 	"crypto/rand"
 	"crypto/rsa"
@@ -507,12 +508,14 @@ type MockHttpClient struct {
 	err error
 	statusCode int
 	checkCallback func(req *http.Request)
+	body io.ReadCloser
 }
 
 func (client MockHttpClient) Do(req *http.Request) (*http.Response, error) {
 	client.checkCallback(req)
 	return &http.Response{
 		StatusCode: client.statusCode,
+		Body: client.body,
 	}, client.err
 }
 
@@ -521,6 +524,16 @@ func NewMockHttpClient(err error, statusCode int, checkCallback func(req *http.R
 		err: err,
 		statusCode: statusCode,
 		checkCallback: checkCallback,
+	}
+}
+
+func NewMockHttpClientWithResponseBody(err error, statusCode int, body io.ReadCloser,
+	checkCallback func(req *http.Request)) *MockHttpClient {
+	return &MockHttpClient{
+		err: err,
+		statusCode: statusCode,
+		checkCallback: checkCallback,
+		body: body,
 	}
 }
 

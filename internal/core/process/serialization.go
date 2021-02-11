@@ -424,14 +424,14 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			}
 
 			if external, ok := externalKVStores[procDef.Tee.OutputConnectorRef]; ok {
-				processes[procDef.Tee.Name] = NewKVTee(external, condition, transformer)
+				processes[procDef.Tee.Name] = NewKVTee(external, condition, transformer, procDef.Tee.AdditionalBody.AsMap())
 			} else if external, ok := externalPublisher[procDef.Tee.OutputConnectorRef]; ok {
-				processes[procDef.Tee.Name] = NewPubSubTee(external, condition, transformer)
+				processes[procDef.Tee.Name] = NewPubSubTee(external, condition, transformer, procDef.Tee.AdditionalBody.AsMap())
 			} else if external, ok := externalHttp[procDef.Tee.OutputConnectorRef]; ok {
-				processes[procDef.Tee.Name] = NewHttpTee(http.DefaultClient, external, condition, transformer)
+				processes[procDef.Tee.Name] = NewHttpTee(http.DefaultClient, external, condition, transformer, procDef.Tee.AdditionalBody.AsMap())
 			} else if external, ok := externalLocalFile[procDef.Tee.OutputConnectorRef]; ok {
 				if processes[procDef.Tee.Name], err = NewLocalFileTee(external, condition,
-					transformer); err != nil {
+					transformer, procDef.Tee.AdditionalBody.AsMap()); err != nil {
 					return nil, err
 				}
 			} else {

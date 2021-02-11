@@ -190,3 +190,58 @@ func TestGetMap(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestMergeMapsHappyPath(t *testing.T) {
+	jsonMap := test.TestJson()
+	otherMap := map[string]interface{} {
+		"b": map[string]interface{}{
+			"e": 1,
+			"f": "hello",
+			"d": []interface{}{float64(5)},
+		},
+	}
+
+	newMap, err := util.MergeMaps(jsonMap, otherMap)
+	assert.Nil(t, err)
+
+	val, err := util.GetMap(newMap, []string{"b", "e"})
+	assert.Nil(t, err)
+	assert.Equal(t, int(1), val)
+
+	val, err = util.GetMap(newMap, []string{"b", "f"})
+	assert.Nil(t, err)
+	assert.Equal(t, "hello", val)
+
+	val, err = util.GetMap(newMap, []string{"b", "d"})
+	assert.Nil(t, err)
+	assert.Equal(t, []interface{}{float64(3),float64(4),float64(5), float64(5)}, val)
+}
+
+func TestMergeMapsConflict(t *testing.T) {
+	jsonMap := test.TestJson()
+	otherMap := map[string]interface{}{
+		"a": 2,
+	}
+
+	_, err := util.MergeMaps(jsonMap, otherMap)
+	assert.Error(t, err)
+
+	otherMap = map[string]interface{} {
+		"b": map[string]interface{}{
+			"d": 5,
+		},
+	}
+
+	_, err = util.MergeMaps(jsonMap, otherMap)
+	assert.Error(t, err)
+
+	otherMap = map[string]interface{} {
+		"f": map[string]interface{}{
+			"g": []interface{}{float64(5)},
+		},
+	}
+
+	_, err = util.MergeMaps(jsonMap, otherMap)
+	assert.Error(t, err)
+
+}
+

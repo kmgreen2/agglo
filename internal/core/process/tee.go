@@ -22,24 +22,36 @@ var TeeMetadataKey string = string(common.TeeMetadataKey)
 // Tee is a process processor that will send a provided mapping to
 // a system (i.e. KVStore, Pubsub, etc.) and return the map
 type Tee struct {
-	outputFunc func(ctx context.Context, key string, in map[string]interface{}) error
+	outputFunc func(ctx context.Context, key string, in map[string]interface{}) (map[string]interface{}, error)
 	condition *core.Condition
 	transformer *Transformer
 	outputType string
 	connectionString string
+	additionalBody map[string]interface{}
 }
 
 // NewKVTee will create a Tee processor that stores maps in the provided KVStore
 // Note: the returned map will contain the UUID of the KV entry with key "_uuid_key"
-func NewKVTee(kvStore kvs.KVStore, condition *core.Condition, transformer *Transformer) *Tee {
-	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) error {
+func NewKVTee(kvStore kvs.KVStore, condition *core.Condition, transformer *Transformer,
+	additionalBody map[string]interface{}) *Tee {
+	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) (map[string]interface{}, error) {
+		var err error
+		payload := in
 		byteBuffer := bytes.NewBuffer([]byte{})
 		encoder := json.NewEncoder(byteBuffer)
-		err := encoder.Encode(in)
-		if err != nil {
-			return err
+
+		if len(additionalBody) > 0 {
+			payload, err = util.MergeMaps(in, additionalBody)
+			if err != nil {
+				return nil, err
+			}
 		}
-		return kvStore.Put(ctx, key, byteBuffer.Bytes())
+
+		err = encoder.Encode(payload)
+		if err != nil {
+			return nil, err
+		}
+		return nil, kvStore.Put(ctx, key, byteBuffer.Bytes())
 	}
 
 	if transformer == nil {
@@ -55,23 +67,33 @@ func NewKVTee(kvStore kvs.KVStore, condition *core.Condition, transformer *Trans
 		transformer,
 		"kvstore",
 		kvStore.ConnectionString(),
+		additionalBody,
 	}
 }
 
 // NewLocalfileTee will create a Tee processor that writes maps to a local file system
-func NewLocalFileTee(path string, condition *core.Condition, transformer *Transformer) (*Tee, error) {
+func NewLocalFileTee(path string, condition *core.Condition, transformer *Transformer,
+	additionalBody map[string]interface{}) (*Tee, error) {
 	if d, err := os.Stat(path); err != nil || !d.IsDir() {
 		msg := fmt.Sprintf("'%s is not a valid path", path)
 		return nil, util.NewInvalidError(msg)
 	}
-	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) error {
+	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) (map[string]interface{}, error) {
+		var err error
+		payload := in
 		byteBuffer := bytes.NewBuffer([]byte{})
 		encoder := json.NewEncoder(byteBuffer)
-		err := encoder.Encode(in)
-		if err != nil {
-			return err
+		if len(additionalBody) > 0 {
+			payload, err = util.MergeMaps(in, additionalBody)
+			if err != nil {
+				return nil, err
+			}
 		}
-		return ioutil.WriteFile(fmt.Sprintf("%s/%s.json", path, key), byteBuffer.Bytes(), 0644)
+		err = encoder.Encode(payload)
+		if err != nil {
+			return nil, err
+		}
+		return nil, ioutil.WriteFile(fmt.Sprintf("%s/%s.json", path, key), byteBuffer.Bytes(), 0644)
 	}
 
 	if transformer == nil {
@@ -87,20 +109,30 @@ func NewLocalFileTee(path string, condition *core.Condition, transformer *Transf
 		transformer,
 		"localfile",
 		path,
+		additionalBody,
 	}, nil
 }
 
 // NewPubSubTee will create a Tee processor that publishes maps using the provided
 // publisher.
-func NewPubSubTee(publisher streaming.Publisher, condition *core.Condition, transformer *Transformer) *Tee {
-	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) error {
+func NewPubSubTee(publisher streaming.Publisher, condition *core.Condition, transformer *Transformer,
+	additionalBody map[string]interface{}) *Tee {
+	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) (map[string]interface{}, error) {
+		var err error
+		payload := in
 		byteBuffer := bytes.NewBuffer([]byte{})
 		encoder := json.NewEncoder(byteBuffer)
-		err := encoder.Encode(in)
-		if err != nil {
-			return err
+		if len(additionalBody) > 0 {
+			payload, err = util.MergeMaps(in, additionalBody)
+			if err != nil {
+				return nil, err
+			}
 		}
-		return publisher.Publish(ctx, byteBuffer.Bytes())
+		err = encoder.Encode(payload)
+		if err != nil {
+			return nil, err
+		}
+		return nil, publisher.Publish(ctx, byteBuffer.Bytes())
 	}
 
 	if transformer == nil {
@@ -116,22 +148,32 @@ func NewPubSubTee(publisher streaming.Publisher, condition *core.Condition, tran
 		transformer,
 		"pubsub",
 		publisher.ConnectionString(),
+		additionalBody,
 	}
 }
 
 // NewHttpTee will create a tee processor that posts JSON-encoded
 // maps to a specified endpoint
-func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition, transformer *Transformer) *Tee {
-	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) error {
+func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition, transformer *Transformer,
+	additionalBody map[string]interface{}) *Tee {
+	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) (map[string]interface{}, error) {
+		var err error
+		payload := in
 		byteBuffer := bytes.NewBuffer([]byte{})
 		encoder := json.NewEncoder(byteBuffer)
-		err := encoder.Encode(in)
+		if len(additionalBody) > 0 {
+			payload, err = util.MergeMaps(in, additionalBody)
+			if err != nil {
+				return nil, err
+			}
+		}
+		err = encoder.Encode(payload)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, byteBuffer)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		headers := http.Header{}
 		headers.Set("Content-Type", "application/json")
@@ -139,13 +181,28 @@ func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition,
 
 		resp, err := client.Do(req)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if resp.StatusCode >= 300 {
 			msg := fmt.Sprintf("error status %d posting to url '%s'", resp.StatusCode, url)
-			return util.NewInternalError(msg)
+			return nil, util.NewInternalError(msg)
 		}
-		return nil
+
+		if resp.Body != nil {
+			bodyBytes, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				return nil, err
+			}
+
+			respMap, err := util.JsonToMap(bodyBytes)
+			if err != nil {
+				return nil, err
+			}
+
+			return respMap, nil
+		} else {
+			return nil, nil
+		}
 	}
 
 	if transformer == nil {
@@ -161,6 +218,7 @@ func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition,
 		transformer,
 		"web",
 		url,
+		additionalBody,
 	}
 }
 
@@ -188,22 +246,27 @@ func (t Tee) Process(ctx context.Context, in map[string]interface{}) (map[string
 		return nil, err
 	}
 
-	err = t.outputFunc(ctx, uuid.String(), teeOut)
+	respMap, err := t.outputFunc(ctx, uuid.String(), teeOut)
 	if err != nil {
 		return nil, err
 	}
 
+
 	if _, ok := out[TeeMetadataKey]; !ok {
-		out[TeeMetadataKey] = make([]map[string]string, 0)
+		out[TeeMetadataKey] = make([]map[string]interface{}, 0)
 	}
 
 	switch outVal := out[TeeMetadataKey].(type) {
-	case []map[string]string:
-		out[TeeMetadataKey] = append(outVal, map[string]string{
+	case []map[string]interface{}:
+		teeOutputMap := map[string]interface{}{
 			"uuid": uuid.String(),
 			"outputType": t.outputType,
 			"connectionString": t.connectionString,
-		})
+		}
+		if respMap != nil && len(respMap) > 0 {
+			teeOutputMap["response"] = respMap
+		}
+		out[TeeMetadataKey] = append(outVal, teeOutputMap)
 	default:
 		msg := fmt.Sprintf("detected corrupted %s in map when teeing.  expected []map[string]string, got %v",
 			TeeMetadataKey, reflect.TypeOf(outVal))

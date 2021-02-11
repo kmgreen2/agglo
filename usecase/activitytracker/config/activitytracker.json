@@ -226,7 +226,8 @@
         "name": "JiraOut",
         "condition": {},
         "outputConnectorRef": "JiraOut",
-        "transformerRef": ""
+        "transformerRef": "",
+        "additionalBody": {}
       }
     },
     {
@@ -386,7 +387,8 @@
         "name": "GithubOut",
         "condition": {},
         "outputConnectorRef": "GithubOut",
-        "transformerRef": ""
+        "transformerRef": "",
+        "additionalBody": {}
       }
     },
     {
@@ -637,7 +639,10 @@
         "name": "CircleciOut",
         "condition": {},
         "outputConnectorRef": "CircleciOut",
-        "transformerRef": ""
+        "transformerRef": "",
+        "additionalBody": {
+          "foobarbaz": 1
+        }
       }
     },
     {

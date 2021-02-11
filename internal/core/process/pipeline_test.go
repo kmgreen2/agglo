@@ -77,7 +77,7 @@ func TestPipelineBasic(t *testing.T) {
 	transformer.AddSpec("author", "gitAuthor", copyTransformation)
 	transformer.AddSpec("hash", "gitHash", copyTransformation)
 
-	builder.Add(process.NewKVTee(kvStore, condition, transformer))
+	builder.Add(process.NewKVTee(kvStore, condition, transformer, nil))
 
 	// Spawn a job for each completed completion that adds the git hash to a list
 	var spawnOutput []string

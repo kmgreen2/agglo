@@ -442,3 +442,37 @@ func (m CopyableSlice) DeepCopy() []interface{} {
 	return newSlice
 }
 
+func MergeMaps(lhs, rhs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	newMap := CopyableMap(lhs).DeepCopy()
+	for k, v := range rhs {
+		if _, ok := newMap[k]; !ok {
+			newMap[k] = v
+			continue
+		}
+		switch _v := v.(type) {
+		case map[string]interface{}:
+			if _newMap, ok := newMap[k].(map[string]interface{}); ok {
+				newMap[k], err = MergeMaps(_newMap, _v)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				msg := fmt.Sprintf("key conflict (%s): %v != %v", k, reflect.TypeOf(_newMap), reflect.TypeOf(_v))
+				return nil, NewConflictError(msg)
+			}
+		case []interface{}:
+			if _newSlice, ok := newMap[k].([]interface{}); ok {
+				newMap[k] = append(_newSlice, _v...)
+			} else {
+				msg := fmt.Sprintf("key conflict (%s): %v != %v", k, reflect.TypeOf(_newSlice), reflect.TypeOf(_v))
+				return nil, NewConflictError(msg)
+			}
+		default:
+			msg := fmt.Sprintf("key conflict (%s)", k)
+			return nil, NewConflictError(msg)
+		}
+	}
+	return newMap, nil
+}
+
