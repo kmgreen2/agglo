@@ -24,9 +24,9 @@ type Daemon interface {
 	IsShutdown() bool
 }
 
-func RunPipelines(in map[string]interface{}, pipelines *process.Pipelines) error {
+func RunPipelines(in map[string]interface{}, pipelines *process.Pipelines, logger *zap.Logger) error {
 	for _, pipeline := range pipelines.Underlying() {
-		future := pipeline.RunAsync(in)
+		future := pipeline.RunAsync(in, process.WithLogger(logger))
 		result := future.Get()
 		if result.Error() != nil && !errors.Is(result.Error(), &util.ContinuationNotSatisfied{}) {
 			return result.Error()
@@ -167,7 +167,7 @@ func (d *StatelessDaemon) Run() error {
 
 		common.MustSetUsingInternalKey(common.MessageIDKey, messageID.String(), in)
 
-		err = RunPipelines(in, d.pipelines)
+		err = RunPipelines(in, d.pipelines, d.logger)
 		if err != nil {
 			resp.WriteHeader(500)
 			_, _ = resp.Write([]byte(err.Error()))
@@ -277,7 +277,7 @@ func (d *DurableDaemon) startWorkerLoop() {
 					d.logger.Error("unable to decode data: " + err.Error())
 					return
 				}
-				err = RunPipelines(in, d.pipelines)
+				err = RunPipelines(in, d.pipelines, d.logger)
 				if err != nil {
 					d.logger.Error("error running pipeline: " + err.Error())
 					return

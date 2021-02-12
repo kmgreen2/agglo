@@ -2,12 +2,12 @@ package process
 
 import (
 	"context"
-	"errors"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/internal/common"
 	"github.com/kmgreen2/agglo/internal/core"
 	"github.com/kmgreen2/agglo/pkg/state"
 	"github.com/kmgreen2/agglo/pkg/util"
+	"github.com/pkg/errors"
 	"time"
 )
 
@@ -75,21 +75,21 @@ func (a Aggregator) Process(ctx context.Context, in map[string]interface{}) (map
 
 	partitionID, err := core.GetPartitionID(in)
 	if err != nil {
-		return out, err
+		return out, PipelineProcessError(a, err, "get partition id")
 	}
 	name, err := core.GetName(in)
 	if err != nil {
-		return out, err
+		return out, PipelineProcessError(a, err, "get pipeline name")
 	}
 
 	inBytes, err := util.MapToJson(in)
 	if err != nil {
-		return nil, err
+		return nil, PipelineProcessError(a, err, "converting map to JSON")
 	}
 
 	err = a.aggregatorStateStore.Append(ctx, core.AggregationStateKey(partitionID, name), inBytes)
 	if err != nil {
-		return nil, err
+		return nil, PipelineProcessError(a, err, "appending to state store")
 	}
 
 	if a.asyncCheckpoint {
@@ -102,7 +102,7 @@ func (a Aggregator) Process(ctx context.Context, in map[string]interface{}) (map
 	} else {
 		err = a.Checkpoint(ctx, in)
 		if err != nil {
-			return nil, err
+			return nil, PipelineProcessError(a, err, "checkpoint")
 		}
 	}
 
@@ -111,7 +111,7 @@ func (a Aggregator) Process(ctx context.Context, in map[string]interface{}) (map
 
 		aggregationStateBytes, err := a.getAggregationState(ctx, partitionID, name)
 		if err != nil {
-			return nil, err
+			return nil, PipelineProcessError(a, err, "get aggregation state")
 		}
 
 		if aggregationStateBytes == nil {
@@ -120,13 +120,13 @@ func (a Aggregator) Process(ctx context.Context, in map[string]interface{}) (map
 		} else {
 			aggregationState, err = core.NewAggregationStateFromBytes(aggregationStateBytes)
 			if err != nil {
-				return nil, err
+				return nil, PipelineProcessError(a, err, "new aggregation state from bytes")
 			}
 		}
 		err = common.SetUsingInternalPrefix(common.AggregationDataPrefix, name, aggregationState.Values,
 			out, true)
 		if err != nil {
-			return nil, err
+			return nil, PipelineProcessError(a, err, "set new aggregation state")
 		}
 	}
 	return out, nil

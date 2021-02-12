@@ -8,7 +8,7 @@ import (
 
 func main() {
 	http.HandleFunc("/webhook", PrintBody)
-	http.ListenAndServe(":80", nil)
+	http.ListenAndServe(":8080", nil)
 }
 
 func PrintBody(w http.ResponseWriter, r *http.Request) {
@@ -18,6 +18,7 @@ func PrintBody(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("Error reading the body: " + err.Error())
 		}
 		fmt.Println(string(bodyBytes))
+		_, _ = w.Write(bodyBytes)
 	}
 }
 
