@@ -8,12 +8,25 @@ import (
 	"github.com/kmgreen2/agglo/pkg/observability"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
 	"reflect"
 	"time"
 )
 
 type PipelineProcess interface {
 	Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error)
+}
+
+func getType(myvar interface{}) string {
+	if t := reflect.TypeOf(myvar); t.Kind() == reflect.Ptr {
+		return "*" + t.Elem().Name()
+	} else {
+		return t.Name()
+	}
+}
+
+func PipelineProcessError(p PipelineProcess, err error, msg string) error {
+	return errors.Wrap(err, fmt.Sprintf("%s - %s", getType(p), msg))
 }
 
 type RunnableStartProcess struct {
@@ -139,6 +152,18 @@ func (lifecycle *Lifecycle) Success(ctx context.Context) {
 func (lifecycle *Lifecycle) Failure(ctx context.Context, err error) {
 	for _, failureFn := range lifecycle.failFns {
 		failureFn(ctx, err)
+	}
+}
+
+type RunOptions struct {
+	logger *zap.Logger
+}
+
+type RunOptionBuilder func(runOptions *RunOptions)
+
+func WithLogger(logger *zap.Logger) RunOptionBuilder {
+	return func (options *RunOptions) {
+		options.logger = logger
 	}
 }
 
@@ -296,7 +321,9 @@ func (pipeline *Pipeline) thenFutureHelper(ctx context.Context, pipelineIndex in
 	return future
 }
 
-func (pipeline Pipeline) RunSync(in map[string]interface{}) (map[string]interface{}, error) {
+func (pipeline Pipeline) RunSync(in map[string]interface{}, runOptions ...RunOptionBuilder) (map[string]interface{},
+error) {
+
 	f := pipeline.RunAsync(in)
 	result := f.Get()
 
@@ -314,13 +341,31 @@ func (pipeline Pipeline) RunSync(in map[string]interface{}) (map[string]interfac
 	}
 }
 
-func (pipeline Pipeline) RunAsync(in map[string]interface{}) util.Future {
+func onFailLogHelper(logger *zap.Logger, msg string) func(ctx context.Context, err error) {
+	return func(ctx context.Context, err error) {
+		// Do not log warnings
+		// ToDo(KMG): Is there a better way to determine if an error is jsut a warning?
+		// We currently use errors to halt pipeline progress.  This is mostly needed for
+		// continuations or processes that are fail-able.  In those cases, we do not need
+		// to log errors.
+		if !util.IsWarning(err) {
+			logger.Error(fmt.Sprintf("%s: %+v", msg, err))
+		}
+	}
+}
+
+func (pipeline Pipeline) RunAsync(in map[string]interface{}, options ...RunOptionBuilder) util.Future {
 	var startIndex int64 = 0
 	var err error
 	var span trace.Span
 	var ctx context.Context
 	var startTime time.Time
 	var inMap map[string]interface{} = in
+
+	runOptions := &RunOptions{}
+	for _, opt := range options {
+		opt(runOptions)
+	}
 
 	ctx = context.Background()
 
@@ -357,8 +402,20 @@ func (pipeline Pipeline) RunAsync(in map[string]interface{}) util.Future {
 
 	// Chain together the processes of the pipeline
 	f := pipeline.createFutureHelper(ctx, int(startIndex), inMap)
+	if runOptions.logger != nil {
+		f.OnFail(func(ctx context.Context, err error) {
+			msg := fmt.Sprintf("Process index: 0")
+			onFailLogHelper(runOptions.logger, msg)(ctx, err)
+		})
+	}
 	for i := int(startIndex + 1); i < len(pipeline.processes); i++ {
 		f = pipeline.thenFutureHelper(ctx, i, f)
+		if runOptions.logger != nil {
+			f.OnFail(func(processIndex int) func(ctx context.Context, err error) {
+				msg := fmt.Sprintf("Process index: %d", processIndex)
+				return onFailLogHelper(runOptions.logger, msg)
+			}(i))
+		}
 		// If this pipeline has checkpointing enabled, then checkpoint after each process
 		if pipeline.checkPointer != nil {
 			f = f.Then(NewRunnablePartialProcess(pipeline.checkPointer), util.SetContext(ctx),

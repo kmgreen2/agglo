@@ -22,5 +22,6 @@ func (continuation *Continuation) Process(ctx context.Context, in map[string]int
 	if ok, err := continuation.condition.Evaluate(in); ok && err == nil {
 		return out, nil
 	}
-	return nil, util.NewContinuationNotSatisfied("continuation stopping processing")
+	err := util.NewContinuationNotSatisfied("continuation stopping processing")
+	return nil, PipelineProcessError(continuation, err, "")
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/kmgreen2/agglo/internal/core"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/pkg/streaming"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -191,15 +192,18 @@ func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition,
 		if resp.Body != nil {
 			bodyBytes, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "NewHttpTee: error reading response body")
 			}
 
-			respMap, err := util.JsonToMap(bodyBytes)
-			if err != nil {
-				return nil, err
+			if len(bodyBytes) > 0 {
+				respMap, err := util.JsonToMap(bodyBytes)
+				if err != nil {
+					return nil, errors.Wrap(err, "NewHttpTee: error converting response body to JSON")
+				}
+				return respMap, nil
+			} else {
+				return nil, nil
 			}
-
-			return respMap, nil
 		} else {
 			return nil, nil
 		}
@@ -227,7 +231,7 @@ func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition,
 func (t Tee) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
 	shouldTee, err := t.condition.Evaluate(in)
 	if err != nil {
-		return in, err
+		return in, PipelineProcessError(t, err, "evaluating condition")
 	}
 
 	if !shouldTee {
@@ -236,19 +240,19 @@ func (t Tee) Process(ctx context.Context, in map[string]interface{}) (map[string
 
 	uuid, err := gUuid.NewRandom()
 	if err != nil {
-		return nil, err
+		return nil, PipelineProcessError(t, err, "generating UUID")
 	}
 
 	out := util.CopyableMap(in).DeepCopy()
 
 	teeOut, err := t.transformer.Process(ctx, in)
 	if err != nil {
-		return nil, err
+		return nil, PipelineProcessError(t, err, "transforming fields")
 	}
 
 	respMap, err := t.outputFunc(ctx, uuid.String(), teeOut)
 	if err != nil {
-		return nil, err
+		return nil, PipelineProcessError(t, err, "running output function")
 	}
 
 

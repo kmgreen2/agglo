@@ -239,17 +239,19 @@ func (c CheckPointer) Process(ctx context.Context, in map[string]interface{}) (m
 			checkpointStateKey := fmt.Sprintf("%s:%s", pipelineName, messageID)
 			checkpoint, err := c.fetchFunc(ctx, checkpointStateKey)
 			if err != nil {
-				return nil, err
+				return nil, PipelineProcessError(c, err, "getting checkpoint")
 			}
 			err = c.updateFunc(ctx, checkpointStateKey, checkpoint, in)
 			if err != nil {
-				return nil, err
+				return nil, PipelineProcessError(c, err, "updating checkpoint")
 			}
 		} else {
-			return nil, util.NewInternalError("could not find messageID to checkpoint")
+			err := util.NewInternalError("could not find messageID to checkpoint")
+			return nil, PipelineProcessError(c, err, "")
 		}
 	} else {
-		return nil, util.NewInternalError("could not find resource name to checkpoint")
+		err := util.NewInternalError("could not find resource name to checkpoint")
+		return nil, PipelineProcessError(c, err, "")
 	}
 	return in, nil
 }

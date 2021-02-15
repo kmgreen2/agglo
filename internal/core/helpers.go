@@ -26,4 +26,3 @@ func GetName(in map[string]interface{}) (string, error) {
 	msg := fmt.Sprintf("could not find valid 'resource name' in payload")
 	return "", util.NewInvalidError(msg)
 }
-

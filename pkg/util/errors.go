@@ -325,3 +325,20 @@ func (err *ContinuationNotSatisfied) Is(other error) bool {
 	return ok
 }
 
+// IsWarning
+func (err *ContinuationNotSatisfied) IsWarning() bool {
+	return true
+}
+
+type Warning interface {
+	IsWarning() bool
+}
+
+func IsWarning(err error) bool {
+	var warning Warning
+	if ok := errors.As(err, &warning); ok && warning.IsWarning() {
+		return true
+	}
+	return false
+}
+

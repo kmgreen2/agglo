@@ -187,6 +187,18 @@
           }
         },
         {
+          "name": "Dumbserver",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
           "name": "CircleciOut",
           "retryStrategy": {
             "numRetries": 0,
@@ -218,6 +230,11 @@
       "name": "CircleciOut",
       "connectionString": "/tmp/circleciout",
       "externalType": "ExternalLocalFile"
+    },
+    {
+      "name": "DumbServer",
+      "connectionString": "http://localhost:8080/webhook",
+      "externalType": "ExternalHttp"
     }
   ],
   "processDefinitions": [
@@ -379,6 +396,17 @@
               "CreateTicket"
             ]
           }
+        }
+      }
+    },
+    {
+      "tee": {
+        "name": "Dumbserver",
+        "condition": {},
+        "outputConnectorRef": "DumbServer",
+        "transformerRef": "",
+        "additionalBody": {
+          "fizz": "buzz"
         }
       }
     },

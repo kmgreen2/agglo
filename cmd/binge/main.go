@@ -7,6 +7,7 @@ import (
 	"github.com/kmgreen2/agglo/pkg/observability"
 	"github.com/kmgreen2/agglo/internal/core/process"
 	"github.com/kmgreen2/agglo/internal/server"
+	"go.uber.org/zap"
 	"io"
 	"io/ioutil"
 	"os"
@@ -203,11 +204,15 @@ func main() {
 		_ = pipelines.Shutdown()
 	} else if args.runType == RunPersistentDaemon {
 		recoverFunc := func(inBytes []byte) error {
+			logger, err := zap.NewProduction()
+			if err != nil {
+				return err
+			}
 			in, err := util.JsonToMap(inBytes)
 			if err != nil {
 				return nil
 			}
-			return server.RunPipelines(in, pipelines)
+			return server.RunPipelines(in, pipelines, logger)
 		}
 
 		dQueue, err := util.OpenDurableQueue(args.stateDbPath, recoverFunc, args.force)

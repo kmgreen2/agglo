@@ -93,7 +93,7 @@ func (c Completer) Process(ctx context.Context, in map[string]interface{}) (map[
 
 	partitionID, err := core.GetPartitionID(in)
 	if err != nil {
-		return out, err
+		return out, PipelineProcessError(c, err, "getting parition ID")
 	}
 	name := c.name
 
@@ -102,68 +102,68 @@ func (c Completer) Process(ctx context.Context, in map[string]interface{}) (map[
 		if errors.Is(err, &util.NotFoundError{}) {
 			return out, nil
 		}
-		return out, err
+		return out, PipelineProcessError(c, err, "matching completion keys")
 	}
 
 	stateKey, err := core.CompletionStateKey(partitionID, name, matchedVal)
 	if err != nil {
-		return out, err
+		return out, PipelineProcessError(c, err, "getting state key keys")
 	}
 
 	mapBytes, err := util.MapToJson(in)
 	if err != nil {
-		return out, err
+		return out, PipelineProcessError(c, err, "serializing in map to bytes")
 	}
 
 	err = c.completionStateStore.Append(ctx, stateKey, mapBytes)
 	if err != nil {
-		return out, err
+		return out, PipelineProcessError(c, err, "appending state to state store")
 	}
 
 	err = c.Checkpoint(ctx, in, matchedVal)
 	if err != nil {
-		return nil, err
+		return nil, PipelineProcessError(c, err, "checkpointing state")
 	}
 
 	completionStateBytes, err := c.getCompletionState(ctx, partitionID, name, matchedVal)
 	if err != nil {
-		return out, err
+		return out, PipelineProcessError(c, err, "getting completion state")
 	}
 
 
 	completionState, err = core.NewCompletionStateFromBytes(completionStateBytes)
 	if err != nil {
-		return nil, err
+		return nil, PipelineProcessError(c, err, "deserializing completion state")
 	}
 
 	if completionState.CompletionDeadline > 0 && time.Now().UnixNano() > completionState.CompletionDeadline {
 		err = common.SetUsingInternalPrefix(common.CompletionStatusPrefix, c.name, "timedout", out,
 			true)
 		if err != nil {
-			return out, err
+			return out, PipelineProcessError(c, err, "setting state to timed-out")
 		}
 	} else if completionState.IsDone() {
 		err = c.completionStateStore.AtomicDelete(ctx, stateKey, completionStateBytes)
 		if err != nil {
-			return out, err
+			return out, PipelineProcessError(c, err, "deleting state after completed")
 		}
 		err = common.SetUsingInternalPrefix(common.CompletionStatusPrefix, c.name, "complete", out, true)
 		if err != nil {
-			return out, err
+			return out, PipelineProcessError(c, err, "setting status to completed")
 		}
 		stateMap, err := util.JsonToMap(completionStateBytes)
 		if err != nil {
-			return out, err
+			return out, PipelineProcessError(c, err, "deserializing state")
 		}
 		err = common.SetUsingInternalPrefix(common.CompletionStatePrefix, c.name, stateMap, out, true)
 		if err != nil {
-			return out, err
+			return out, PipelineProcessError(c, err, "setting state to complete")
 		}
 	} else {
 		err = common.SetUsingInternalPrefix(common.CompletionStatusPrefix, c.name, "triggered", out,
 			true)
 		if err != nil {
-			return out, err
+			return out, PipelineProcessError(c, err, "setting state to triggered")
 		}
 	}
 
