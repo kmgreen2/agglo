@@ -20,7 +20,7 @@ func TestKVCheckPointer(t *testing.T) {
 	}
 	pipelineName := "foo"
 	kvStore := kvs.NewMemKVStore()
-	checkpointer := NewKVCheckPointer(kvStore)
+	checkpointer := NewKVCheckPointer("pipelineCheckPointer", kvStore)
 
 	in := map[string]interface{} {
 		string(common.ResourceNameKey): pipelineName,
@@ -65,7 +65,7 @@ func TestLocalFileCheckPointer(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	checkpointer, err := NewLocalFileCheckPointer(path)
+	checkpointer, err := NewLocalFileCheckPointer("pipelineCheckPointer", path)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}

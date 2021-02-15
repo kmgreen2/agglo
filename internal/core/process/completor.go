@@ -26,6 +26,10 @@ func NewCompleter(name string, completion *core.Completion, kvStore kvs.KVStore)
 	}
 }
 
+func (c Completer) Name() string {
+	return c.name
+}
+
 func (c Completer) getCompletionState(ctx context.Context, partitionID gUuid.UUID, name string,
 	value interface{}) ([]byte, error) {
 	stateKey, err := core.CompletionStateKey(partitionID, name, value)

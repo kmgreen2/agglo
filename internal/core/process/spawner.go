@@ -8,19 +8,25 @@ import (
 )
 
 type Spawner struct {
+	name string
 	job       core.Job
 	condition *core.Condition
 	delay     time.Duration
 	doSync    bool
 }
 
-func NewSpawner(job core.Job, condition *core.Condition, delay time.Duration, doSync bool) *Spawner {
+func NewSpawner(name string, job core.Job, condition *core.Condition, delay time.Duration, doSync bool) *Spawner {
 	return &Spawner{
+		name: name,
 		job: job,
 		condition: condition,
 		delay: delay,
 		doSync: doSync,
 	}
+}
+
+func (s Spawner) Name() string {
+	return s.name
 }
 
 func (s Spawner) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {

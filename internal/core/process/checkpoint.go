@@ -22,6 +22,7 @@ type Finalizer interface {
 }
 
 type CheckPointer struct {
+	pipelineName string
 	updateFunc func(ctx context.Context, key string, checkpointState, data map[string]interface{}) error
 	fetchFunc func(ctx context.Context, key string) (map[string]interface{}, error)
 	removeFunc func(ctx context.Context, key string) error
@@ -64,7 +65,7 @@ func updateSerializeCheckpoint(checkpointState, data map[string]interface{}) (ol
 	return
 }
 
-func NewKVCheckPointer(kvStore kvs.KVStore) *CheckPointer {
+func NewKVCheckPointer(pipelineName string, kvStore kvs.KVStore) *CheckPointer {
 	updateFunc := func(ctx context.Context, key string, checkpointState, data map[string]interface{}) error {
 		oldCheckpoint, newCheckpoint, err := updateSerializeCheckpoint(checkpointState, data)
 		if err != nil {
@@ -97,6 +98,7 @@ func NewKVCheckPointer(kvStore kvs.KVStore) *CheckPointer {
 	}
 
 	return &CheckPointer{
+		pipelineName: pipelineName,
 		updateFunc: updateFunc,
 		fetchFunc: fetchFunc,
 		removeFunc: removeFunc,
@@ -105,7 +107,7 @@ func NewKVCheckPointer(kvStore kvs.KVStore) *CheckPointer {
 	}
 }
 
-func NewLocalFileCheckPointer(path string) (*CheckPointer, error) {
+func NewLocalFileCheckPointer(pipelineName, path string) (*CheckPointer, error) {
 	if d, err := os.Stat(path); err != nil || !d.IsDir() {
 		msg := fmt.Sprintf("'%s is not a valid path", path)
 		return nil, util.NewInvalidError(msg)
@@ -145,6 +147,7 @@ func NewLocalFileCheckPointer(path string) (*CheckPointer, error) {
 	}
 
 	return &CheckPointer{
+		pipelineName: pipelineName,
 		updateFunc: updateFunc,
 		fetchFunc: fetchFunc,
 		removeFunc: removeFunc,
@@ -175,6 +178,10 @@ func getDataFromCheckpoint(checkpoint map[string]interface{}) (map[string]interf
 		}
 	}
 	return nil, util.NewNotFoundError("could not find checkpoint data")
+}
+
+func (c CheckPointer) Name() string {
+	return c.pipelineName + "-checkPointer"
 }
 
 func (c CheckPointer) GetCheckpoint(ctx context.Context, pipelineName, messageID string) (out map[string]interface{},

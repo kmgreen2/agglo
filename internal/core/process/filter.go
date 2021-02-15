@@ -7,31 +7,38 @@ import (
 )
 
 type Filter struct {
+	name string
 	regex       *regexp.Regexp
 	keepMatched bool
 }
 
-func NewRegexKeyFilter(expr string, keepMatched bool) (*Filter, error) {
+func NewRegexKeyFilter(name string, expr string, keepMatched bool) (*Filter, error) {
 	re, err := regexp.Compile(expr)
 	if err != nil {
 		return nil, err
 	}
 	return &Filter {
-		re,
-		keepMatched,
+		name: name,
+		regex: re,
+		keepMatched: keepMatched,
 	}, nil
 }
 
-func NewListKeyFilter(keys []string, keepMatched bool) (*Filter, error) {
+func NewListKeyFilter(name string, keys []string, keepMatched bool) (*Filter, error) {
 	expr := strings.Join(keys, "|")
 	re, err := regexp.Compile(expr)
 	if err != nil {
 		return nil, err
 	}
 	return &Filter {
-		re,
-		keepMatched,
+		name: name,
+		regex: re,
+		keepMatched: keepMatched,
 	}, nil
+}
+
+func (filter Filter) Name() string {
+	return filter.name
 }
 
 func (filter *Filter) process(in map[string]interface{}, out map[string]interface{}) interface{} {

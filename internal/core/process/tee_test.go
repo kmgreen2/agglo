@@ -46,7 +46,7 @@ func TestHttpTee(t *testing.T) {
 
 	httpClient := test.NewMockHttpClient(nil, 200, checkFunc)
 
-	httpTee := process.NewHttpTee(httpClient, "foo", core.TrueCondition, nil, nil)
+	httpTee := process.NewHttpTee("httpTee", httpClient, "foo", core.TrueCondition, nil, nil)
 
 	out, err := httpTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, err)
@@ -89,7 +89,7 @@ func TestHttpTeeWithAdditional(t *testing.T) {
 
 	httpClient := test.NewMockHttpClient(nil, 200, checkFunc)
 
-	httpTee := process.NewHttpTee(httpClient, "foo", core.TrueCondition, nil, additionalBody)
+	httpTee := process.NewHttpTee("httpTee", httpClient, "foo", core.TrueCondition, nil, additionalBody)
 
 	out, err := httpTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, err)
@@ -134,7 +134,7 @@ func TestHttpTeeWithResponse(t *testing.T) {
 		ioutil.NopCloser(bytes.NewBuffer(respBytes)),
 		checkFunc)
 
-	httpTee := process.NewHttpTee(httpClient, "foo", core.TrueCondition, nil, nil)
+	httpTee := process.NewHttpTee("httpTee", httpClient, "foo", core.TrueCondition, nil, nil)
 
 	out, err := httpTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, err)
@@ -155,14 +155,14 @@ func TestHttpTeeWithResponse(t *testing.T) {
 func TestHttpTeeError(t *testing.T) {
 	jsonMap := test.TestJson()
 	httpClient := test.NewMockHttpClient(fmt.Errorf("error"),500, func(req *http.Request){})
-	httpTee := process.NewHttpTee(httpClient, "foo", core.TrueCondition, nil, nil)
+	httpTee := process.NewHttpTee("httpTee", httpClient, "foo", core.TrueCondition, nil, nil)
 
 	out, err := httpTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, out)
 	assert.Error(t, err)
 
 	httpClient = test.NewMockHttpClient(nil, 500, func(req *http.Request){})
-	httpTee = process.NewHttpTee(httpClient, "foo", core.TrueCondition, nil, nil)
+	httpTee = process.NewHttpTee("httpTee", httpClient, "foo", core.TrueCondition, nil, nil)
 	out, err = httpTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, out)
 	assert.Error(t, err)
@@ -171,7 +171,7 @@ func TestHttpTeeError(t *testing.T) {
 func TestHttpFalseCondition(t *testing.T) {
 	jsonMap := test.TestJson()
 	httpClient := test.NewMockHttpClient(nil, 200, func(req *http.Request){})
-	httpTee := process.NewHttpTee(httpClient, "foo", core.FalseCondition, nil, nil)
+	httpTee := process.NewHttpTee("httpTee", httpClient, "foo", core.FalseCondition, nil, nil)
 
 	out, err := httpTee.Process(context.Background(), jsonMap)
 	assert.Equal(t, jsonMap, out)
@@ -182,7 +182,7 @@ func TestKVTee(t *testing.T) {
 	var storedMap map[string]interface{}
 	jsonMap := test.TestJson()
 	kvStore := kvs.NewMemKVStore()
-	kvTee := process.NewKVTee(kvStore, core.TrueCondition, nil, nil)
+	kvTee := process.NewKVTee("kvTee", kvStore, core.TrueCondition, nil, nil)
 
 	out, err := kvTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, err)
@@ -216,7 +216,7 @@ func TestKVTeeWithAdditional(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	kvTee := process.NewKVTee(kvStore, core.TrueCondition, nil, additionalBody)
+	kvTee := process.NewKVTee("kvTee", kvStore, core.TrueCondition, nil, additionalBody)
 
 	out, err := kvTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, err)
@@ -242,7 +242,7 @@ func TestKVTeeError(t *testing.T) {
 	kvStore.EXPECT().Put(context.Background(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("error"))
 	kvStore.EXPECT().ConnectionString().Return("")
 
-	kvTee := process.NewKVTee(kvStore, core.TrueCondition,nil, nil)
+	kvTee := process.NewKVTee("kvTee", kvStore, core.TrueCondition,nil, nil)
 
 	out, err := kvTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, out)
@@ -254,7 +254,7 @@ func TestKVTeeFalseCondition(t *testing.T) {
 	jsonMap := test.TestJson()
 	kvStore := mocks.NewMockKVStore(ctrl)
 	kvStore.EXPECT().ConnectionString().Return("")
-	kvTee := process.NewKVTee(kvStore, core.FalseCondition, nil, nil)
+	kvTee := process.NewKVTee("kvTee", kvStore, core.FalseCondition, nil, nil)
 
 	out, err := kvTee.Process(context.Background(), jsonMap)
 	assert.Equal(t, jsonMap, out)
@@ -293,7 +293,7 @@ func TestPublisherTee(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	publisherTee := process.NewPubSubTee(publisher, core.TrueCondition, nil, nil)
+	publisherTee := process.NewPubSubTee("httpTee", publisher, core.TrueCondition, nil, nil)
 
 	out, err := publisherTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, err)
@@ -347,7 +347,7 @@ func TestPublisherTeeWithAdditional(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	publisherTee := process.NewPubSubTee(publisher, core.TrueCondition, nil, additionalBody)
+	publisherTee := process.NewPubSubTee("pubSubTee", publisher, core.TrueCondition, nil, additionalBody)
 
 	out, err := publisherTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, err)
@@ -366,7 +366,7 @@ func TestPublisherTeeError(t *testing.T) {
 	publisher.EXPECT().Publish(context.Background(), gomock.Any()).Return(fmt.Errorf("error"))
 	publisher.EXPECT().ConnectionString().Return("")
 
-	publisherTee := process.NewPubSubTee(publisher, core.TrueCondition, nil, nil)
+	publisherTee := process.NewPubSubTee("pubSubTee", publisher, core.TrueCondition, nil, nil)
 	out, err := publisherTee.Process(context.Background(), jsonMap)
 	assert.Nil(t, out)
 	assert.Error(t, err)
@@ -377,7 +377,7 @@ func TestPublisherTeeFalseCondition(t *testing.T) {
 	jsonMap := test.TestJson()
 	publisher := mocks.NewMockPublisher(ctrl)
 	publisher.EXPECT().ConnectionString().Return("")
-	publisherTee := process.NewPubSubTee(publisher, core.FalseCondition, nil, nil)
+	publisherTee := process.NewPubSubTee("pubSubTee", publisher, core.FalseCondition, nil, nil)
 
 	out, err := publisherTee.Process(context.Background(), jsonMap)
 	assert.Equal(t, jsonMap, out)

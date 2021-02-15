@@ -10,6 +10,7 @@ import (
 )
 
 type Transformer struct {
+	name string
 	specs          []*TransformerSpec
 	fieldSeparator string
 	indexSeparator string
@@ -22,9 +23,10 @@ type TransformerSpec struct {
 	transformation *core.Transformation
 }
 
-func NewTransformer(specs []*TransformerSpec, fieldSeparator, indexSeparator string,
+func NewTransformer(name string, specs []*TransformerSpec, fieldSeparator, indexSeparator string,
 	forwardInputFields bool) *Transformer {
 	return &Transformer{
+		name,
 		specs,
 		fieldSeparator,
 		indexSeparator,
@@ -32,8 +34,12 @@ func NewTransformer(specs []*TransformerSpec, fieldSeparator, indexSeparator str
 	}
 }
 
+func (t Transformer) Name() string {
+	return t.name
+}
+
 func DefaultTransformer() *Transformer {
-	return NewTransformer(nil, ".", ".", false)
+	return NewTransformer("default", nil, ".", ".", false)
 }
 
 func (t *Transformer) AddSpec(sourceField, targetField string, transformation *core.Transformation) {

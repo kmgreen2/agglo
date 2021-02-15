@@ -12,7 +12,7 @@ import (
 func TestAnnotateHappyPath(t *testing.T) {
 	jsonMap := test.TestJson()
 
-	builder := process.NewAnnotatorBuilder()
+	builder := process.NewAnnotatorBuilder("foo")
 
 	cond, err := core.NewCondition(core.NewComparatorExpression(core.Variable("b.d.0"), 3, core.Equal))
 	if err != nil {
@@ -38,7 +38,7 @@ func TestAnnotateHappyPath(t *testing.T) {
 func TestAnnotateDuplicateField(t *testing.T) {
 	jsonMap := test.TestJson()
 
-	builder := process.NewAnnotatorBuilder()
+	builder := process.NewAnnotatorBuilder("foo")
 
 	cond, err := core.NewCondition(core.NewComparatorExpression(core.Variable("b.d.0"), 3, core.Equal))
 	if err != nil {

@@ -15,6 +15,7 @@ import (
 
 type PipelineProcess interface {
 	Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error)
+	Name() string
 }
 
 func getType(myvar interface{}) string {
@@ -26,7 +27,7 @@ func getType(myvar interface{}) string {
 }
 
 func PipelineProcessError(p PipelineProcess, err error, msg string) error {
-	return errors.Wrap(err, fmt.Sprintf("%s - %s", getType(p), msg))
+	return errors.Wrap(err, fmt.Sprintf("%s(%s) - %s", p.Name(), getType(p), msg))
 }
 
 type RunnableStartProcess struct {

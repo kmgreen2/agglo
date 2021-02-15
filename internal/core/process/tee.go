@@ -23,6 +23,7 @@ var TeeMetadataKey string = string(common.TeeMetadataKey)
 // Tee is a process processor that will send a provided mapping to
 // a system (i.e. KVStore, Pubsub, etc.) and return the map
 type Tee struct {
+	name string
 	outputFunc func(ctx context.Context, key string, in map[string]interface{}) (map[string]interface{}, error)
 	condition *core.Condition
 	transformer *Transformer
@@ -33,7 +34,7 @@ type Tee struct {
 
 // NewKVTee will create a Tee processor that stores maps in the provided KVStore
 // Note: the returned map will contain the UUID of the KV entry with key "_uuid_key"
-func NewKVTee(kvStore kvs.KVStore, condition *core.Condition, transformer *Transformer,
+func NewKVTee(name string, kvStore kvs.KVStore, condition *core.Condition, transformer *Transformer,
 	additionalBody map[string]interface{}) *Tee {
 	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) (map[string]interface{}, error) {
 		var err error
@@ -63,6 +64,7 @@ func NewKVTee(kvStore kvs.KVStore, condition *core.Condition, transformer *Trans
 		transformer.AddSpec("", "", transformation)
 	}
 	return &Tee{
+		name,
 		outputFunc,
 		condition,
 		transformer,
@@ -73,7 +75,7 @@ func NewKVTee(kvStore kvs.KVStore, condition *core.Condition, transformer *Trans
 }
 
 // NewLocalfileTee will create a Tee processor that writes maps to a local file system
-func NewLocalFileTee(path string, condition *core.Condition, transformer *Transformer,
+func NewLocalFileTee(name string ,path string, condition *core.Condition, transformer *Transformer,
 	additionalBody map[string]interface{}) (*Tee, error) {
 	if d, err := os.Stat(path); err != nil || !d.IsDir() {
 		msg := fmt.Sprintf("'%s is not a valid path", path)
@@ -105,6 +107,7 @@ func NewLocalFileTee(path string, condition *core.Condition, transformer *Transf
 		transformer.AddSpec("", "", transformation)
 	}
 	return &Tee{
+		name,
 		outputFunc,
 		condition,
 		transformer,
@@ -116,7 +119,7 @@ func NewLocalFileTee(path string, condition *core.Condition, transformer *Transf
 
 // NewPubSubTee will create a Tee processor that publishes maps using the provided
 // publisher.
-func NewPubSubTee(publisher streaming.Publisher, condition *core.Condition, transformer *Transformer,
+func NewPubSubTee(name string, publisher streaming.Publisher, condition *core.Condition, transformer *Transformer,
 	additionalBody map[string]interface{}) *Tee {
 	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) (map[string]interface{}, error) {
 		var err error
@@ -144,6 +147,7 @@ func NewPubSubTee(publisher streaming.Publisher, condition *core.Condition, tran
 		transformer.AddSpec("", "", transformation)
 	}
 	return &Tee{
+		name,
 		outputFunc,
 		condition,
 		transformer,
@@ -155,7 +159,7 @@ func NewPubSubTee(publisher streaming.Publisher, condition *core.Condition, tran
 
 // NewHttpTee will create a tee processor that posts JSON-encoded
 // maps to a specified endpoint
-func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition, transformer *Transformer,
+func NewHttpTee(name string, client common.HTTPClient, url string, condition *core.Condition, transformer *Transformer,
 	additionalBody map[string]interface{}) *Tee {
 	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) (map[string]interface{}, error) {
 		var err error
@@ -217,6 +221,7 @@ func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition,
 		transformer.AddSpec("", "", transformation)
 	}
 	return &Tee{
+		name,
 		outputFunc,
 		condition,
 		transformer,
@@ -224,6 +229,10 @@ func NewHttpTee(client common.HTTPClient, url string, condition *core.Condition,
 		url,
 		additionalBody,
 	}
+}
+
+func (t Tee) Name() string {
+	return t.name
 }
 
 // Process processes an input map by sending it to the appropriate system and
