@@ -27,14 +27,14 @@ func (s Spawner) Process(ctx context.Context, in map[string]interface{}) (map[st
 	out := util.CopyableMap(in).DeepCopy()
 	shouldRun, err := s.condition.Evaluate(out)
 	if err != nil {
-		return out, err
+		return out, PipelineProcessError(s, err, "evaluating condition")
 	}
 	if shouldRun {
 		f := s.job.Run(s.delay, s.doSync, out)
 		if s.doSync {
 			result := f.Get()
 			if result.Error() != nil {
-				return in, result.Error()
+				return in, PipelineProcessError(s, result.Error(), "running job")
 			}
 		}
 	}

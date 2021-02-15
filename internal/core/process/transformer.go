@@ -142,7 +142,7 @@ func (t Transformer) Process(ctx context.Context, in map[string]interface{}) (ma
 		err := t.createPathAndTransform(spec.sourceField, spec.targetField, spec.transformation, in, out)
 		// This will skip transforming fields when the source field cannot be found in the `in` map
 		if err != nil && !errors.Is(err, &util.NotFoundError{}){
-			return in, err
+			return in, PipelineProcessError(t, err, "transforming fields")
 		}
 	}
 	return out, nil

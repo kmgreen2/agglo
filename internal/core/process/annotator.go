@@ -17,12 +17,12 @@ func (a Annotator) Process(ctx context.Context, in map[string]interface{}) (map[
 	for _, annotation := range a.annotations {
 		should, err := annotation.ShouldAnnotate(util.Flatten(out))
 		if err != nil {
-			return in, err
+			return in, PipelineProcessError(a, err, "evaluating condition")
 		}
 		if should {
 			err = annotation.Annotate(out)
 			if err != nil {
-				return in, err
+				return in, PipelineProcessError(a, err, "adding annotation")
 			}
 		}
 	}

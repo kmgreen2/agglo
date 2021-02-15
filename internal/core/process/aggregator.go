@@ -68,7 +68,7 @@ func (a Aggregator) checkpointMapFunc() (func(curr, val []byte) ([]byte, error))
 
 func (a Aggregator) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
 	if shouldProcess, err := a.condition.Evaluate(in); !shouldProcess || err != nil {
-		return in, err
+		return in, PipelineProcessError(a, err, "evaluating condition")
 	}
 
 	out := util.CopyableMap(in).DeepCopy()
