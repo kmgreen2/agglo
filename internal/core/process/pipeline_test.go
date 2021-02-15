@@ -23,7 +23,7 @@ func TestPipelineBasic(t *testing.T) {
 	// Annotate the inbound map with the proper partitionID and name
 	// partitionID is meant to separate different organizations or departments
 	// name is meant to partition different classes of messages (e.g. CI/CD, messaging, etc.)
-	annotatorBuilder := process.NewAnnotatorBuilder()
+	annotatorBuilder := process.NewAnnotatorBuilder("foo")
 	annotatorBuilder.Add(core.NewAnnotation(string(common.PartitionIDKey), partitionID.String(), core.TrueCondition))
 	annotatorBuilder.Add(core.NewAnnotation(string(common.ResourceNameKey), name, core.TrueCondition))
 	builder.Add(annotatorBuilder.Build())
@@ -39,7 +39,7 @@ func TestPipelineBasic(t *testing.T) {
 	condition, err := core.NewCondition(conditionBuilder.Get())
 	assert.Nil(t, err)
 
-	annotatorBuilder = process.NewAnnotatorBuilder()
+	annotatorBuilder = process.NewAnnotatorBuilder("foo")
 	annotatorBuilder.Add(core.NewAnnotation("version-control", "git-dev", condition))
 	builder.Add(annotatorBuilder.Build())
 
@@ -51,7 +51,7 @@ func TestPipelineBasic(t *testing.T) {
 	condition, err = core.NewCondition(conditionBuilder.Get())
 	assert.Nil(t, err)
 
-	annotatorBuilder = process.NewAnnotatorBuilder()
+	annotatorBuilder = process.NewAnnotatorBuilder("foo")
 	annotatorBuilder.Add(core.NewAnnotation("deploy", "circleci-dev", condition))
 	builder.Add(annotatorBuilder.Build())
 
@@ -60,7 +60,7 @@ func TestPipelineBasic(t *testing.T) {
 		core.AggDiscreteHistogram, []string{}))
 	condition, err = core.NewCondition(core.NewComparatorExpression(core.Variable("version-control"), "git-dev",
 		core.Equal))
-	builder.Add(process.NewAggregator(aggregation, condition, state.NewKvStateStore(kvStore), false, true))
+	builder.Add(process.NewAggregator("fooAgg", aggregation, condition, state.NewKvStateStore(kvStore), false, true))
 
 	// Create a completion that joins on commit hash
 	completion := core.NewCompletion([]string{"hash", "githash"}, -1)
@@ -68,7 +68,7 @@ func TestPipelineBasic(t *testing.T) {
 	builder.Add(completer)
 
 	// Create transformations that set fields to be stored and tee them out to the kvstore
-	transformer := process.NewTransformer(nil, ".", ".", false)
+	transformer := process.NewTransformer("fooTransformer", nil, ".", ".", false)
 	condition, err = core.NewCondition(core.NewComparatorExpression(core.Variable("version-control"), "git-dev",
 		core.Equal))
 	transformationBuilder := core.NewTransformationBuilder()
@@ -77,7 +77,7 @@ func TestPipelineBasic(t *testing.T) {
 	transformer.AddSpec("author", "gitAuthor", copyTransformation)
 	transformer.AddSpec("hash", "gitHash", copyTransformation)
 
-	builder.Add(process.NewKVTee(kvStore, condition, transformer, nil))
+	builder.Add(process.NewKVTee("kvTee", kvStore, condition, transformer, nil))
 
 	// Spawn a job for each completed completion that adds the git hash to a list
 	var spawnOutput []string
@@ -89,10 +89,10 @@ func TestPipelineBasic(t *testing.T) {
 		common.CompletionStatusPrefix, "default")),
 		"complete",	core.Equal))
 
-	builder.Add(process.NewSpawner(core.NewLocalJob(runnable), condition, -1, true))
+	builder.Add(process.NewSpawner("foo", core.NewLocalJob(runnable), condition, -1, true))
 
 	// Use a filter to strip the internally added fields
-	filter, err := process.NewRegexKeyFilter("^agglo.*", false)
+	filter, err := process.NewRegexKeyFilter("foo", "^agglo.*", false)
 	builder.Add(filter)
 
 	pipeline := builder.Get()

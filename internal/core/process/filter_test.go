@@ -14,7 +14,7 @@ func TestNewRegexKeyFilter(t *testing.T) {
 		"baz": "foo",
 	}
 
-	filter, err := process.NewRegexKeyFilter(`^f.*`, true)
+	filter, err := process.NewRegexKeyFilter("foo", `^f.*`, true)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -32,7 +32,7 @@ func TestNewRegexKeyFilterInvert(t *testing.T) {
 		"baz": "foo",
 	}
 
-	filter, err := process.NewRegexKeyFilter(`^f.*`, false)
+	filter, err := process.NewRegexKeyFilter("foo", `^f.*`, false)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -49,7 +49,7 @@ func TestNewListKeyFilter(t *testing.T) {
 		"baz": "foo",
 	}
 
-	filter, err := process.NewListKeyFilter([]string{"foo", "baz"}, true)
+	filter, err := process.NewListKeyFilter("foo", []string{"foo", "baz"}, true)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -74,7 +74,7 @@ func TestNewListMultilevelKeyFilter(t *testing.T) {
 		},
 	}
 
-	filter, err := process.NewListKeyFilter([]string{"foo", "baz", "booze"}, true)
+	filter, err := process.NewListKeyFilter("foo", []string{"foo", "baz", "booze"}, true)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}

@@ -230,7 +230,8 @@ func buildCondition(condition *api.Condition) (*core.Condition, error) {
 
 func buildTransformer(transformerSpec *api.Transformer) (*Transformer, error) {
 	transformerSpecs := transformerSpec.Specs
-	transformer := NewTransformer(nil, ".", ".", transformerSpec.ForwardInputFields)
+	transformer := NewTransformer(transformerSpec.Name, nil, ".", ".",
+		transformerSpec.ForwardInputFields)
 	for _, spec := range transformerSpecs {
 		condition, err := buildCondition(spec.Transformation.Condition)
 		if err != nil {
@@ -336,7 +337,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 				msg := fmt.Sprintf("name conflict in process definitions: %s", procDef.Annotator.Name)
 				return nil, util.NewInvalidError(msg)
 			}
-			annotatorBuilder := NewAnnotatorBuilder()
+			annotatorBuilder := NewAnnotatorBuilder(procDef.Annotator.Name)
 			for _, annotation := range procDef.Annotator.Annotations {
 				condition, err := buildCondition(annotation.Condition)
 				if err != nil {
@@ -358,7 +359,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 				if err != nil {
 					return nil, err
 				}
-				processes[procDef.Aggregator.Name] = NewAggregator(aggregation, condition,
+				processes[procDef.Aggregator.Name] = NewAggregator(procDef.Aggregator.Name, aggregation, condition,
 					state.NewKvStateStore(kvStore), procDef.Aggregator.AsyncCheckpoint, procDef.Aggregator.ForwardState)
 			} else {
 				msg := fmt.Sprintf("unknown kvStore for %s: %s", procDef.Aggregator.Name, procDef.Aggregator.StateStore)
@@ -383,7 +384,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 				msg := fmt.Sprintf("name conflict in process definitions: %s", procDef.Filter.Name)
 				return nil, util.NewInvalidError(msg)
 			}
-			filter, err := NewRegexKeyFilter(procDef.Filter.Regex, procDef.Filter.KeepMatched)
+			filter, err := NewRegexKeyFilter(procDef.Filter.Name, procDef.Filter.Regex, procDef.Filter.KeepMatched)
 			if err != nil {
 				return nil, err
 			}
@@ -424,13 +425,17 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			}
 
 			if external, ok := externalKVStores[procDef.Tee.OutputConnectorRef]; ok {
-				processes[procDef.Tee.Name] = NewKVTee(external, condition, transformer, procDef.Tee.AdditionalBody.AsMap())
+				processes[procDef.Tee.Name] = NewKVTee(procDef.Tee.Name, external, condition, transformer,
+					procDef.Tee.AdditionalBody.AsMap())
 			} else if external, ok := externalPublisher[procDef.Tee.OutputConnectorRef]; ok {
-				processes[procDef.Tee.Name] = NewPubSubTee(external, condition, transformer, procDef.Tee.AdditionalBody.AsMap())
+				processes[procDef.Tee.Name] = NewPubSubTee(procDef.Tee.Name, external, condition, transformer,
+					procDef.Tee.AdditionalBody.AsMap())
 			} else if external, ok := externalHttp[procDef.Tee.OutputConnectorRef]; ok {
-				processes[procDef.Tee.Name] = NewHttpTee(http.DefaultClient, external, condition, transformer, procDef.Tee.AdditionalBody.AsMap())
+				processes[procDef.Tee.Name] = NewHttpTee(procDef.Tee.Name, http.DefaultClient, external, condition,
+					transformer,
+					procDef.Tee.AdditionalBody.AsMap())
 			} else if external, ok := externalLocalFile[procDef.Tee.OutputConnectorRef]; ok {
-				if processes[procDef.Tee.Name], err = NewLocalFileTee(external, condition,
+				if processes[procDef.Tee.Name], err = NewLocalFileTee(procDef.Tee.Name, external, condition,
 					transformer, procDef.Tee.AdditionalBody.AsMap()); err != nil {
 					return nil, err
 				}
@@ -449,7 +454,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			if err != nil {
 				return nil, err
 			}
-			processes[procDef.Spawner.Name] = NewSpawner(job, condition,
+			processes[procDef.Spawner.Name] = NewSpawner(procDef.Spawner.Name, job, condition,
 				time.Duration(procDef.Spawner.DelayInMs) * time.Millisecond, procDef.Spawner.DoSync)
 		case *api.ProcessDefinition_Continuation:
 			if _, ok := processes[procDef.Continuation.Name]; ok {
@@ -460,7 +465,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			if err != nil {
 				return nil, err
 			}
-			processes[procDef.Continuation.Name] = NewContinuation(condition)
+			processes[procDef.Continuation.Name] = NewContinuation(procDef.Continuation.Name, condition)
 		}
 	}
 
@@ -475,7 +480,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			pipelineBuilder.EnableMetrics()
 		}
 		// Each pipeline must set annotations to ensure there are no conflicts in the state stores
-		annotatorBuilder := NewAnnotatorBuilder()
+		annotatorBuilder := NewAnnotatorBuilder("internalAnnotator")
 		annotatorBuilder.Add(core.NewAnnotation(string(common.PartitionIDKey), partitionUuid.String(),
 			core.TrueCondition))
 		annotatorBuilder.Add(core.NewAnnotation(string(common.ResourceNameKey), pipeline.Name, core.TrueCondition))
@@ -497,9 +502,9 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 		if pipeline.Checkpoint != nil {
 			var checkPointer *CheckPointer
 			if external, ok := externalKVStores[pipeline.Checkpoint.OutputConnectorRef]; ok {
-				checkPointer = NewKVCheckPointer(external)
+				checkPointer = NewKVCheckPointer(pipeline.Name, external)
 			}  else if external, ok := externalLocalFile[pipeline.Checkpoint.OutputConnectorRef]; ok {
-				checkPointer, err = NewLocalFileCheckPointer(external)
+				checkPointer, err = NewLocalFileCheckPointer(pipeline.Name, external)
 				if err != nil {
 					return nil, util.NewInvalidError(err.Error())
 				}

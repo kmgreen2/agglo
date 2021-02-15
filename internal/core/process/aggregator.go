@@ -12,6 +12,7 @@ import (
 )
 
 type Aggregator struct {
+	name string
 	aggregation *core.Aggregation
 	condition *core.Condition
 	aggregatorStateStore state.StateStore
@@ -19,15 +20,20 @@ type Aggregator struct {
 	forwardState bool
 }
 
-func NewAggregator(aggregation *core.Aggregation, condition *core.Condition, stateStore state.StateStore,
+func NewAggregator(name string, aggregation *core.Aggregation, condition *core.Condition, stateStore state.StateStore,
 	asyncCheckpoint, forwardState bool) *Aggregator {
 	return &Aggregator{
+		name: name,
 		aggregation: aggregation,
 		condition: condition,
 		aggregatorStateStore: stateStore,
 		asyncCheckpoint: asyncCheckpoint,
 		forwardState: forwardState,
 	}
+}
+
+func (a Aggregator) Name() string {
+	return a.name
 }
 
 func (a Aggregator) getAggregationState(ctx context.Context, partitionID gUuid.UUID, name string) ([]byte, error) {

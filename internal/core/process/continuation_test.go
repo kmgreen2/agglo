@@ -16,7 +16,7 @@ func TestContinuation(t *testing.T) {
 	if err != nil {
 		assert.Fail(t, err.Error())
 	}
-	continuation := process.NewContinuation(condition)
+	continuation := process.NewContinuation("foo", condition)
 	out, err := continuation.Process(context.Background(), m)
 	assert.Equal(t, m, out)
 	assert.Nil(t, err)
@@ -30,7 +30,7 @@ func TestNotContinuation(t *testing.T) {
 	if err != nil {
 		assert.Fail(t, err.Error())
 	}
-	continuation := process.NewContinuation(condition)
+	continuation := process.NewContinuation("foo", condition)
 	out, err := continuation.Process(context.Background(), m)
 	assert.Nil(t, out)
 	assert.Error(t, err)

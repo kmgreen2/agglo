@@ -8,6 +8,7 @@ import (
 
 // Annotator is a process processor that will conditionally apply underlying annotations to a provided map
 type Annotator struct {
+	name string
 	annotations []*core.Annotation
 }
 
@@ -30,15 +31,21 @@ func (a Annotator) Process(ctx context.Context, in map[string]interface{}) (map[
 	return out, nil
 }
 
+func (a Annotator) Name() string {
+	return a.name
+}
+
 // AnnotatorBuilder is a builder for an Annotator process processor
 type AnnotatorBuilder struct {
 	annotate *Annotator
 }
 
 // NewAnnotatorBuilder creates a new AnnotatorBuilder
-func NewAnnotatorBuilder() *AnnotatorBuilder {
+func NewAnnotatorBuilder(name string) *AnnotatorBuilder {
 	return &AnnotatorBuilder{
-		annotate: &Annotator{},
+		annotate: &Annotator{
+			name: name,
+		},
 	}
 }
 

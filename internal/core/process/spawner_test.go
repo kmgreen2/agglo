@@ -15,7 +15,7 @@ func TestSpawnerHappyPathAsync(t *testing.T) {
 	runnable := test.NewSleepRunnable(1)
 	job := core.NewLocalJob(runnable)
 
-	spawner := process.NewSpawner(job, core.TrueCondition, -1, false)
+	spawner := process.NewSpawner("foo", job, core.TrueCondition, -1, false)
 
 	out, err := spawner.Process(context.Background(), in)
 
@@ -28,7 +28,7 @@ func TestSpawnerHappyPathFalseCondition(t *testing.T) {
 	runnable := test.NewSleepRunnable(1)
 	job := core.NewLocalJob(runnable)
 
-	spawner := process.NewSpawner(job, core.FalseCondition, 10*time.Second, true)
+	spawner := process.NewSpawner("foo", job, core.FalseCondition, 10*time.Second, true)
 
 	start := time.Now()
 	out, err := spawner.Process(context.Background(), in)
@@ -45,7 +45,7 @@ func TestSpawnerHappyPathSync(t *testing.T) {
 	runnable := test.NewSleepRunnable(1)
 	job := core.NewLocalJob(runnable)
 
-	spawner := process.NewSpawner(job, core.TrueCondition, -1, true)
+	spawner := process.NewSpawner("foo", job, core.TrueCondition, -1, true)
 
 
 	start := time.Now()
@@ -62,7 +62,7 @@ func TestSpawnerFailSync(t *testing.T) {
 	runnable := test.NewFailRunnable()
 	job := core.NewLocalJob(runnable)
 
-	spawner := process.NewSpawner(job, core.TrueCondition, -1, true)
+	spawner := process.NewSpawner("foo", job, core.TrueCondition, -1, true)
 
 	out, err := spawner.Process(context.Background(), in)
 
@@ -75,7 +75,7 @@ func TestSpawnerHappyPathDelaySync(t *testing.T) {
 	runnable := test.NewSleepRunnable(1)
 	job := core.NewLocalJob(runnable)
 
-	spawner := process.NewSpawner(job, core.TrueCondition, 1*time.Second, true)
+	spawner := process.NewSpawner("foo", job, core.TrueCondition, 1*time.Second, true)
 
 
 	start := time.Now()
