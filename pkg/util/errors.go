@@ -217,10 +217,21 @@ func (err *CancelledError) Error() string {
 	return "Canceled"
 }
 
+// Error returns the error message
+func (err *CancelledError) IsWarning() bool {
+	return true
+}
+
 // NewCancelledError will return a CancelledError object
 func NewCancelledError() *CancelledError {
 	return &CancelledError{
 	}
+}
+
+// Is
+func (err *CancelledError) Is(other error) bool {
+	_, ok := other.(*CancelledError)
+	return ok
 }
 
 // EvictedError represents an error condition where an object is unexpectedly not found
@@ -340,5 +351,47 @@ func IsWarning(err error) bool {
 		return true
 	}
 	return false
+}
+
+// PipelineError
+type PipelineError struct {
+	name string
+	errors []error
+}
+
+// NewPipelineError is the constructor for PipelineError
+func NewPipelineError(name string) *PipelineError {
+	return &PipelineError{
+		name: name,
+	}
+}
+
+func (e *PipelineError) AddError(other error) {
+	e.errors = append(e.errors, other)
+}
+
+// Error returns the string representation of the PipelineError
+func (e *PipelineError) Error() string {
+	msg := fmt.Sprintf("Errors running the pipeline (%s):\n", e.name)
+	for _, err := range e.errors {
+		msg += err.Error() + "\n"
+	}
+	return msg
+}
+
+// Is
+func (e *PipelineError) Is(other error) bool {
+	_, ok := other.(*PipelineError)
+	return ok
+}
+
+// IsWarning()
+func (e *PipelineError) IsWarning() bool {
+	for _, err := range e.errors {
+		if !IsWarning(err) {
+			return false
+		}
+	}
+	return true
 }
 

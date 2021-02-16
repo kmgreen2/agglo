@@ -25,12 +25,20 @@ type Daemon interface {
 }
 
 func RunPipelines(in map[string]interface{}, pipelines *process.Pipelines, logger *zap.Logger) error {
+	var err *util.PipelineError = nil
 	for _, pipeline := range pipelines.Underlying() {
 		future := pipeline.RunAsync(in, process.WithLogger(logger))
 		result := future.Get()
-		if result.Error() != nil && !errors.Is(result.Error(), &util.ContinuationNotSatisfied{}) {
-			return result.Error()
+		if result.Error() != nil && !util.IsWarning(result.Error()) {
+			if err == nil {
+				err = util.NewPipelineError(pipeline.Name())
+			}
+			err.AddError(result.Error())
 		}
+	}
+
+	if err != nil {
+		return err
 	}
 	return nil
 }

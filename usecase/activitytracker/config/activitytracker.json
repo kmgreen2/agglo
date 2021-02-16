@@ -120,7 +120,7 @@
           }
         },
         {
-          "name": "GithubOut",
+          "name": "Dumbserver",
           "retryStrategy": {
             "numRetries": 0,
             "initialBackOffMs": 0
