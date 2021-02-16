@@ -355,6 +355,10 @@ func onFailLogHelper(logger *zap.Logger, msg string) func(ctx context.Context, e
 	}
 }
 
+func (pipeline Pipeline) Name() string {
+	return pipeline.name
+}
+
 func (pipeline Pipeline) RunAsync(in map[string]interface{}, options ...RunOptionBuilder) util.Future {
 	var startIndex int64 = 0
 	var err error
