@@ -15,15 +15,15 @@ jobs:
       dynamodb:
         image: amazon/dynamodb-local:latest
         ports:
-        - 8000/tcp
+        - 8000:8000
       minio:
-        image: minio/minio:latest
+        image: bitnami/minio:latest
         env:
-          MINIO_ROOT_USER: localtest
-          MINIO_ROOT_PASSWORD: localtest
+          MINIO_ACCESS_KEY: localtest
+          MINIO_SECRET_KEY: localtest
         ports:
-        - 9000/tcp
-        options: server /data
+        - 9000:9000
+        options: --name minio-server
     steps:
     - uses: actions/checkout@v2
 
@@ -36,7 +36,21 @@ jobs:
       run: wget https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x mc && ./mc alias set localtest http://localhost:9000 localtest localtest
     
     - name: Create Minio bucket
-      run: ./mc mb localtest localtest
+      run: ./mc mb localtest localtest || echo "noop"
+    
+    - name: Install aws client
+      run: curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+           unzip awscliv2.zip \
+           sudo ./aws/install 
+    
+    - name: Create Dynamo table
+      run: aws dynamodb create-table --endpoint-url http://localhost:8000 --region us-west-2 \
+                --table-name localkvstore \
+                --attribute-definitions \
+                    AttributeName=KeyPrefix,AttributeType=S \
+                    AttributeName=ValueKey,AttributeType=S \
+                --key-schema AttributeName=KeyPrefix,KeyType=HASH AttributeName=ValueKey,KeyType=RANGE \
+                --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 || echo "noop"
 
     - name: Build
       run: make build

@@ -26,3 +26,5 @@ bin/*
 
 *.aux
 *.log
+
+coverage.*

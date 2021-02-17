@@ -52,7 +52,7 @@ test: build genmocks ## run tests quickly
 	go test ./... ; \
 
 .PHONY: coverage
-coverage: setup genmocks ## check code coverage
+coverage: genmocks ## check code coverage
 	go test ./... -cover -coverprofile=coverage.txt
 	go tool cover -html=coverage.txt -o coverage.html
 
