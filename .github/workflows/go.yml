@@ -32,6 +32,9 @@ jobs:
       with:
         go-version: 1.15
     
+    - name: Install mockgen
+      run: go get github.com/golang/mock/mockgen@v1.4.4
+    
     - name: Install minio-client
       run: wget https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x mc && ./mc alias set localtest http://localhost:9000 localtest localtest
     
