@@ -1,4 +1,6 @@
- docker run -d -p 8000:8000 amazon/dynamodb-local
+docker run -d -p 8000:8000 --name dynamodb amazon/dynamodb-local
+
+sleep 2
 
 aws dynamodb create-table --endpoint-url http://localhost:8000 --region us-west-2 \
      --table-name localkvstore \
