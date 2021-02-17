@@ -14,6 +14,10 @@ jobs:
     services:
       dynamodb:
         image: amazon/dynamodb-local:latest
+        env:
+            AWS_ACCESS_KEY_ID: 'localtest'
+            AWS_SECRET_ACCESS_KEY: 'localtest'
+            REGION='us-west-2'
         ports:
         - 8000:8000
       minio:
@@ -49,9 +53,17 @@ jobs:
                     AttributeName=ValueKey,AttributeType=S
                 --key-schema AttributeName=KeyPrefix,KeyType=HASH AttributeName=ValueKey,KeyType=RANGE
                 --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 || echo "noop"
+      env:
+        AWS_ACCESS_KEY_ID: 'localtest'
+        AWS_SECRET_ACCESS_KEY: 'localtest'
+        REGION='us-west-2'
 
     - name: Build
       run: make ci-build
 
     - name: Test
       run: make ci-test
+      env:
+        AWS_ACCESS_KEY_ID: 'localtest'
+        AWS_SECRET_ACCESS_KEY: 'localtest'
+        REGION='us-west-2'
