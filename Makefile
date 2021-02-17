@@ -60,7 +60,7 @@ test: build genmocks ## run tests quickly
 	go test ./... ; \
 
 .PHONY: ci-test
-ci-test: ## run tests quickly
+ci-test: mockgen ## run tests quickly
 	GOOS=linux go test ./... ; \
 
 .PHONY: coverage
