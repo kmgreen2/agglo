@@ -25,7 +25,9 @@ jobs:
         env:
           MINIO_ACCESS_KEY: localtest
           MINIO_SECRET_KEY: localtest
-        options: --name minio-server --publish 9000:9000
+        ports:
+        - 9000:9000
+        options: --name minio-server  --health-cmd="curl --silent --fail http://localhost:9000/minio/health/live || exit 1" --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
     - uses: actions/checkout@v2
 
