@@ -1,3 +1,3 @@
 # agglo
 
-![Workflow Status](https://github.com/actions/agglo/workflows/.github/workflows/go.yml/badge.svg)
+![Workflow Status](https://github.com/kmgreen2/agglo/workflows/.github/workflows/go.yml/badge.svg)
