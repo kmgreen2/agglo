@@ -100,7 +100,7 @@ func DeserializeMemObjectStoreParams(payload []byte, memObjectStoreParams *MemOb
 // We implement the reference to the object store as a singleton.  This allows for two things:
 // 1. Shared reference to the same in-memory object store in the same process (testing)
 // 2. The individual object store implementations can manage their own object store references, which
-//    allows us to instantiate object stored on-demand.  That is, each object has the object store parameters
+//    allows us to instantiate object stores on-demand.  That is, each object has the object store parameters
 //    stored as metadata and will instantiate via NewObjectStore(params ObjectStoreBackendParams), which is
 //    only needed when accessing the object
 var (

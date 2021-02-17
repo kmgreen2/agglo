@@ -23,11 +23,13 @@ type BackendType int
 
 const (
 	// UnknownBackend is an undefined object store backend
-	UnknownBackend = iota
+	UnknownBackend BackendType = iota
 	// NilBackend
 	NilBackend
 	// MemObjectStoreBackend
 	MemObjectStoreBackend
+	// S3ObjectStoreBackend
+	S3ObjectStoreBackend
 )
 
 // ObjectStoreBackendParams is an interface whose implementation converts backend parameters into a map of strings
@@ -114,6 +116,15 @@ func SerializeObjectDescriptor(desc *ObjectDescriptor) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+	} else if params, ok := desc.backendParams.(*S3ObjectStoreBackendParams); ok {
+		paramsBytes, err := SerializeS3ObjectStoreParams(params)
+		if err != nil {
+			return nil, err
+		}
+		err = gEncoder.Encode(paramsBytes)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		return nil, util.NewInvalidError(fmt.Sprintf("Deserialize - invalid backend params type: %T",
 			desc.backendParams))
@@ -153,6 +164,11 @@ func DeserializeObjectDescriptor(descBytes []byte, desc *ObjectDescriptor) error
 		if err != nil {
 			return err
 		}
+	} else if backendType == S3ObjectStoreBackend {
+		desc.backendParams, err = NewS3ObjectStoreBackendParamsFromBytes(paramsBytes)
+		if err != nil {
+			return err
+		}
 	} else {
 		return util.NewInvalidError(fmt.Sprintf("Deserialize - invalid backend type: %d", backendType))
 	}
@@ -165,6 +181,11 @@ func NewObjectStore(params ObjectStoreBackendParams) (ObjectStore, error) {
 	var err error
 	if params.GetBackendType() == MemObjectStoreBackend {
 		objectStore, err = NewMemObjectStore(params)
+		if err != nil {
+			return nil, err
+		}
+	} else if params.GetBackendType() == S3ObjectStoreBackend {
+		objectStore, err = NewS3ObjectStore(params)
 		if err != nil {
 			return nil, err
 		}
