@@ -41,6 +41,10 @@ jobs:
     
     - name: Install minio-client
       run: wget https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x mc && ./mc alias set localtest http://localhost:9000 localtest localtest
+      env:
+          AWS_ACCESS_KEY_ID: 'localtest'
+          AWS_SECRET_ACCESS_KEY: 'localtest'
+          REGION: 'us-west-2'
     
     - name: Create Minio bucket
       run: ./mc mb localtest/localtest || echo "noop"
