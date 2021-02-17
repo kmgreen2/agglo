@@ -25,8 +25,6 @@ jobs:
         env:
           MINIO_ACCESS_KEY: localtest
           MINIO_SECRET_KEY: localtest
-        ports:
-        - 9000:9000
         options: --name minio-server --publish 9000:9000
     steps:
     - uses: actions/checkout@v2
