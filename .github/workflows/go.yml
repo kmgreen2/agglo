@@ -1,0 +1,45 @@
+name: Go
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:latest
+        ports:
+        - 8000/tcp
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: localtest
+          MINIO_ROOT_PASSWORD: localtest
+        ports:
+        - 9000/tcp
+        options: server /data
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.15
+    
+    - name: Install minio-client
+      run: wget https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x mc && ./mc alias set localtest http://localhost:9000 localtest localtest
+    
+    - name: Create Minio bucket
+      run: ./mc mb localtest localtest
+
+    - name: Build
+      run: make build
+
+    - name: Test
+      run: make test
