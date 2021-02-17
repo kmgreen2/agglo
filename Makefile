@@ -26,6 +26,14 @@ build:
 	CGO_ENABLED=1 go build -o bin/genevents cmd/genevents/main.go
 	CGO_ENABLED=1 go build -o bin/activitytracker cmd/activitytracker/main.go cmd/activitytracker/activitytracker.go
 
+.PHONY: ci-build
+ci-build: 
+	GOOS=linux CGO_ENABLED=1 go build -o bin/regexmap cmd/regexmap/main.go
+	GOOS=linux CGO_ENABLED=1 go build -o bin/printvals cmd/printvals/main.go
+	GOOS=linux CGO_ENABLED=1 go build -o bin/binge cmd/binge/main.go
+	GOOS=linux CGO_ENABLED=1 go build -o bin/genevents cmd/genevents/main.go
+	GOOS=linux CGO_ENABLED=1 go build -o bin/activitytracker cmd/activitytracker/main.go cmd/activitytracker/activitytracker.go
+
 .PHONY: genmocks
 genmocks:
 	$(foreach  mock_source,$(PKG_SOURCES), $(call _mockgen,$(mock_source)))
@@ -50,6 +58,10 @@ lint:
 .PHONY: test
 test: build genmocks ## run tests quickly
 	go test ./... ; \
+
+.PHONY: ci-test
+ci-test: genmocks ## run tests quickly
+	GOOS=linux go test ./... ; \
 
 .PHONY: coverage
 coverage: genmocks ## check code coverage
