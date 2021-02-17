@@ -61,16 +61,15 @@ test: build genmocks ## run tests quickly
 	go test ./... ; \
 	deployments/minio/stop-minio.sh ; deployments/dynamodb/stop-dynamodb.sh  
 
-.PHONY: ci-test
-ci-test: genmocks ## run tests quickly
-	GOOS=linux go test ./... ; \
-
 coverage: setup genmocks ## check code coverage
 	deployments/minio/run-minio.sh  && deployments/dynamodb/run-dynamodb.sh  && \
 	go test ./... -cover -coverprofile=coverage.txt && \
 	go tool cover -html=coverage.txt -o coverage.html && \
 	deployments/minio/stop-minio.sh ; deployments/dynamodb/stop-dynamodb.sh  
 
+.PHONY: ci-test
+ci-test: genmocks ## run tests quickly
+	GOOS=linux go test ./... ; \
 
 .PHONY: proto
 proto: api/proto/pipeline.proto api/proto/genevents.proto
