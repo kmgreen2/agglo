@@ -2,71 +2,21 @@ package storage_test
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/sha1"
 	"errors"
-	"fmt"
 	gUuid "github.com/google/uuid"
-	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/pkg/storage"
 	"github.com/stretchr/testify/assert"
-	"hash"
 	"io"
 	"testing"
 )
-
-type RandomReader struct {
-	len int
-	offset int
-	digest hash.Hash
-}
-
-func NewRandomReader(len int) *RandomReader {
-	return &RandomReader{
-		len: len,
-		offset: 0,
-		digest: sha1.New(),
-	}
-}
-
-func (reader *RandomReader) Read(b []byte) (int, error) {
-	if reader.offset >= reader.len {
-		return -1, io.EOF
-	}
-	numLeft := reader.len - reader.offset
-	bufRef := b
-	if len(b) > numLeft {
-		bufRef = b[:numLeft]
-	}
-	numRead, err := rand.Read(bufRef)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return -1, err
-	}
-	_, err = reader.digest.Write(bufRef)
-	if err != nil {
-		return -1, err
-	}
-	reader.offset += numRead
-	return numRead, nil
-}
-
-func (reader *RandomReader) Hash() []byte {
-	return reader.digest.Sum(nil)
-}
-
-type BadReader struct {
-}
-
-func (reader *BadReader) Read(b []byte) (int ,error) {
-	return -1, &util.InternalError{}
-}
 
 func RandomMemObjectStoreInstanceParams() (*storage.MemObjectStoreBackendParams, error) {
 	uuid := gUuid.New()
 	return storage.NewMemObjectStoreBackendParams(storage.MemObjectStoreBackend, uuid.String())
 }
 
-func TestHappyPath(t *testing.T) {
+func TestMemHappyPath(t *testing.T) {
 	fileSize := 1024
 	params, err := RandomMemObjectStoreInstanceParams()
 	if err != nil {
@@ -113,7 +63,7 @@ func TestHappyPath(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestPutConflictError(t *testing.T) {
+func TestMemPutConflictError(t *testing.T) {
 	params, err := RandomMemObjectStoreInstanceParams()
 	if err != nil {
 		assert.FailNow(t, err.Error())
@@ -133,7 +83,7 @@ func TestPutConflictError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestPutReadError(t *testing.T) {
+func TestMemPutReadError(t *testing.T) {
 	params, err := RandomMemObjectStoreInstanceParams()
 	if err != nil {
 		assert.FailNow(t, err.Error())
@@ -148,7 +98,7 @@ func TestPutReadError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestGetNotFound(t *testing.T) {
+func TestMemGetNotFound(t *testing.T) {
 	params, err := RandomMemObjectStoreInstanceParams()
 	if err != nil {
 		assert.FailNow(t, err.Error())
@@ -161,7 +111,7 @@ func TestGetNotFound(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestHeadNotFound(t *testing.T) {
+func TestMemHeadNotFound(t *testing.T) {
 	params, err := RandomMemObjectStoreInstanceParams()
 	if err != nil {
 		assert.FailNow(t, err.Error())
@@ -174,25 +124,7 @@ func TestHeadNotFound(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func putObjects(objStore storage.ObjectStore, prefix string, numWithPrefix int, numWithoutPrefix int) error {
-	for i := 0; i < numWithPrefix; i++ {
-		randomReader := NewRandomReader(1024)
-		err := objStore.Put(context.Background(), fmt.Sprintf("%s%d", prefix, i), randomReader)
-		if err != nil {
-			return err
-		}
-	}
-	for i := 0; i < numWithoutPrefix; i++ {
-		randomReader := NewRandomReader(1024)
-		err := objStore.Put(context.Background(), fmt.Sprintf("%d%s%d", i, prefix, i), randomReader)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func TestListNone(t *testing.T) {
+func TestMemListNone(t *testing.T) {
 	params, err := RandomMemObjectStoreInstanceParams()
 	if err != nil {
 		assert.FailNow(t, err.Error())
@@ -210,7 +142,7 @@ func TestListNone(t *testing.T) {
 	assert.Equal(t, len(results), 0)
 }
 
-func TestListAll(t *testing.T) {
+func TestMemListAll(t *testing.T) {
 	params, err := RandomMemObjectStoreInstanceParams()
 	if err != nil {
 		assert.FailNow(t, err.Error())
@@ -228,7 +160,7 @@ func TestListAll(t *testing.T) {
 	assert.Equal(t, len(results), 20)
 }
 
-func TestListSome(t *testing.T) {
+func TestMemListSome(t *testing.T) {
 	params, err := RandomMemObjectStoreInstanceParams()
 	if err != nil {
 		assert.FailNow(t, err.Error())

@@ -10,14 +10,13 @@ import (
 	"sync"
 )
 
-type KVStoreOption func(*MemKVStore)
+type MemKVStoreOption func(*MemKVStore)
 
-func WithTracing() KVStoreOption {
+func WithTracing() MemKVStoreOption {
 	return func(kvStore *MemKVStore) {
 		kvStore.emitter = observability.NewEmitter("agglo/memKvStore")
 	}
 }
-
 
 // MemKVStore is a KVStore implementation that uses an in-memory map
 type MemKVStore struct {
@@ -27,7 +26,7 @@ type MemKVStore struct {
 }
 
 // NewMemKVStore will return a new MemKVStore object
-func NewMemKVStore(opts ...KVStoreOption) *MemKVStore {
+func NewMemKVStore(opts ...MemKVStoreOption) *MemKVStore {
 	kvStore := &MemKVStore{
 		values: make(map[string][]byte),
 		lock: &sync.Mutex{},
