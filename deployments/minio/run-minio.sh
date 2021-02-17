@@ -5,4 +5,4 @@ docker run -d -p 9000:9000 \
 
 mc alias set localtest http://localhost:9000 localtest localtest
 
-mc mb localtest localtest
+mc mb localtest/localtest
