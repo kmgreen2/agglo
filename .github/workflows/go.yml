@@ -17,7 +17,7 @@ jobs:
         env:
             AWS_ACCESS_KEY_ID: 'localtest'
             AWS_SECRET_ACCESS_KEY: 'localtest'
-            REGION='us-west-2'
+            REGION: 'us-west-2'
         ports:
         - 8000:8000
       minio:
@@ -56,7 +56,7 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: 'localtest'
         AWS_SECRET_ACCESS_KEY: 'localtest'
-        REGION='us-west-2'
+        REGION: 'us-west-2'
 
     - name: Build
       run: make ci-build
@@ -66,4 +66,4 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: 'localtest'
         AWS_SECRET_ACCESS_KEY: 'localtest'
-        REGION='us-west-2'
+        REGION: 'us-west-2'
