@@ -33,6 +33,11 @@ func AnchorNodeKey(uuid gUuid.UUID) string {
 	return fmt.Sprintf("%s:a", uuid.String())
 }
 
+// SubStreamHeadKey returns the string representation of a key associated with the head of a substream
+func SubStreamHeadKey(id SubStreamID) string {
+	return fmt.Sprintf("%s:h", string(id))
+}
+
 // NameKeyPrefix will return the key prefix for a primary record's name
 func NameKeyPrefix(name string) (string, error) {
 	err := hasInvalidChars(name)

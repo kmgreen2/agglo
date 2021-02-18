@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
+	"github.com/kmgreen2/agglo/pkg/state"
 	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/kvs"
@@ -22,7 +23,32 @@ import (
 	Anchor node:  <UUID>-a -> <anchor UUID>
  	Name (listing): md5(name)[:4]-<name>-<UUID>
  	Tags: md5(tag)[:4]-<tag>-<UUID>
+	SubStreamHead: <subStreamID>:h
  */
+
+type SubStreamAppender struct {
+	streamStore StreamStore
+	subStreamID SubStreamID
+}
+
+func AllocateSubStreamID() SubStreamID {
+	return SubStreamID(gUuid.New().String())
+}
+
+func NewSubStreamAppender(streamStore StreamStore, subStreamID SubStreamID) *SubStreamAppender {
+	return &SubStreamAppender{
+		streamStore: streamStore,
+		subStreamID: subStreamID,
+	}
+}
+
+func (ssa *SubStreamAppender) Head() (*StreamImmutableMessage, error) {
+	return ssa.streamStore.Head(ssa.subStreamID)
+}
+
+func (ssa *SubStreamAppender) Append(message *UncommittedMessage, anchorTickerUuid gUuid.UUID) (gUuid.UUID, error) {
+	return ssa.streamStore.Append(message, ssa.subStreamID, anchorTickerUuid)
+}
 
 // StreamStore is the interface for a converged stream of substreams
 type StreamStore interface {
@@ -47,7 +73,7 @@ type KVStreamStore struct {
 	kvStore    kvs.KVStore
 	heads      map[string]*StreamImmutableMessage
 	digestType util.DigestType
-	writeLocks map[string]*sync.Mutex
+	writeLocks map[string]*state.KVDistributedLock
 	streamLock *sync.Mutex
 }
 
@@ -58,17 +84,14 @@ func NewKVStreamStore(kvStore kvs.KVStore, digestType util.DigestType) *KVStream
 		kvStore: kvStore,
 		digestType: digestType,
 		heads: make(map[string]*StreamImmutableMessage),
-		writeLocks: make(map[string]*sync.Mutex),
+		writeLocks: make(map[string]*state.KVDistributedLock),
 		streamLock: &sync.Mutex{},
 	}
 }
 
-// Head will return the latest message appended to the ticker stream
+// Head will return the latest message appended to the substream
 func (streamStore *KVStreamStore) Head(subStreamID SubStreamID) (*StreamImmutableMessage, error) {
-	if head, ok := streamStore.heads[string(subStreamID)]; ok {
-		return head, nil
-	}
-	return nil, util.NewNotFoundError(fmt.Sprintf("Head - substream not found: %s", subStreamID))
+	return streamStore.getHead(subStreamID)
 }
 
 // Create will create a new substream
@@ -285,16 +308,35 @@ func (streamStore *KVStreamStore) GetHistoryToLastAnchor(uuid gUuid.UUID) ([]*St
 
 // getHead will return the head of a specific substream; otherwise, return an error
 func (streamStore *KVStreamStore) getHead(subStreamID SubStreamID) (*StreamImmutableMessage, error) {
-	if head, ok := streamStore.heads[string(subStreamID)]; ok {
-		return head , nil
+	messageUUIDBytes, err := streamStore.kvStore.Get(context.Background(), SubStreamHeadKey(subStreamID))
+	if err != nil {
+		return nil, err
 	}
-	return nil, util.NewNotFoundError(fmt.Sprintf("GetHead - cannot find substream: %s", subStreamID))
+
+	messageUUID, err := BytesToUUID(messageUUIDBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	message, err := streamStore.GetMessageByUUID(messageUUID)
+	if err != nil {
+		return nil, err
+	}
+	return message, nil
 }
 
 // setHead will set the head of a specific substream; otherwise, return an error
 func (streamStore *KVStreamStore) setHead(subStreamID SubStreamID, message *StreamImmutableMessage) error {
-	streamStore.heads[string(subStreamID)] = message
-	return nil
+	messageUUIDBytes, err := UuidToBytes(message.uuid)
+	if err != nil {
+		return err
+	}
+	prevUUIDBytes, err := UuidToBytes(message.prevUuid)
+	if err != nil {
+		return err
+	}
+	return streamStore.kvStore.AtomicPut(context.Background(), SubStreamHeadKey(subStreamID), prevUUIDBytes,
+		messageUUIDBytes)
 }
 
 // Append will append an uncommitted message to a substream, anchored at the provided anchor UUID; otherwise return
@@ -305,13 +347,19 @@ func (streamStore *KVStreamStore) Append(message *UncommittedMessage, subStreamI
 
 	streamStore.streamLock.Lock()
 	if _, ok := streamStore.writeLocks[string(subStreamID)]; !ok {
-		streamStore.writeLocks[string(subStreamID)] = &sync.Mutex{}
+		streamStore.writeLocks[string(subStreamID)] = state.NewKVDistributedLock(string(subStreamID), streamStore.kvStore)
 	}
 	streamStore.streamLock.Unlock()
 
 	// Take lock
-	streamStore.writeLocks[string(subStreamID)].Lock()
-	defer streamStore.writeLocks[string(subStreamID)].Unlock()
+	ctx, err := streamStore.writeLocks[string(subStreamID)].Lock(context.Background(), -1)
+	if err != nil {
+		return gUuid.Nil, err
+	}
+	defer func() {
+		// ToDo(KMG): Log the error
+		_ = streamStore.writeLocks[string(subStreamID)].Unlock(ctx)
+	}()
 
 	head, err := streamStore.getHead(subStreamID)
 	if err != nil {

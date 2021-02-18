@@ -1,6 +1,8 @@
 package entwine
 
-import "strings"
+import (
+	"strings"
+)
 
 // SubStreamID is a wrapper for a SubStreamID
 type SubStreamID string
