@@ -327,13 +327,17 @@ func (streamStore *KVStreamStore) getHead(subStreamID SubStreamID) (*StreamImmut
 
 // setHead will set the head of a specific substream; otherwise, return an error
 func (streamStore *KVStreamStore) setHead(subStreamID SubStreamID, message *StreamImmutableMessage) error {
+	var err error
+	var prevUUIDBytes  []byte
 	messageUUIDBytes, err := UuidToBytes(message.uuid)
 	if err != nil {
 		return err
 	}
-	prevUUIDBytes, err := UuidToBytes(message.prevUuid)
-	if err != nil {
-		return err
+	if message.prevUuid != gUuid.Nil {
+		prevUUIDBytes, err = UuidToBytes(message.prevUuid)
+		if err != nil {
+			return err
+		}
 	}
 	return streamStore.kvStore.AtomicPut(context.Background(), SubStreamHeadKey(subStreamID), prevUUIDBytes,
 		messageUUIDBytes)
