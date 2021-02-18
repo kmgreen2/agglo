@@ -26,30 +26,6 @@ import (
 	SubStreamHead: <subStreamID>:h
  */
 
-type SubStreamAppender struct {
-	streamStore StreamStore
-	subStreamID SubStreamID
-}
-
-func AllocateSubStreamID() SubStreamID {
-	return SubStreamID(gUuid.New().String())
-}
-
-func NewSubStreamAppender(streamStore StreamStore, subStreamID SubStreamID) *SubStreamAppender {
-	return &SubStreamAppender{
-		streamStore: streamStore,
-		subStreamID: subStreamID,
-	}
-}
-
-func (ssa *SubStreamAppender) Head() (*StreamImmutableMessage, error) {
-	return ssa.streamStore.Head(ssa.subStreamID)
-}
-
-func (ssa *SubStreamAppender) Append(message *UncommittedMessage, anchorTickerUuid gUuid.UUID) (gUuid.UUID, error) {
-	return ssa.streamStore.Append(message, ssa.subStreamID, anchorTickerUuid)
-}
-
 // StreamStore is the interface for a converged stream of substreams
 type StreamStore interface {
 	GetMessagesByName(name string) ([]*StreamImmutableMessage, error)
@@ -71,7 +47,6 @@ type StreamStore interface {
 // KVStreamStore is an implementation of StreamStore that is backed by an in-memory map
 type KVStreamStore struct {
 	kvStore    kvs.KVStore
-	heads      map[string]*StreamImmutableMessage
 	digestType util.DigestType
 	writeLocks map[string]*state.KVDistributedLock
 	streamLock *sync.Mutex
@@ -83,7 +58,6 @@ func NewKVStreamStore(kvStore kvs.KVStore, digestType util.DigestType) *KVStream
 	return &KVStreamStore{
 		kvStore: kvStore,
 		digestType: digestType,
-		heads: make(map[string]*StreamImmutableMessage),
 		writeLocks: make(map[string]*state.KVDistributedLock),
 		streamLock: &sync.Mutex{},
 	}
@@ -102,12 +76,7 @@ func (streamStore *KVStreamStore) Create(subStreamID SubStreamID, digestType uti
 	if err != nil {
 		return err
 	}
-	err = streamStore.append(genesisMessage)
-	if err != nil {
-		return err
-	}
-	streamStore.heads[string(subStreamID)] = genesisMessage
-	return nil
+	return streamStore.append(genesisMessage)
 }
 
 // GetMessagesByName will return all messages that have a given name; otherwise, return an error

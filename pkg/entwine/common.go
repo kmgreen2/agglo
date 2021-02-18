@@ -38,6 +38,16 @@ func SubStreamHeadKey(id SubStreamID) string {
 	return fmt.Sprintf("%s:h", string(id))
 }
 
+// TickerHeadKey returns the string representation of a key associated with the head of a ticker stream
+func TickerHeadKey() string {
+	return "ticker:h"
+}
+
+// TickerHeadKey returns the string representation of a key associated with the head of a ticker stream
+func ProofIndexKey(id SubStreamID) string {
+	return fmt.Sprintf("%s:pi", string(id))
+}
+
 // NameKeyPrefix will return the key prefix for a primary record's name
 func NameKeyPrefix(name string) (string, error) {
 	err := hasInvalidChars(name)

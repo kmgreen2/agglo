@@ -1,10 +1,13 @@
 package entwine
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
+	"github.com/kmgreen2/agglo/pkg/state"
 	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/kvs"
@@ -31,7 +34,7 @@ type TickerStore interface {
 	HappenedBefore(lhs *TickerImmutableMessage, rhs *TickerImmutableMessage) (bool, error)
 	Append(signer crypto.Signer) error
 	GetLatestProofKey(subStreamID SubStreamID) (string, error)
-	Head() *TickerImmutableMessage
+	Head() (*TickerImmutableMessage, error)
 	CreateGenesisProof(subStreamID SubStreamID) (Proof, error)
 	GetProofStartUuid(subStreamID SubStreamID) (gUuid.UUID, error)
 	GetProofForStreamIndex(subStreamID SubStreamID, streamIdx int64) (Proof, error)
@@ -41,10 +44,8 @@ type TickerStore interface {
 // KVStreamStore is an implementation of TickerStore that is backed by an in-memory map
 type KVTickerStore struct {
 	kvStore      kvs.KVStore
-	head         *TickerImmutableMessage
 	tickerLock   *sync.Mutex
-	proofIndexes map[string]int
-	proofLocks   map[string]*sync.Mutex
+	proofLocks   map[string]*state.KVDistributedLock
 	digestType   util.DigestType
 }
 
@@ -54,9 +55,45 @@ func NewKVTickerStore(kvStore kvs.KVStore, digestType util.DigestType) *KVTicker
 	return &KVTickerStore{
 		kvStore: kvStore,
 		digestType: digestType,
-		proofIndexes: make(map[string]int),
-		proofLocks: make(map[string]*sync.Mutex),
+		proofLocks: make(map[string]*state.KVDistributedLock),
 		tickerLock: &sync.Mutex{},
+	}
+}
+
+func (tickerStore *KVTickerStore) getLatestProofIndex(id SubStreamID) (int, error) {
+	var idx int
+	idxBytes, err := tickerStore.kvStore.Get(context.Background(), ProofIndexKey(id))
+	if err != nil {
+		return -1, err
+	}
+	currDecoder := gob.NewDecoder(bytes.NewBuffer(idxBytes))
+	err = currDecoder.Decode(&idx)
+	if err != nil {
+		return -1, err
+	}
+	return idx, nil
+}
+
+func (tickerStore *KVTickerStore) setLatestProofIndex(id SubStreamID, idx int) error {
+	// Index must monotonically increase by 1 as each proof is added, so we can explicitly enforce
+	prevBuffer := bytes.NewBuffer([]byte{})
+	prevEncoder := gob.NewEncoder(prevBuffer)
+	err := prevEncoder.Encode(idx-1)
+	if err != nil {
+		return err
+	}
+	currBuffer := bytes.NewBuffer([]byte{})
+	currEncoder := gob.NewEncoder(currBuffer)
+	err = currEncoder.Encode(idx)
+	if err != nil {
+		return err
+	}
+	if idx > 0 {
+		return tickerStore.kvStore.AtomicPut(context.Background(), ProofIndexKey(id), prevBuffer.Bytes(),
+			currBuffer.Bytes())
+	} else {
+		return tickerStore.kvStore.AtomicPut(context.Background(), ProofIndexKey(id), nil,
+			currBuffer.Bytes())
 	}
 }
 
@@ -87,8 +124,22 @@ func (tickerStore *KVTickerStore) GetMessages(uuids []gUuid.UUID) ([]*TickerImmu
 }
 
 // Head will return the latest message appended to the ticker stream
-func (tickerStore *KVTickerStore) Head() *TickerImmutableMessage {
-	return tickerStore.head
+func (tickerStore *KVTickerStore) Head() (*TickerImmutableMessage, error) {
+	messageUUIDBytes, err := tickerStore.kvStore.Get(context.Background(), TickerHeadKey())
+	if err != nil {
+		return nil, err
+	}
+
+	messageUUID, err := BytesToUUID(messageUUIDBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	message, err := tickerStore.GetMessageByUUID(messageUUID)
+	if err != nil {
+		return nil, err
+	}
+	return message, nil
 }
 
 // GetHistory will return the ordered, immutable history between two UUIDs; otherwise return an error
@@ -134,15 +185,31 @@ func (tickerStore *KVTickerStore) GetHistory(start gUuid.UUID, end gUuid.UUID) (
 	return messages, nil
 }
 
+func (tickerStore *KVTickerStore) getProofLock(subStreamID SubStreamID) *state.KVDistributedLock {
+	if _, ok := tickerStore.proofLocks[string(subStreamID)]; !ok {
+		tickerStore.proofLocks[string(subStreamID)] = state.NewKVDistributedLock(string(subStreamID),
+			tickerStore.kvStore)
+	}
+	return tickerStore.proofLocks[string(subStreamID)]
+}
+
 // CreateGenesisProof will create a genesis proof for a substream; otherwise, return an error
 func (tickerStore *KVTickerStore) CreateGenesisProof(subStreamID SubStreamID) (Proof, error) {
-	if _, ok := tickerStore.proofLocks[string(subStreamID)]; !ok {
-		tickerStore.proofLocks[string(subStreamID)] = &sync.Mutex{}
+	proofLock := tickerStore.getProofLock(subStreamID)
+	// Take lock
+	ctx, err := proofLock.Lock(context.Background(), -1)
+	if err != nil {
+		return nil, err
 	}
-	tickerStore.proofLocks[string(subStreamID)].Lock()
-	defer tickerStore.proofLocks[string(subStreamID)].Unlock()
+	defer func() {
+		// ToDo(KMG): Log the error
+		_ = proofLock.Unlock(ctx)
+	}()
 
-	tickerMessage := tickerStore.head
+	tickerMessage, err := tickerStore.Head()
+	if err != nil {
+		return nil, err
+	}
 	proof, err := NewGenesisProof(subStreamID, tickerMessage)
 	if err != nil {
 		return nil, err
@@ -165,7 +232,10 @@ func (tickerStore *KVTickerStore) CreateGenesisProof(subStreamID SubStreamID) (P
 		return nil, err
 	}
 
-	tickerStore.proofIndexes[string(subStreamID)] = 0
+	err = tickerStore.setLatestProofIndex(subStreamID, 0)
+	if err != nil {
+		return nil, err
+	}
 
 	return proof, nil
 }
@@ -173,7 +243,7 @@ func (tickerStore *KVTickerStore) CreateGenesisProof(subStreamID SubStreamID) (P
 // GetProofs will get all of the proofs at the given indexes for a sub stream
 func (tickerStore *KVTickerStore) GetProofs(subStreamID SubStreamID, startIdx, endIdx int) ([]Proof, error) {
 	var proofs []Proof
-	if idx, ok := tickerStore.proofIndexes[string(subStreamID)]; ok {
+	if idx, err := tickerStore.getLatestProofIndex(subStreamID); err == nil {
 		if startIdx > idx {
 			return nil, NewInvalidError(fmt.Sprintf("GetProofs - start index is greater than current index: %d > %d",
 				startIdx, idx))
@@ -206,57 +276,26 @@ func (tickerStore *KVTickerStore) GetProofs(subStreamID SubStreamID, startIdx, e
 
 // GetLatestProofKey will return the latest known proof for a substream; otherwise, return an error
 func (tickerStore *KVTickerStore) GetLatestProofKey(subStreamID SubStreamID) (string, error) {
-	proofPrefix, err := ProofIdentifierPrefix(subStreamID)
-	if err != nil {
-		return "", err
-	}
-	if idx, ok := tickerStore.proofIndexes[string(subStreamID)]; ok {
+	if idx, err := tickerStore.getLatestProofIndex(subStreamID); err == nil {
 		return ProofIdentifier(subStreamID, idx)
-	}
-
-	keys, err := tickerStore.kvStore.List(context.Background(), proofPrefix)
-	if err != nil {
+	} else {
 		return "", err
 	}
-
-	// No proofs have been stored yet, return not found.  Caller should create a genesis proof
-	if len(keys) == 0 {
-		return "", util.NewNotFoundError(fmt.Sprintf(
-			"GetProofStartUuid - cannot find previous proof for substream: %s", subStreamID))
-	}
-
-	maxIdx := -1
-
-	for _, key := range keys {
-		var idx int
-		_, err = fmt.Sscanf(key, proofPrefix + ":%d", &idx)
-		if err != nil {
-			return "", err
-		}
-		if idx > maxIdx {
-			maxIdx = idx
-		}
-	}
-
-	// ToDo(KMG): This is opportunistic cache population.  Should this be validated instead of populated?
-	tickerStore.proofLocks[string(subStreamID)].Lock()
-	tickerStore.proofIndexes[string(subStreamID)] = maxIdx
-	tickerStore.proofLocks[string(subStreamID)].Unlock()
-
-	return ProofIdentifier(subStreamID, maxIdx)
 }
 
 // GetProofForStreamIndex returns the proof that contains the message at the provided index in the stream.  If no
 // such proof can be found, it returns a NotFound error
 func (tickerStore *KVTickerStore) GetProofForStreamIndex(subStreamID SubStreamID, streamIdx int64) (Proof, error) {
-	if _, ok := tickerStore.proofIndexes[string(subStreamID)]; !ok {
+	firstIdx := 0
+	lastIdx := 0
+
+	if idx, err := tickerStore.getLatestProofIndex(subStreamID); err != nil {
 		return nil, util.NewNotFoundError(fmt.Sprintf(
 			"GetProofForStreamIndex - Cannot find proof for message at index '%d' for substream '%s'",
 			streamIdx, subStreamID))
+	} else {
+		lastIdx = idx
 	}
-
-	firstIdx := 0
-	lastIdx := tickerStore.proofIndexes[string(subStreamID)]
 
 	for firstIdx <= lastIdx {
 		midIdx := int(math.Floor(float64(lastIdx + firstIdx) / 2))
@@ -320,9 +359,11 @@ func (tickerStore *KVTickerStore) GetProofStartUuid(subStreamID SubStreamID) (gU
 func (tickerStore *KVTickerStore) Anchor(messages []*StreamImmutableMessage, subStreamID SubStreamID,
 	authenticator crypto.Authenticator) (*TickerImmutableMessage, error) {
 
-	tickerMessage := tickerStore.head
-
-	err := tickerStore.ValidateTickerUuids(messages, tickerMessage)
+	tickerMessage, err := tickerStore.Head()
+	if err != nil {
+		return nil, err
+	}
+	err = tickerStore.ValidateTickerUuids(messages, tickerMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -349,8 +390,21 @@ func (tickerStore *KVTickerStore) Anchor(messages []*StreamImmutableMessage, sub
 		}
 	}
 
-	tickerStore.proofLocks[string(subStreamID)].Lock()
-	defer tickerStore.proofLocks[string(subStreamID)].Unlock()
+	proofLock := tickerStore.getProofLock(subStreamID)
+	// Take lock
+	ctx, err := proofLock.Lock(context.Background(), -1)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		// ToDo(KMG): Log the error
+		_ = proofLock.Unlock(ctx)
+	}()
+
+	latestProofIndex, err := tickerStore.getLatestProofIndex(subStreamID)
+	if err != nil {
+		return nil, err
+	}
 
 	// Get previous proof
 	prevProofKey, err := tickerStore.GetLatestProofKey(subStreamID)
@@ -383,7 +437,7 @@ func (tickerStore *KVTickerStore) Anchor(messages []*StreamImmutableMessage, sub
 		return nil, err
 	}
 
-	proofKey, err := ProofIdentifier(subStreamID, tickerStore.proofIndexes[string(subStreamID)] + 1)
+	proofKey, err := ProofIdentifier(subStreamID, latestProofIndex + 1)
 	if err != nil {
 		return nil, err
 	}
@@ -393,7 +447,10 @@ func (tickerStore *KVTickerStore) Anchor(messages []*StreamImmutableMessage, sub
 		return nil, err
 	}
 
-	tickerStore.proofIndexes[string(subStreamID)]++
+	err = tickerStore.setLatestProofIndex(subStreamID, latestProofIndex + 1)
+	if err != nil {
+		return nil, err
+	}
 
 	return tickerMessage, nil
 }
@@ -456,6 +513,24 @@ func (tickerStore *KVTickerStore) HappenedBefore(lhs *TickerImmutableMessage, rh
 	return lhs.Index() < rhs.Index(), nil
 }
 
+// setHead will set the head of the ticker; otherwise, return an error
+func (tickerStore *KVTickerStore) setHead(message *TickerImmutableMessage) error {
+	var err error
+	var prevUUIDBytes  []byte
+	messageUUIDBytes, err := UuidToBytes(message.uuid)
+	if err != nil {
+		return err
+	}
+	if message.prevUuid != gUuid.Nil {
+		prevUUIDBytes, err = UuidToBytes(message.prevUuid)
+		if err != nil {
+			return err
+		}
+	}
+	return tickerStore.kvStore.AtomicPut(context.Background(), TickerHeadKey(), prevUUIDBytes,
+		messageUUIDBytes)
+}
+
 // Append will append an uncommitted message to a sub stream; otherwise, return
 // an error.
 // ToDo(KMG): Need to rollback if failure, then add tests for that
@@ -464,7 +539,10 @@ func (tickerStore *KVTickerStore) Append(signer crypto.Signer) error {
 	tickerStore.tickerLock.Lock()
 	defer tickerStore.tickerLock.Unlock()
 
-	head := tickerStore.head
+	head, err := tickerStore.Head()
+	if err != nil && !errors.Is(err, &util.NotFoundError{}) {
+		return err
+	}
 
 	immutableMessage, err := NewTickerImmutableMessage(tickerStore.digestType, signer,
 		ts, head)
@@ -494,7 +572,5 @@ func (tickerStore *KVTickerStore) Append(signer crypto.Signer) error {
 	}
 
 	// Set new head
-	tickerStore.head = immutableMessage
-
-	return nil
+	return tickerStore.setHead(immutableMessage)
 }

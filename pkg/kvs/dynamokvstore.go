@@ -100,11 +100,15 @@ func NewDynamoKVStore(endpoint, region, tableName string, prefixLength int) *Dyn
 }
 
 func (kvStore *DynamoKVStore) AtomicPut(ctx context.Context, key string, prev, value []byte) error {
+	var expr expression.Expression
+	var err error
 	if prev == nil {
-		return kvStore.Put(ctx, key, value)
+		expr, err = expression.NewBuilder().WithCondition(expression.AttributeNotExists(
+			expression.Name("Value"))).Build()
+	} else {
+		expr, err = expression.NewBuilder().WithCondition(expression.Equal(expression.Name("Value"),
+			expression.Value(prev))).Build()
 	}
-	expr, err := expression.NewBuilder().WithCondition(expression.Equal(expression.Name("Value"),
-		expression.Value(prev))).Build()
 	if err != nil {
 		return err
 	}

@@ -17,7 +17,11 @@ func TestKVTickerStore_GetMessageByUUID(t *testing.T) {
 		assert.FailNow(t, err.Error())
 	}
 
-	uuid = tickerStore.Head().Uuid()
+	head, err := tickerStore.Head()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	uuid = head.Uuid()
 	for {
 		message, err := tickerStore.GetMessageByUUID(uuid)
 		if err != nil {
@@ -50,7 +54,11 @@ func TestKVTickerStore_GetMessages(t *testing.T) {
 	uuids := make([]gUuid.UUID, 10)
 
 	i := 0
-	uuids[i] = tickerStore.Head().Uuid()
+	head, err := tickerStore.Head()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	uuids[i] = head.Uuid()
 	for {
 		message, err := tickerStore.GetMessageByUUID(uuids[i])
 		if err != nil {
@@ -94,7 +102,11 @@ func TestKVTickerStore_GetHistory(t *testing.T) {
 
 	uuids := make([]gUuid.UUID, 10)
 
-	uuids[9] = tickerStore.Head().Uuid()
+	head, err := tickerStore.Head()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	uuids[9] = head.Uuid()
 	for i := 8; i >= 0; i-- {
 		message, err := tickerStore.GetMessageByUUID(uuids[i+1])
 		if err != nil {
@@ -155,7 +167,10 @@ func TestKVTickerStore_Anchor(t *testing.T) {
 	}
 
 	// Get all ticker messages
-	tickerHead := tickerStore.Head()
+	tickerHead, err := tickerStore.Head()
+	if err != nil {
+		assert.Fail(t, err.Error())
+	}
 	tickerMessages, err := tickerStore.GetHistory(gUuid.Nil, tickerHead.Uuid())
 	if err != nil {
 		assert.Fail(t, err.Error())

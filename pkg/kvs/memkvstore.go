@@ -56,7 +56,7 @@ func (kvStore *MemKVStore) AtomicPut(ctx context.Context, key string, prev, valu
 
 	currBytes, _ := kvStore.values[key]
 
-	if prev == nil && currBytes == nil || (prev != nil && bytes.Compare(currBytes, prev) == 0){
+	if (prev == nil && currBytes == nil) || (prev != nil && bytes.Compare(currBytes, prev) == 0){
 		kvStore.values[key] = value
 	} else {
 		msg := fmt.Sprintf("state has changed for '%s', cannot apply atomic update", key)
