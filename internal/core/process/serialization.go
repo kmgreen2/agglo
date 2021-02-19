@@ -8,6 +8,7 @@ import (
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/internal/common"
 	"github.com/kmgreen2/agglo/pkg/state"
+	"github.com/kmgreen2/agglo/pkg/storage"
 	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/internal/core"
 	"github.com/kmgreen2/agglo/pkg/kvs"
@@ -299,6 +300,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 
 	externalKVStores := make(map[string]kvs.KVStore)
 	externalPublisher := make(map[string]streaming.Publisher)
+	externalObjectStore := make(map[string]storage.ObjectStore)
 	externalHttp := make(map[string]string)
 	externalLocalFile := make(map[string]string)
 	processes := make(map[string]PipelineProcess)
@@ -326,6 +328,12 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			externalHttp[externalSystem.Name] = externalSystem.ConnectionString
 		case api.ExternalType_ExternalLocalFile:
 			externalLocalFile[externalSystem.Name] = externalSystem.ConnectionString
+		case api.ExternalType_ExternalObjectStore:
+			objectStore, err := storage.NewObjectStoreFromConnectionString(externalSystem.ConnectionString)
+			if err != nil {
+				return nil, err
+			}
+			externalObjectStore[externalSystem.Name] = objectStore
 		}
 	}
 
@@ -429,6 +437,9 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 					procDef.Tee.AdditionalBody.AsMap())
 			} else if external, ok := externalPublisher[procDef.Tee.OutputConnectorRef]; ok {
 				processes[procDef.Tee.Name] = NewPubSubTee(procDef.Tee.Name, external, condition, transformer,
+					procDef.Tee.AdditionalBody.AsMap())
+			} else if external, ok := externalObjectStore[procDef.Tee.OutputConnectorRef]; ok {
+				processes[procDef.Tee.Name] = NewObjectStoreTee(procDef.Tee.Name, external, condition, transformer,
 					procDef.Tee.AdditionalBody.AsMap())
 			} else if external, ok := externalHttp[procDef.Tee.OutputConnectorRef]; ok {
 				processes[procDef.Tee.Name] = NewHttpTee(procDef.Tee.Name, http.DefaultClient, external, condition,

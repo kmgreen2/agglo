@@ -7,6 +7,7 @@ import (
 	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/internal/common"
+	"github.com/kmgreen2/agglo/pkg/storage"
 	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/internal/core"
 	"github.com/kmgreen2/agglo/pkg/kvs"
@@ -227,6 +228,47 @@ func NewHttpTee(name string, client common.HTTPClient, url string, condition *co
 		transformer,
 		"web",
 		url,
+		additionalBody,
+	}
+}
+
+func NewObjectStoreTee(name string, objectStore storage.ObjectStore, condition *core.Condition,
+	transformer *Transformer, additionalBody map[string]interface{}) *Tee {
+
+	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) (map[string]interface{}, error) {
+		var err error
+		payload := in
+		byteBuffer := bytes.NewBuffer([]byte{})
+		encoder := json.NewEncoder(byteBuffer)
+
+		if len(additionalBody) > 0 {
+			payload, err = util.MergeMaps(in, additionalBody)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		err = encoder.Encode(payload)
+		if err != nil {
+			return nil, err
+		}
+		return nil, objectStore.Put(ctx, key, byteBuffer)
+	}
+
+	if transformer == nil {
+		transformation := core.NewTransformation(
+			[]core.FieldTransformation{&core.CopyTransformation{}},
+			core.TrueCondition)
+		transformer = DefaultTransformer()
+		transformer.AddSpec("", "", transformation)
+	}
+	return &Tee{
+		name,
+		outputFunc,
+		condition,
+		transformer,
+		"object",
+		objectStore.ConnectionString(),
 		additionalBody,
 	}
 }
