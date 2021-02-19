@@ -1,6 +1,7 @@
 package crypto_test
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 	"crypto"
 	"crypto/rsa"
@@ -132,6 +133,40 @@ func TestAlgorithmMismatch(t *testing.T) {
 	if authenticator.Verify(message, signature) {
 		t.Error("Expected signature to *not* verify message!")
 	}
+}
+
+func TestExportParsePrivateKey(t *testing.T) {
+	reader := rand.Reader
+	bitSize := 2048
+	key, err := rsa.GenerateKey(reader, bitSize)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	parsedKey, err := ParseRSAPrivateKeyFromPEM(ExportRSAPrivateKeyAsPEM(key))
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	assert.True(t, parsedKey.Equal(key))
+}
+
+func TestExportParsePublicKey(t *testing.T) {
+	reader := rand.Reader
+	bitSize := 2048
+	key, err := rsa.GenerateKey(reader, bitSize)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	pem, err := ExportRSAPublicKeyAsPEM(&key.PublicKey)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	parsedKey, err := ParseRSAPublicKeyFromPEM(pem)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	assert.True(t, parsedKey.Equal(&key.PublicKey))
 }
 
 
