@@ -17,6 +17,7 @@ import (
 type MemObjectStore struct {
 	blobs map[string][]byte
 	config *ObjectStoreConfig
+	instanceName string
 	lock *sync.Mutex
 }
 
@@ -131,11 +132,16 @@ func NewMemObjectStore(params ObjectStoreBackendParams) (*MemObjectStore, error)
 		osConfig, err := NewObjectStoreConfig(configBase)
 		memObjectStoreInstance[memObjectStoreParams.instanceName] = &MemObjectStore{
 			blobs: make(map[string][]byte),
+			instanceName: memObjectStoreParams.instanceName,
 			config: osConfig,
 			lock: &sync.Mutex{},
 		}
 	}
 	return memObjectStoreInstance[memObjectStoreParams.instanceName], nil
+}
+
+func (objStore *MemObjectStore) ConnectionString() string {
+	return fmt.Sprintf("mem:%s", objStore.instanceName)
 }
 
 // Put will map the content read from a stream to a provided key and store the stream as a blob

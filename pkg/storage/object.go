@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/util"
 	"io"
+	"strings"
 )
 
 // ObjectStore is the interface for an object store
@@ -16,6 +17,7 @@ type ObjectStore interface {
 	Head(ctx context.Context, key string) error
 	Delete(ctx context.Context, key string) error
 	List(ctx context.Context, prefix string) ([]string, error)
+	ConnectionString() string
 }
 
 // BackendType is the type of backend
@@ -173,6 +175,31 @@ func DeserializeObjectDescriptor(descBytes []byte, desc *ObjectDescriptor) error
 		return util.NewInvalidError(fmt.Sprintf("Deserialize - invalid backend type: %d", backendType))
 	}
 	return nil
+}
+
+func NewObjectStoreFromConnectionString(connectionString string) (ObjectStore, error) {
+	connectionStringAry := strings.Split(connectionString, ":")
+	if len(connectionStringAry) < 2 {
+		return nil, util.NewInvalidError(fmt.Sprintf("invalid connection string, expected <type>:<connStr> got: %s",
+			connectionString))
+	}
+	switch connectionStringAry[0] {
+	case "mem":
+		params, err := NewMemObjectStoreBackendParams(MemObjectStoreBackend,
+			strings.Join(connectionStringAry[1:], ":"))
+		if err != nil {
+			return nil, err
+		}
+		return NewObjectStore(params)
+	case "s3":
+		params, err := NewS3ObjectStoreBackendParamsFromConnectionString(S3ObjectStoreBackend,
+			strings.Join(connectionStringAry[1:], ":"))
+		if err != nil {
+			return nil, err
+		}
+		return NewObjectStore(params)
+	}
+	return nil, util.NewInvalidError(fmt.Sprintf("invalid backend type: %s", connectionStringAry[0]))
 }
 
 // NewObjectStore will return an object that is used to access an object store

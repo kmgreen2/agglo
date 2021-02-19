@@ -9,6 +9,7 @@ import (
 	"github.com/kmgreen2/agglo/internal/core"
 	"github.com/kmgreen2/agglo/internal/core/process"
 	"github.com/kmgreen2/agglo/pkg/kvs"
+	"github.com/kmgreen2/agglo/pkg/storage"
 	"github.com/kmgreen2/agglo/pkg/streaming"
 	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/test"
@@ -380,6 +381,103 @@ func TestPublisherTeeFalseCondition(t *testing.T) {
 	publisherTee := process.NewPubSubTee("pubSubTee", publisher, core.FalseCondition, nil, nil)
 
 	out, err := publisherTee.Process(context.Background(), jsonMap)
+	assert.Equal(t, jsonMap, out)
+	assert.Nil(t, err)
+}
+
+func TestObjectStoreTee(t *testing.T) {
+	var storedMap map[string]interface{}
+	jsonMap := test.TestJson()
+	params, err := storage.NewMemObjectStoreBackendParams(storage.MemObjectStoreBackend, "test")
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	objectStore, err := storage.NewMemObjectStore(params)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	objectStoreTee := process.NewObjectStoreTee("objectStoreTee", objectStore, core.TrueCondition, nil, nil)
+
+	out, err := objectStoreTee.Process(context.Background(), jsonMap)
+	assert.Nil(t, err)
+
+	teeMetadata := out[process.TeeMetadataKey].([]map[string]interface{})
+
+	storedMapByteBuffer, err := objectStore.Get(context.Background(), teeMetadata[0]["uuid"].(string))
+	assert.Nil(t, err)
+
+	decoder := json.NewDecoder(storedMapByteBuffer)
+	err = decoder.Decode(&storedMap)
+	assert.Nil(t, err)
+
+	assert.True(t, util.CopyableMap(storedMap).DeepCompare(jsonMap))
+	delete(out, process.TeeMetadataKey)
+	assert.True(t, util.CopyableMap(out).DeepCompare(jsonMap))
+}
+
+func TestObjectStoreTeeWithAdditional(t *testing.T) {
+	var storedMap map[string]interface{}
+	jsonMap := test.TestJson()
+	params, err := storage.NewMemObjectStoreBackendParams(storage.MemObjectStoreBackend, "test")
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	objectStore, err := storage.NewMemObjectStore(params)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	additionalBody := map[string]interface{}{
+		"foo": "bar",
+		"buzz": float64(1),
+	}
+
+	requestMap, err := util.MergeMaps(jsonMap, additionalBody)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	objectStoreTee := process.NewObjectStoreTee("objectStoreTee", objectStore, core.TrueCondition, nil, additionalBody)
+
+	out, err := objectStoreTee.Process(context.Background(), jsonMap)
+	assert.Nil(t, err)
+
+	teeMetadata := out[process.TeeMetadataKey].([]map[string]interface{})
+
+	storedMapByteBuffer, err := objectStore.Get(context.Background(), teeMetadata[0]["uuid"].(string))
+	assert.Nil(t, err)
+
+	decoder := json.NewDecoder(storedMapByteBuffer)
+	err = decoder.Decode(&storedMap)
+	assert.Nil(t, err)
+
+	assert.True(t, util.CopyableMap(storedMap).DeepCompare(requestMap))
+	delete(out, process.TeeMetadataKey)
+	assert.True(t, util.CopyableMap(out).DeepCompare(jsonMap))
+}
+
+func TestObjectStoreTeeError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	jsonMap := test.TestJson()
+	objectStore := mocks.NewMockObjectStore(ctrl)
+	objectStore.EXPECT().Put(context.Background(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("error"))
+	objectStore.EXPECT().ConnectionString().Return("")
+
+	objectStoreTee := process.NewObjectStoreTee("objectStoreTee", objectStore, core.TrueCondition,nil, nil)
+
+	out, err := objectStoreTee.Process(context.Background(), jsonMap)
+	assert.Nil(t, out)
+	assert.Error(t, err)
+}
+
+func TestObjectStoreTeeFalseCondition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	jsonMap := test.TestJson()
+	objectStore := mocks.NewMockObjectStore(ctrl)
+	objectStore.EXPECT().ConnectionString().Return("")
+	objectStoreTee := process.NewObjectStoreTee("objectStoreTee", objectStore, core.FalseCondition, nil, nil)
+
+	out, err := objectStoreTee.Process(context.Background(), jsonMap)
 	assert.Equal(t, jsonMap, out)
 	assert.Nil(t, err)
 }

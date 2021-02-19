@@ -1,6 +1,5 @@
 package storage
 
-
 import (
 	"bytes"
 	"context"
@@ -12,10 +11,12 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"io"
 	"net/http"
+	"strings"
 )
 
 type S3ObjectStore struct {
 	client *minio.Client
+	endpoint string
 	bucketName string
 	config *ObjectStoreConfig
 }
@@ -31,10 +32,45 @@ type S3ObjectStoreBackendParams struct {
 	bucketName string
 }
 
+func NewS3ObjectStoreBackendParamsFromConnectionString(backendType BackendType,
+	connectionString string) (*S3ObjectStoreBackendParams, error) {
+	var endpoint, bucketName string
+	connectionStringAry := strings.Split(connectionString, ",")
+
+	for _, entry := range connectionStringAry {
+		entryAry := strings.Split(entry, "=")
+		if len(entryAry) != 2 {
+			return nil, util.NewInvalidError(fmt.Sprintf("invalid entry in connection string: %s", entry))
+		}
+		switch entryAry[0] {
+		case "endpoint":
+			endpoint = entryAry[1]
+		case "bucketName":
+			bucketName = entryAry[1]
+		}
+	}
+
+	missingEntries := ""
+
+	if len(endpoint) == 0 {
+		missingEntries += "endpoint "
+	}
+
+	if len(bucketName) == 0 {
+		missingEntries += "bucketName "
+	}
+
+	if len(missingEntries) > 0 {
+		return nil, util.NewInvalidError(fmt.Sprintf("missing entries in connection string: %s", missingEntries))
+	}
+
+	return NewS3ObjectStoreBackendParams(backendType, endpoint, bucketName)
+}
+
 func NewS3ObjectStoreBackendParams(backendType BackendType, endpoint,
 	bucketName string) (*S3ObjectStoreBackendParams, error) {
 	if backendType != S3ObjectStoreBackend {
-		return nil, util.NewInvalidError(fmt.Sprintf("NewMemObjectStoreBackendParams - Invalid backendType: %v",
+		return nil, util.NewInvalidError(fmt.Sprintf("NewS3ObjectStoreBackendParams - Invalid backendType: %v",
 			backendType))
 	}
 	return &S3ObjectStoreBackendParams{
@@ -153,7 +189,12 @@ func NewS3ObjectStore(params ObjectStoreBackendParams) (*S3ObjectStore, error) {
 	}
 
 	objectStore.bucketName = objectStoreParams.bucketName
+	objectStore.endpoint = objectStoreParams.endpoint
 	return objectStore, nil
+}
+
+func (objStore *S3ObjectStore) ConnectionString() string {
+	return fmt.Sprintf("s3:endpoint=%s,bucketName=%s", objStore.endpoint, objStore.bucketName)
 }
 
 func (objStore *S3ObjectStore) Put(ctx context.Context, key string, reader io.Reader) error {
