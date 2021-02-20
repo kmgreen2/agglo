@@ -343,7 +343,7 @@ func (streamStore *KVStreamStore) SetCurrentAnchorUuid(subStreamID SubStreamID, 
 			return err
 		}
 	}
-	return streamStore.kvStore.AtomicPut(context.Background(), SubStreamHeadKey(subStreamID), prevUUIDBytes,
+	return streamStore.kvStore.AtomicPut(context.Background(), SubStreamCurrAnchorKey(subStreamID), prevUUIDBytes,
 		uuidBytes)
 }
 

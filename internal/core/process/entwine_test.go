@@ -23,8 +23,8 @@ import (
 )
 
 func doEntwineMessages(maps []map[string]interface{}, subStreamID entwine.SubStreamID, privatePem string,
-	kvStore kvs.KVStore, objectStore storage.ObjectStore, tickerClient client.TickerClient, tickerInterval int,
-	condition *core.Condition) ([]map[string]interface{}, error) {
+	kvStore kvs.KVStore, objectStore storage.ObjectStore, tickFunc func(),
+	tickerClient client.TickerClient, tickerInterval int, condition *core.Condition) ([]map[string]interface{}, error) {
 
 	var outMaps []map[string]interface{}
 
@@ -36,6 +36,7 @@ func doEntwineMessages(maps []map[string]interface{}, subStreamID entwine.SubStr
 	}
 
 	for _, m := range maps {
+		tickFunc()
 		out, err := entwineProc.Process(context.Background(), m)
 		if err != nil {
 			return nil, err
@@ -77,13 +78,14 @@ func TestEntwineHappyPath(t *testing.T) {
 
 	privatePem := crypto.ExportRSAPrivateKeyAsPEM(privateKey)
 
+	tickFunc := func () {
+		_ = tickerStore.Append(signer)
+	}
+	tickFunc()
+
 	var mockCalls  []*gomock.Call
 	for i := 0; i < numMaps; i++ {
 		// Make sure we Tick the Ticker
-		err = tickerStore.Append(signer)
-		if err != nil {
-			assert.FailNow(t, err.Error())
-		}
 		if i % tickerInterval == 0 {
 			if i == 0 {
 				mockCalls = append(mockCalls, mockTicker.EXPECT().CreateGenesisProof(gomock.Any(),
@@ -105,7 +107,6 @@ func TestEntwineHappyPath(t *testing.T) {
 				mockCalls = append(mockCalls, mockTicker.EXPECT().Anchor(gomock.Any(), gomock.Any(), gomock.Eq(subStreamID)).
 					DoAndReturn(func(ctx context.Context, proof []*entwine.StreamImmutableMessage,
 						subStreamID entwine.SubStreamID) (*entwine.TickerImmutableMessage, error){
-						fmt.Printf("%v", proof)
 						return tickerStore.Anchor(proof, subStreamID, authenticator)
 					}).Times(1))
 			}
@@ -116,7 +117,8 @@ func TestEntwineHappyPath(t *testing.T) {
 
 	gomock.InOrder(mockCalls...)
 
-	outMaps, err := doEntwineMessages(maps, subStreamID, privatePem, kvStore, objStore, mockTicker, tickerInterval,
+	outMaps, err := doEntwineMessages(maps, subStreamID, privatePem, kvStore, objStore, tickFunc, mockTicker,
+		tickerInterval,
 		core.TrueCondition)
 
 	if err != nil {
