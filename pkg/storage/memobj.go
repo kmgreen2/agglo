@@ -63,6 +63,11 @@ func (memObjectStoreParams *MemObjectStoreBackendParams) GetBackendType() Backen
 	return memObjectStoreParams.backendType
 }
 
+//  ConnectionString will return the connection string for the parameters
+func (memObjectStoreParams *MemObjectStoreBackendParams) ConnectionString() string {
+	return fmt.Sprintf("mem:instanceName=%s", memObjectStoreParams.instanceName)
+}
+
 // SerializeMemObjectStoreParams will serialize the backend params and return an error if the params cannot be serialized
 func SerializeMemObjectStoreParams(memObjectStoreParams *MemObjectStoreBackendParams) ([]byte, error) {
 	byteBuffer := bytes.NewBuffer(make([]byte, 0))
@@ -142,6 +147,13 @@ func NewMemObjectStore(params ObjectStoreBackendParams) (*MemObjectStore, error)
 
 func (objStore *MemObjectStore) ConnectionString() string {
 	return fmt.Sprintf("mem:%s", objStore.instanceName)
+}
+
+func (objStore *MemObjectStore) ObjectStoreBackendParams() ObjectStoreBackendParams {
+	return &MemObjectStoreBackendParams{
+		backendType: MemObjectStoreBackend,
+		instanceName: objStore.instanceName,
+	}
 }
 
 // Put will map the content read from a stream to a provided key and store the stream as a blob

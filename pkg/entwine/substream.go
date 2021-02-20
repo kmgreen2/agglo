@@ -36,3 +36,16 @@ func (ssa *SubStreamAppender) Head() (*StreamImmutableMessage, error) {
 func (ssa *SubStreamAppender) Append(message *UncommittedMessage, anchorTickerUuid gUuid.UUID) (gUuid.UUID, error) {
 	return ssa.streamStore.Append(message, ssa.subStreamID, anchorTickerUuid)
 }
+
+func (ssa *SubStreamAppender) GetAnchorUuid() (gUuid.UUID, error) {
+	return ssa.streamStore.GetCurrentAnchorUuid(ssa.subStreamID)
+}
+
+func (ssa *SubStreamAppender) SetAnchorUuid(uuid gUuid.UUID) error {
+	return ssa.streamStore.SetCurrentAnchorUuid(ssa.subStreamID, uuid)
+}
+
+func (ssa *SubStreamAppender) GetHistory(startUuid, endUuid gUuid.UUID) ([]*StreamImmutableMessage, error) {
+	return ssa.streamStore.GetHistory(startUuid, endUuid)
+}
+

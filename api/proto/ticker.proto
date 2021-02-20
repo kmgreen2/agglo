@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+option go_package = ".;api";
+
+package ticker;
+
+import "google/api/annotations.proto";
+
+enum DigestType {
+    SHA1 = 0;
+    SHA256 = 1;
+    MD5 = 2;
+}
+
+message TickerImmutableMessage {
+    bytes signature = 1;
+    bytes digest = 2;
+    DigestType digestType = 3;
+    string uuid = 4;
+    string prevUuid = 5;
+    int64 idx = 6;
+    int64 ts = 7;
+}
+
+message StreamImmutableMessage {
+    bytes signature = 1;
+    bytes digest = 2;
+    DigestType digestType = 3;
+    string uuid = 4;
+    string prevUuid = 5;
+    int64 idx = 6;
+    int64 ts = 7;
+    string name = 8;
+    repeated string tags = 9;
+    string objectStoreConnectionString = 10;
+    string objectStoreKey = 11;
+    bytes objectDigest = 12;
+    string anchorTickerUuid = 13;
+    string subStreamID = 14;
+}
+
+message AnchorRequest {
+    repeated StreamImmutableMessage proof = 1;
+    string subStreamID = 2;
+}
+
+message AnchorResponse {
+    TickerImmutableMessage tickerMessage = 1;
+}
+
+message TickRequest {
+}
+
+message TickResponse {
+}
+
+message GetProofStartUuidRequest {
+    string subStreamID = 1;
+}
+
+message GetProofStartUuidResponse {
+    string uuid = 1;
+}
+
+message CreateGenesisProofRequest {
+    string subStreamID = 1;
+}
+
+message CreateGenesisProofResponse {
+    string uuid = 1;
+}
+
+service Ticker {
+    rpc Anchor(AnchorRequest) returns (AnchorResponse) {
+        option (google.api.http) = {
+            post: "/api/v1/anchor"
+            body: "*"
+        };
+    }
+
+    rpc Tick(TickRequest) returns (TickResponse) {
+        option (google.api.http) = {
+            post: "/api/v1/tick"
+            body: "*"
+        };
+    }
+
+    rpc GetProofStartUuid(GetProofStartUuidRequest) returns
+    (GetProofStartUuidResponse) {
+        option (google.api.http) = {
+            get: "/api/v1/getProofStartUuid/{subStreamID}"
+        };
+    }
+
+    rpc CreateGenesisProof(CreateGenesisProofRequest) returns
+    (CreateGenesisProofResponse) {
+        option (google.api.http) = {
+            get: "/api/v1/createGenesisProof/{subStreamID}"
+        };
+    }
+}

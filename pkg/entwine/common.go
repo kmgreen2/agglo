@@ -38,6 +38,11 @@ func SubStreamHeadKey(id SubStreamID) string {
 	return fmt.Sprintf("%s:h", string(id))
 }
 
+// SubStreamCurrAnchorKey returns the string representation of a key associated with current anchor uuid for a substream
+func SubStreamCurrAnchorKey(id SubStreamID) string {
+	return fmt.Sprintf("%s:ca", string(id))
+}
+
 // TickerHeadKey returns the string representation of a key associated with the head of a ticker stream
 func TickerHeadKey() string {
 	return "ticker:h"

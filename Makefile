@@ -75,4 +75,11 @@ ci-test: genmocks ## run tests quickly
 proto: api/proto/pipeline.proto api/proto/genevents.proto
 	$(PROTOC) --go_out=generated/proto api/proto/pipeline.proto 
 	$(PROTOC) --go_out=generated/proto api/proto/genevents.proto
+	$(PROTOC) -I$(GOPATH)/src \
+        -I$(GOPATH)/src/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis api/proto/ticker.proto \
+        --go_out=generated/proto --go-grpc_out=generated/proto
+	$(PROTOC) -I$(GOPATH)/src \
+        -I$(GOPATH)/src/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis api/proto/ticker.proto \
+        --go_out=generated/proto \
+        --grpc-gateway_out=logtostderr=true:generated/proto
 
