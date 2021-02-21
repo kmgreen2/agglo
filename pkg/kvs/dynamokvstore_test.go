@@ -111,12 +111,7 @@ func TestDynamoBadConnectionString(t *testing.T) {
 func TestDynamoAtomicPut(t *testing.T) {
 	kvStore := kvs.NewDynamoKVStore("http://localhost:8000", "us-west-2", "localkvstore", 2)
 
-	err := kvStore.Delete(context.Background(), "foo")
-	if err != nil {
-		assert.FailNow(t, err.Error())
-	}
-
-	err = kvStore.AtomicPut(context.Background(), "foo", nil, []byte("foobar"))
+	err := kvStore.AtomicPut(context.Background(), "foo", nil, []byte("foobar"))
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
