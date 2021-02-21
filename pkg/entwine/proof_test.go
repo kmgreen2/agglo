@@ -36,6 +36,24 @@ func TestProof_ValidateInvalid(t *testing.T) {
 func TestProof_IsConsistent(t *testing.T) {
 }
 
+func TestProofImpl_HasUuid(t *testing.T) {
+	subStreamID := entwine.SubStreamID("0")
+	messages, _, _, err := test.GetSubStream(subStreamID, 4, false, nil)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	proof, err := test.GetProof(messages, subStreamID)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	for _, fingerprint := range proof.Fingerprints() {
+		assert.True(t, proof.HasUuid(fingerprint.Uuid))
+	}
+	assert.False(t, proof.HasUuid(gUuid.New()))
+}
+
 func TestProof_IsConsistentInvalid(t *testing.T) {
 	subStreamID := entwine.SubStreamID("0")
 	messages, _, _, err := test.GetSubStream(subStreamID, 4, false, nil)

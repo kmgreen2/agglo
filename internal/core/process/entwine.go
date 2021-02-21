@@ -172,6 +172,7 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (map[s
 			},
 			"entwineUuid": entwineUuid.String(),
 			"tickerUuid": e.currTickerUUID.String(),
+			"subStreamID": e.subStreamID,
 		}
 		out[EntwineMetadataKey] = append(outVal, teeOutputMap)
 	default:

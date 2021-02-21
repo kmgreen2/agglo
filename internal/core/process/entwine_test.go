@@ -204,27 +204,57 @@ func TestEntwineMultipleHappyPath(t *testing.T) {
 	subStreamID1 := entwine.SubStreamID(gUuid.New().String())
 	subStreamID2 := entwine.SubStreamID(gUuid.New().String())
 
-	_, currTickerUuid1, err := entwineSubStream(t, numMaps, anchorInterval, subStreamID1,
+	outMaps1, currTickerUuid1, err := entwineSubStream(t, numMaps, anchorInterval, subStreamID1,
 		subStreamPrivateKey1, kvStore1, objStore1, tickerStore, tickFunc, gUuid.Nil)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
 
-	_, currTickerUuid2, err := entwineSubStream(t, numMaps, anchorInterval, subStreamID2,
+	outMaps2, currTickerUuid2, err := entwineSubStream(t, numMaps, anchorInterval, subStreamID2,
 		subStreamPrivateKey2, kvStore2, objStore2, tickerStore, tickFunc, gUuid.Nil)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
 
-	_, _, err = entwineSubStream(t, numMaps, anchorInterval, subStreamID1,
+	outMaps3, _, err := entwineSubStream(t, numMaps, anchorInterval, subStreamID1,
 		subStreamPrivateKey1, kvStore1, objStore1, tickerStore, tickFunc, currTickerUuid1)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
 
-	_, _, err = entwineSubStream(t, numMaps, anchorInterval, subStreamID2,
+	outMaps4, _, err := entwineSubStream(t, numMaps, anchorInterval, subStreamID2,
 		subStreamPrivateKey2, kvStore2, objStore2, tickerStore, tickFunc, currTickerUuid2)
 	if err != nil {
 		assert.FailNow(t, err.Error())
+	}
+
+	// Validate ordering of all of the messages between the two streams
+	streamStore1 := entwine.NewKVStreamStore(kvStore1, util.SHA256)
+	streamStore2 := entwine.NewKVStreamStore(kvStore2, util.SHA256)
+
+	var finalMessages []*entwine.StreamImmutableMessage
+
+	for i, outMaps := range [][]map[string]interface{}{outMaps1, outMaps2, outMaps3, outMaps4} {
+		streamStore := streamStore1
+		if i % 2 == 1 {
+			streamStore = streamStore2
+		}
+		for _, m := range outMaps {
+			entwineMetadata := m[process.EntwineMetadataKey].([]map[string]interface{})[0]
+			finalMessage, err := streamStore.GetMessageByUUID(gUuid.MustParse(entwineMetadata["entwineUuid"].(string)))
+			if err != nil {
+				assert.FailNow(t, err.Error())
+			}
+			finalMessages = append(finalMessages, finalMessage)
+		}
+	}
+
+	// Ensure that m[i] NOT happenedBefore m[i-1]
+	for i, _ := range finalMessages {
+		if i > 0 {
+			ok, err := finalMessages[i].HappenedBefore(finalMessages[i-1], tickerStore)
+			assert.Nil(t, err)
+			assert.False(t, ok)
+		}
 	}
 }
