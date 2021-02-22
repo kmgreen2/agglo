@@ -159,10 +159,6 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (map[s
 		return nil, err
 	}
 
-	if _, ok := out[EntwineMetadataKey]; !ok {
-		out[EntwineMetadataKey] = make([]map[string]interface{}, 0)
-	}
-
 	switch outVal := out[EntwineMetadataKey].(type) {
 	case []map[string]interface{}:
 		teeOutputMap := map[string]interface{}{

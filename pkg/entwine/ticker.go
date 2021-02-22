@@ -39,7 +39,6 @@ type TickerStore interface {
 	GetProofStartUuid(subStreamID SubStreamID) (gUuid.UUID, error)
 	GetProofForStreamIndex(subStreamID SubStreamID, streamIdx int64) (Proof, error)
 	GetProofs(subStreamID SubStreamID, startIdx, endIdx int) ([]Proof, error)
-	GetLatestProof(subStreamID SubStreamID) (Proof, error)
 }
 
 // KVStreamStore is an implementation of TickerStore that is backed by an in-memory map
@@ -282,23 +281,6 @@ func (tickerStore *KVTickerStore) GetLatestProofKey(subStreamID SubStreamID) (st
 	} else {
 		return "", err
 	}
-}
-
-// GetLatestProof will return the latest proof for a given substream
-func (tickerStore *KVTickerStore) GetLatestProof(subStreamID SubStreamID) (Proof, error) {
-	proofKey, err := tickerStore.GetLatestProofKey(subStreamID)
-	if err != nil {
-		return nil, err
-	}
-	proofBytes, err := tickerStore.kvStore.Get(context.Background(), proofKey)
-	if err != nil {
-		return nil, err
-	}
-	proof, err := NewProofFromBytes(proofBytes)
-	if err != nil {
-		return nil, err
-	}
-	return proof, nil
 }
 
 // GetProofForStreamIndex returns the proof that contains the message at the provided index in the stream.  If no

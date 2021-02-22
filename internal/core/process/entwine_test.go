@@ -17,6 +17,7 @@ import (
 	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/test"
 	mocks "github.com/kmgreen2/agglo/test/mocks"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -258,3 +259,92 @@ func TestEntwineMultipleHappyPath(t *testing.T) {
 		}
 	}
 }
+
+func TestNewEntwineBadPEM(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockTicker := mocks.NewMockTickerClient(ctrl)
+	mockKvStore := mocks.NewMockKVStore(ctrl)
+	mockObjStore := mocks.NewMockObjectStore(ctrl)
+
+	_, err := process.NewEntwine("test", entwine.SubStreamID("0"), "bad", mockKvStore, mockObjStore,
+		mockTicker, 4, core.TrueCondition)
+
+	assert.Error(t, err)
+	assert.True(t, errors.Is(err, &util.InvalidError{}))
+}
+
+func TestNewEntwineNoAnchorUuid(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockTicker := mocks.NewMockTickerClient(ctrl)
+	mockKvStore := mocks.NewMockKVStore(ctrl)
+	mockObjStore := mocks.NewMockObjectStore(ctrl)
+
+	privateKey, err := generatePrivateKey()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	privatePem := crypto.ExportRSAPrivateKeyAsPEM(privateKey)
+
+	mockKvStore.EXPECT().Get(gomock.Any(), gomock.Eq(entwine.SubStreamCurrAnchorKey(entwine.SubStreamID("0")))).Return(
+		nil,
+		util.NewInternalError("error"))
+
+	_, err = process.NewEntwine("test", entwine.SubStreamID("0"), privatePem, mockKvStore, mockObjStore,
+		mockTicker, 4, core.TrueCondition)
+
+	assert.Error(t, err)
+}
+
+func TestNewEntwineErrorCreatingGenesisProof(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockTicker := mocks.NewMockTickerClient(ctrl)
+	mockKvStore := mocks.NewMockKVStore(ctrl)
+	mockObjStore := mocks.NewMockObjectStore(ctrl)
+
+	privateKey, err := generatePrivateKey()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	privatePem := crypto.ExportRSAPrivateKeyAsPEM(privateKey)
+
+	mockKvStore.EXPECT().Get(gomock.Any(), gomock.Eq(entwine.SubStreamCurrAnchorKey(entwine.SubStreamID("0")))).
+		Return(nil,util.NewNotFoundError("error"))
+
+	mockTicker.EXPECT().CreateGenesisProof(gomock.Any(), entwine.SubStreamID("0")).
+		Return(gUuid.Nil, util.NewInternalError("error"))
+
+	_, err = process.NewEntwine("test", entwine.SubStreamID("0"), privatePem, mockKvStore, mockObjStore,
+		mockTicker, 4, core.TrueCondition)
+
+	assert.Error(t, err)
+}
+
+func TestNewEntwineHeadError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockTicker := mocks.NewMockTickerClient(ctrl)
+	mockKvStore := mocks.NewMockKVStore(ctrl)
+	mockObjStore := mocks.NewMockObjectStore(ctrl)
+
+	privateKey, err := generatePrivateKey()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	privatePem := crypto.ExportRSAPrivateKeyAsPEM(privateKey)
+
+	retUuid, err := entwine.UuidToBytes(gUuid.New())
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	mockKvStore.EXPECT().Get(gomock.Any(), gomock.Eq(entwine.SubStreamCurrAnchorKey(entwine.SubStreamID("0")))).
+		Return(retUuid, nil)
+
+	mockKvStore.EXPECT().Get(gomock.Any(), gomock.Eq(entwine.SubStreamHeadKey(entwine.SubStreamID("0")))).
+		Return(nil, util.NewInternalError("error"))
+
+	_, err = process.NewEntwine("test", entwine.SubStreamID("0"), privatePem, mockKvStore, mockObjStore,
+		mockTicker, 4, core.TrueCondition)
+
+	assert.Error(t, err)
+}
+

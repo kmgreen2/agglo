@@ -466,6 +466,11 @@ func (message *StreamImmutableMessage) Index() int64 {
 	return message.idx
 }
 
+// Ts will return the timestamp of this message
+func (message *StreamImmutableMessage) Ts() int64 {
+	return message.ts
+}
+
 // VerifySignature will validate the signature of the message using a provided authenticator
 func (message *StreamImmutableMessage) VerifySignature(authenticator crypto.Authenticator) (bool, error) {
 	signatureBytes, err := message.GetSignaturePayload()
