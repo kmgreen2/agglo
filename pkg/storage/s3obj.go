@@ -104,6 +104,11 @@ func (s3ObjectStoreParams *S3ObjectStoreBackendParams) GetBackendType() BackendT
 	return s3ObjectStoreParams.backendType
 }
 
+//  ConnectionString will return the connection string for the parameters
+func (s3ObjectStoreParams *S3ObjectStoreBackendParams) ConnectionString() string {
+	return fmt.Sprintf("s3:endpoint=%s,bucketName=%s", s3ObjectStoreParams.endpoint, s3ObjectStoreParams.bucketName)
+}
+
 // SerializeS3ObjectStoreParams will serialize the backend params and return an error if the params cannot be serialized
 func SerializeS3ObjectStoreParams(s3ObjectStoreParams *S3ObjectStoreBackendParams) ([]byte, error) {
 	byteBuffer := bytes.NewBuffer(make([]byte, 0))
@@ -190,11 +195,20 @@ func NewS3ObjectStore(params ObjectStoreBackendParams) (*S3ObjectStore, error) {
 
 	objectStore.bucketName = objectStoreParams.bucketName
 	objectStore.endpoint = objectStoreParams.endpoint
+
 	return objectStore, nil
 }
 
 func (objStore *S3ObjectStore) ConnectionString() string {
 	return fmt.Sprintf("s3:endpoint=%s,bucketName=%s", objStore.endpoint, objStore.bucketName)
+}
+
+func (objStore *S3ObjectStore) ObjectStoreBackendParams() ObjectStoreBackendParams {
+	return &S3ObjectStoreBackendParams{
+		backendType: S3ObjectStoreBackend,
+		bucketName: objStore.bucketName,
+		endpoint: objStore.endpoint,
+	}
 }
 
 func (objStore *S3ObjectStore) Put(ctx context.Context, key string, reader io.Reader) error {

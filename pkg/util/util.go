@@ -7,6 +7,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/json"
+	api "github.com/kmgreen2/agglo/generated/proto"
 	"github.com/pkg/errors"
 	"hash"
 	"strings"
@@ -39,6 +40,34 @@ func InitHash(digestType DigestType) hash.Hash {
 		return md5.New()
 	default:
 		return nil
+	}
+}
+
+func DigestTypeToPb(digestType DigestType) api.DigestType {
+	switch digestType {
+	case SHA1:
+		return api.DigestType_SHA1
+	case SHA256:
+		return api.DigestType_SHA256
+	case MD5:
+		return api.DigestType_MD5
+	default:
+		// Shouldn't ever reach this
+		return 0
+	}
+}
+
+func DigestTypeFromPb(digestType api.DigestType) DigestType {
+	switch digestType {
+	case api.DigestType_SHA1:
+		return SHA1
+	case api.DigestType_MD5:
+		return MD5
+	case api.DigestType_SHA256:
+		return SHA256
+	default:
+		// Shouldn't ever reach this
+		return 0
 	}
 }
 

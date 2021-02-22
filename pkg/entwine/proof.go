@@ -35,6 +35,7 @@ type Proof interface {
 	TickerIdx() int64
 	String() string
 	IsConsistent(prevProof Proof) (bool, error)
+	HasUuid(uuid gUuid.UUID) bool
 }
 
 // ByAge implements sort.Interface for []Person based on
@@ -289,6 +290,16 @@ func (proof *ProofImpl) Validate() bool {
 		prevDigest = fingerprint.Digest
 	}
 	return true
+}
+
+// HasUuid will return true if the proof contains the provided Uuid and false otherwise
+func (proof *ProofImpl) HasUuid(uuid gUuid.UUID) bool {
+	for _, fingerprint := range proof.messageFingerprints {
+		if strings.Compare(fingerprint.Uuid.String(), uuid.String()) == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func isConsistent(lhs, rhs Proof) bool {

@@ -18,6 +18,7 @@ type ObjectStore interface {
 	Delete(ctx context.Context, key string) error
 	List(ctx context.Context, prefix string) ([]string, error)
 	ConnectionString() string
+	ObjectStoreBackendParams() ObjectStoreBackendParams
 }
 
 // BackendType is the type of backend
@@ -38,6 +39,7 @@ const (
 type ObjectStoreBackendParams interface {
 	GetBackendType() BackendType
 	Get() map[string]string
+	ConnectionString() string
 }
 
 // NilObjectStoreBackendParams is a hack to get serialization to work for genesis messages
@@ -52,6 +54,11 @@ func (backendParams *NilObjectStoreBackendParams) GetBackendType() BackendType {
 // Get returns nil
 func (backendParams *NilObjectStoreBackendParams) Get() map[string]string {
 	return nil
+}
+
+// ConnectionString returns ""
+func (backendParams *NilObjectStoreBackendParams) ConnectionString() string {
+	return ""
 }
 
 // ObjectDescriptor contains all of the information needed to access an object from an object store
@@ -177,7 +184,7 @@ func DeserializeObjectDescriptor(descBytes []byte, desc *ObjectDescriptor) error
 	return nil
 }
 
-func NewObjectStoreFromConnectionString(connectionString string) (ObjectStore, error) {
+func NewObjectStoreParamsFromConnectionString(connectionString string) (ObjectStoreBackendParams, error) {
 	connectionStringAry := strings.Split(connectionString, ":")
 	if len(connectionStringAry) < 2 {
 		return nil, util.NewInvalidError(fmt.Sprintf("invalid connection string, expected <type>:<connStr> got: %s",
@@ -190,16 +197,24 @@ func NewObjectStoreFromConnectionString(connectionString string) (ObjectStore, e
 		if err != nil {
 			return nil, err
 		}
-		return NewObjectStore(params)
+		return params, nil
 	case "s3":
 		params, err := NewS3ObjectStoreBackendParamsFromConnectionString(S3ObjectStoreBackend,
 			strings.Join(connectionStringAry[1:], ":"))
 		if err != nil {
 			return nil, err
 		}
-		return NewObjectStore(params)
+		return params, nil
 	}
 	return nil, util.NewInvalidError(fmt.Sprintf("invalid backend type: %s", connectionStringAry[0]))
+}
+
+func NewObjectStoreFromConnectionString(connectionString string) (ObjectStore, error) {
+	params, err := NewObjectStoreParamsFromConnectionString(connectionString)
+	if err != nil {
+		return nil, err
+	}
+	return NewObjectStore(params)
 }
 
 // NewObjectStore will return an object that is used to access an object store

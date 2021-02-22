@@ -142,18 +142,6 @@ func TestKVTickerStore_GetHistoryError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestKVTickerStore_GetLatestProofKey(t *testing.T) {
-}
-
-func TestKVTickerStore_GetLatestProofKeyError(t *testing.T) {
-}
-
-func TestKVTickerStore_GetProofStartUuid(t *testing.T) {
-}
-
-func TestKVTickerStore_GetProofStartUuidError(t *testing.T) {
-}
-
 func TestKVTickerStore_Anchor(t *testing.T) {
 	subStreamID := entwine.SubStreamID("0")
 	startNumTicks := 12

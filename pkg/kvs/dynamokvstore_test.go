@@ -128,6 +128,11 @@ func TestDynamoAtomicPut(t *testing.T) {
 
 	err = kvStore.AtomicPut(context.Background(), "foo", []byte("fizzbar"), []byte("barfoo"))
 	assert.Error(t, err)
+
+	err = kvStore.Delete(context.Background(), "foo")
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
 }
 
 func TestDynamoAtomicDelete(t *testing.T) {
@@ -160,6 +165,11 @@ func TestDynamoGetNotFound(t *testing.T) {
 	}
 	_, err = kvStore.Get(context.Background(), "fizz")
 	assert.Error(t, err)
+
+	err = kvStore.Delete(context.Background(), "foo")
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
 }
 
 func TestDynamoHeadNotFound(t *testing.T) {
@@ -170,6 +180,11 @@ func TestDynamoHeadNotFound(t *testing.T) {
 	}
 	err = kvStore.Head(context.Background(), "fizz")
 	assert.Error(t, err)
+
+	err = kvStore.Delete(context.Background(), "foo")
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
 }
 
 func TestDynamoDeleteNotFound(t *testing.T) {
@@ -180,4 +195,9 @@ func TestDynamoDeleteNotFound(t *testing.T) {
 	}
 	err = kvStore.Delete(context.Background(), "fizz")
 	assert.Error(t, err)
+
+	err = kvStore.Delete(context.Background(), "foo")
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
 }

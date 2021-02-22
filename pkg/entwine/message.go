@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
+	api "github.com/kmgreen2/agglo/generated/proto"
 	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/storage"
@@ -294,6 +295,109 @@ func NewStreamImmutableMessageFromBuffer(messageBytes []byte) (*StreamImmutableM
 	return message, nil
 }
 
+// NewStreamImmutableMessageFromPb will create a StreamImmutableMessage from a protocol buffer.  If it cannot
+// decode the byte slice, an error will be returned
+func NewStreamImmutableMessageFromPb(message *api.StreamImmutableMessage) (*StreamImmutableMessage, error) {
+	params, err := storage.NewObjectStoreParamsFromConnectionString(message.ObjectStoreConnectionString)
+	if err != nil {
+		return nil, err
+	}
+
+	outMessage := &StreamImmutableMessage{
+		subStreamID: SubStreamID(message.SubStreamID),
+		objectDescriptor: storage.NewObjectDescriptor(params, message.ObjectStoreKey),
+		name: message.Name,
+		tags: message.Tags,
+		objectDigest: message.ObjectDigest,
+	}
+
+	outMessage.signature = message.Signature
+	outMessage.digest = message.Digest
+	outMessage.digestType = util.DigestTypeFromPb(message.DigestType)
+
+	anchorUuid, err := gUuid.Parse(message.AnchorTickerUuid)
+	if err != nil {
+		return nil, err
+	}
+	outMessage.anchorTickerUuid = anchorUuid
+	uuid, err := gUuid.Parse(message.Uuid)
+	if err != nil {
+		return nil, err
+	}
+	outMessage.uuid = uuid
+	prevUuid, err := gUuid.Parse(message.PrevUuid)
+	if err != nil {
+		return nil, err
+	}
+	outMessage.prevUuid = prevUuid
+	outMessage.idx = message.Idx
+	outMessage.ts = message.Ts
+
+	return outMessage, nil
+}
+
+// NewTickerImmutableMessageFromPb will create a TickerImmutableMessage from a protocol buffer.  If it cannot
+// decode the byte slice, an error will be returned
+func NewTickerImmutableMessageFromPb(message *api.TickerImmutableMessage) (*TickerImmutableMessage, error) {
+	outMessage := &TickerImmutableMessage{}
+	outMessage.signature = message.Signature
+	outMessage.digest = message.Digest
+	outMessage.digestType = util.DigestTypeFromPb(message.DigestType)
+
+	uuid, err := gUuid.Parse(message.Uuid)
+	if err != nil {
+		return nil, err
+	}
+	outMessage.uuid = uuid
+	prevUuid, err := gUuid.Parse(message.PrevUuid)
+	if err != nil {
+		return nil, err
+	}
+	outMessage.prevUuid = prevUuid
+	outMessage.idx = message.Idx
+	outMessage.ts = message.Ts
+
+	return outMessage, nil
+}
+
+// NewStreamImmutableMessageFromPb will create a StreamImmutableMessage from a protocol buffer.  If it cannot
+// decode the byte slice, an error will be returned
+func NewPbFromStreamImmutableMessage(message *StreamImmutableMessage) *api.StreamImmutableMessage {
+	pbMessage := &api.StreamImmutableMessage{}
+
+	pbMessage.AnchorTickerUuid = message.anchorTickerUuid.String()
+	pbMessage.Uuid = message.uuid.String()
+	pbMessage.PrevUuid = message.prevUuid.String()
+	pbMessage.SubStreamID = string(message.subStreamID)
+	pbMessage.ObjectStoreConnectionString = message.objectDescriptor.GetParams().ConnectionString()
+	pbMessage.Name = message.name
+	pbMessage.Tags = message.tags
+	pbMessage.ObjectDigest = message.objectDigest
+	pbMessage.Signature = message.signature
+	pbMessage.Digest = message.digest
+	pbMessage.DigestType = util.DigestTypeToPb(message.digestType)
+	pbMessage.Idx = message.idx
+	pbMessage.Ts = message.ts
+
+	return pbMessage
+}
+
+// NewStreamImmutableMessageFromPb will create a StreamImmutableMessage from a protocol buffer.  If it cannot
+// decode the byte slice, an error will be returned
+func NewPbFromTickerImmutableMessage(message *TickerImmutableMessage) *api.TickerImmutableMessage {
+	pbMessage := &api.TickerImmutableMessage{}
+
+	pbMessage.Uuid = message.uuid.String()
+	pbMessage.PrevUuid = message.prevUuid.String()
+	pbMessage.Signature = message.signature
+	pbMessage.Digest = message.digest
+	pbMessage.DigestType = util.DigestTypeToPb(message.digestType)
+	pbMessage.Idx = message.idx
+	pbMessage.Ts = message.ts
+
+	return pbMessage
+}
+
 // Signature will return the signature computed when the message was created
 func (message *StreamImmutableMessage) Signature() []byte {
 	return message.signature
@@ -360,6 +464,11 @@ func (message *StreamImmutableMessage) Tags() []string {
 // Index will return the substream index of this message
 func (message *StreamImmutableMessage) Index() int64 {
 	return message.idx
+}
+
+// Ts will return the timestamp of this message
+func (message *StreamImmutableMessage) Ts() int64 {
+	return message.ts
 }
 
 // VerifySignature will validate the signature of the message using a provided authenticator

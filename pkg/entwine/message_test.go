@@ -3,10 +3,14 @@ package entwine_test
 import (
 	"context"
 	gocrypto "crypto"
+	gUuid "github.com/google/uuid"
+	api "github.com/kmgreen2/agglo/generated/proto"
 	"github.com/kmgreen2/agglo/pkg/entwine"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
 )
 
 func TestNewStreamGenesisMessage(t *testing.T) {
@@ -280,4 +284,129 @@ func TestValidateTickerMessagesInvalid(t *testing.T) {
 	verify, err := entwine.ValidateTickerMessages(append(messagesBegin, messagesEnd...), nil)
 	assert.Nil(t, err)
 	assert.False(t, verify)
+}
+
+func TestNewStreamImmutableMessageFromPb(t *testing.T) {
+	pbMessage := &api.StreamImmutableMessage{
+		Signature: []byte("signature"),
+		Digest: []byte("digest"),
+		DigestType: api.DigestType_SHA256,
+		Uuid: gUuid.New().String(),
+		PrevUuid: gUuid.New().String(),
+		Idx: 1,
+		Ts: time.Now().Unix(),
+		Name: "foo",
+		Tags: []string{"foo", "bar"},
+		ObjectStoreConnectionString: "mem:foo",
+		ObjectStoreKey: "foo",
+		ObjectDigest: []byte("objdigest"),
+		AnchorTickerUuid: gUuid.New().String(),
+		SubStreamID: gUuid.New().String(),
+	}
+
+	message, err := entwine.NewStreamImmutableMessageFromPb(pbMessage)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	assert.Equal(t, pbMessage.Signature, message.Signature())
+	assert.Equal(t, pbMessage.Digest, message.Digest())
+	assert.Equal(t, util.SHA256, message.DigestType())
+	assert.Equal(t, pbMessage.Uuid, message.Uuid().String())
+	assert.Equal(t, pbMessage.PrevUuid, message.Prev().String())
+	assert.Equal(t, pbMessage.Idx, message.Index())
+	assert.Equal(t, pbMessage.Ts, message.Ts())
+	assert.Equal(t, pbMessage.Name, message.Name())
+	assert.Equal(t, pbMessage.Tags, message.Tags())
+	assert.Equal(t, pbMessage.AnchorTickerUuid, message.GetAnchorUUID().String())
+	assert.Equal(t, pbMessage.SubStreamID, string(message.SubStream()))
+}
+
+func TestNewPbFromStreamImmutableMessage(t *testing.T) {
+	origPbMessage := &api.StreamImmutableMessage{
+		Signature: []byte("signature"),
+		Digest: []byte("digest"),
+		DigestType: api.DigestType_SHA256,
+		Uuid: gUuid.New().String(),
+		PrevUuid: gUuid.New().String(),
+		Idx: 1,
+		Ts: time.Now().Unix(),
+		Name: "foo",
+		Tags: []string{"foo", "bar"},
+		ObjectStoreConnectionString: "mem:foo",
+		ObjectStoreKey: "foo",
+		ObjectDigest: []byte("objdigest"),
+		AnchorTickerUuid: gUuid.New().String(),
+		SubStreamID: gUuid.New().String(),
+	}
+
+	message, err := entwine.NewStreamImmutableMessageFromPb(origPbMessage)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	pbMessage := entwine.NewPbFromStreamImmutableMessage(message)
+
+	assert.Equal(t, origPbMessage.Signature, pbMessage.Signature)
+	assert.Equal(t, origPbMessage.Digest, pbMessage.Digest)
+	assert.Equal(t, origPbMessage.DigestType, pbMessage.DigestType)
+	assert.Equal(t, origPbMessage.Uuid, pbMessage.Uuid)
+	assert.Equal(t, origPbMessage.PrevUuid, pbMessage.PrevUuid)
+	assert.Equal(t, origPbMessage.Idx, pbMessage.Idx)
+	assert.Equal(t, origPbMessage.Ts, pbMessage.Ts)
+	assert.Equal(t, origPbMessage.Name, pbMessage.Name)
+	assert.Equal(t, origPbMessage.Tags, pbMessage.Tags)
+	assert.Equal(t, origPbMessage.AnchorTickerUuid, pbMessage.AnchorTickerUuid)
+	assert.Equal(t, origPbMessage.SubStreamID, pbMessage.SubStreamID)
+}
+
+func TestNewTickerImmutableMessageFromPb(t *testing.T) {
+	pbMessage := &api.TickerImmutableMessage{
+		Signature: []byte("signature"),
+		Digest: []byte("digest"),
+		DigestType: api.DigestType_SHA256,
+		Uuid: gUuid.New().String(),
+		PrevUuid: gUuid.New().String(),
+		Idx: 1,
+		Ts: time.Now().Unix(),
+	}
+
+	message, err := entwine.NewTickerImmutableMessageFromPb(pbMessage)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	assert.Equal(t, pbMessage.Signature, message.Signature())
+	assert.Equal(t, pbMessage.Digest, message.Digest())
+	assert.Equal(t, util.SHA256, message.DigestType())
+	assert.Equal(t, pbMessage.Uuid, message.Uuid().String())
+	assert.Equal(t, pbMessage.PrevUuid, message.Prev().String())
+	assert.Equal(t, pbMessage.Idx, message.Index())
+}
+
+func TestNewPbFromTickerImmutableMessage(t *testing.T) {
+	origPbMessage := &api.TickerImmutableMessage{
+		Signature: []byte("signature"),
+		Digest: []byte("digest"),
+		DigestType: api.DigestType_SHA256,
+		Uuid: gUuid.New().String(),
+		PrevUuid: gUuid.New().String(),
+		Idx: 1,
+		Ts: time.Now().Unix(),
+	}
+
+	message, err := entwine.NewTickerImmutableMessageFromPb(origPbMessage)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	pbMessage := entwine.NewPbFromTickerImmutableMessage(message)
+
+	assert.Equal(t, origPbMessage.Signature, pbMessage.Signature)
+	assert.Equal(t, origPbMessage.Digest, pbMessage.Digest)
+	assert.Equal(t, origPbMessage.DigestType, pbMessage.DigestType)
+	assert.Equal(t, origPbMessage.Uuid, pbMessage.Uuid)
+	assert.Equal(t, origPbMessage.PrevUuid, pbMessage.PrevUuid)
+	assert.Equal(t, origPbMessage.Idx, pbMessage.Idx)
+	assert.Equal(t, origPbMessage.Ts, pbMessage.Ts)
 }

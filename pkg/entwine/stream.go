@@ -37,6 +37,9 @@ type StreamStore interface {
 	Head(subStreamID SubStreamID) (*StreamImmutableMessage, error)
 	Create(subStreamID SubStreamID, digestType util.DigestType,
 		signer crypto.Signer, anchorTickerUuid gUuid.UUID) error
+	GetCurrentAnchorUuid(subStreamID SubStreamID) (gUuid.UUID, error)
+	SetCurrentAnchorUuid(subStreamID SubStreamID, uuid gUuid.UUID) error
+
 
 	// This function needs to be at a higher level
 	// If the anchor is encoded into every message, then this is a simple fetch and compare from the Ticker: idx1 < idx2
@@ -311,6 +314,39 @@ func (streamStore *KVStreamStore) setHead(subStreamID SubStreamID, message *Stre
 	return streamStore.kvStore.AtomicPut(context.Background(), SubStreamHeadKey(subStreamID), prevUUIDBytes,
 		messageUUIDBytes)
 }
+
+func (streamStore *KVStreamStore) GetCurrentAnchorUuid(subStreamID SubStreamID) (gUuid.UUID, error) {
+	uuidBytes, err := streamStore.kvStore.Get(context.Background(), SubStreamCurrAnchorKey(subStreamID))
+	if err != nil {
+		return gUuid.Nil, err
+	}
+
+	uuid, err := BytesToUUID(uuidBytes)
+	if err != nil {
+		return gUuid.Nil, err
+	}
+	return uuid, nil
+}
+
+func (streamStore *KVStreamStore) SetCurrentAnchorUuid(subStreamID SubStreamID, uuid gUuid.UUID) error {
+	var err error
+	var prevUUIDBytes  []byte
+	uuidBytes, err := UuidToBytes(uuid)
+	if err != nil {
+		return err
+	}
+
+	prevUuid, err := streamStore.GetCurrentAnchorUuid(subStreamID)
+	if prevUuid != gUuid.Nil {
+		prevUUIDBytes, err = UuidToBytes(prevUuid)
+		if err != nil {
+			return err
+		}
+	}
+	return streamStore.kvStore.AtomicPut(context.Background(), SubStreamCurrAnchorKey(subStreamID), prevUUIDBytes,
+		uuidBytes)
+}
+
 
 // Append will append an uncommitted message to a substream, anchored at the provided anchor UUID; otherwise return
 // an error.

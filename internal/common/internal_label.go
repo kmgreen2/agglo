@@ -16,6 +16,7 @@ const (
 	CheckpointIndexKey InternalKey = "internal:checkpoint:idx"
 	CheckpointDataKey InternalKey = "internal:checkpoint:data"
 	TeeMetadataKey InternalKey = "internal:tee:output"
+	EntwineMetadataKey InternalKey = "internal:entwine:output"
 	MessageIDKey InternalKey = "internal:messageID"
 )
 
