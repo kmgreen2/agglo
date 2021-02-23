@@ -18,6 +18,7 @@ import (
 	"github.com/kmgreen2/agglo/pkg/observability"
 	"github.com/kmgreen2/agglo/pkg/streaming"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -504,7 +505,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 				msg := fmt.Sprintf("KV store is not defined: %s", procDef.Entwine.StreamStateStore)
 				return nil, util.NewInvalidError(msg)
 			}
-			tickerClient, err := client.NewTickerClient(procDef.Entwine.TickerEndpoint)
+			tickerClient, err := client.NewTickerClient(procDef.Entwine.TickerEndpoint, grpc.WithInsecure())
 			if err != nil {
 				return nil, err
 			}

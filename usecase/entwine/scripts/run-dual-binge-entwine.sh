@@ -58,15 +58,21 @@ mc mb localtestB
 
 # Generate key pairs
 
-rm /tmp/a.pem*; ssh-keygen -f /tmp/a.pem -t rsa -m PEM -N "" && ssh-keygen -f /tmp/a.pem.pub -e -m pem > /tmp/authenticators/A.pem
-rm /tmp/b.pem*; ssh-keygen -f /tmp/b.pem -t rsa -m PEM -N "" && ssh-keygen -f /tmp/b.pem.pub -e -m pem > /tmp/authenticators/B.pem
-rm /tmp/ticker.pem*; ssh-keygen -f /tmp/ticker.pem -t rsa -N "" && ssh-keygen -f /tmp/ticker.pem.pub -e -m pem > /tmp/authenticators/ticker.pem
+rm /tmp/a.pem*; ssh-keygen -f /tmp/a.pem -t rsa -m pem -N "" && ssh-keygen -f /tmp/a.pem.pub -e -m pem > /tmp/authenticators/A.pem
+rm /tmp/b.pem*; ssh-keygen -f /tmp/b.pem -t rsa -m pem -N "" && ssh-keygen -f /tmp/b.pem.pub -e -m pem > /tmp/authenticators/B.pem
+rm /tmp/ticker.pem*; ssh-keygen -f /tmp/ticker.pem -t rsa -m pem -N "" && ssh-keygen -f /tmp/ticker.pem.pub -e -m pem > /tmp/authenticators/ticker.pem
 
 
-${ROOTDIR}/bin/ticker  --grpcPort 8001 -kvConnectionString "dynamo:endpoint:localhost:8000,region=us-west-2,tableName=tickerKVStore,prefixLength=4" \
-    -authenticatorPath /tmp/authenticators -privateKeyPath /tmp/ticker.pem
+${ROOTDIR}/bin/ticker  --grpcPort 8001 -kvConnectionString "dynamo:endpoint=localhost:8000,region=us-west-2,tableName=tickerKVStore,prefixLength=4" \
+    -authenticatorPath /tmp/authenticators -privateKeyPath /tmp/ticker.pem &
+TICKER_PID=$!
 
-${ROOTDIR}/bin/binge  -daemonPath /entwine -daemonPort 8008 -maxConnections 16 -runType stateless-daemon -exporter stdout -config ${ROOTDIR}/usecase/entwine/config/binge-a.json
+${ROOTDIR}/bin/binge  -daemonPath /entwine -daemonPort 8008 -maxConnections 16 -runType stateless-daemon -exporter stdout -config ${ROOTDIR}/usecase/entwine/config/binge-a.json &
+BINGE1_PID=$!
 
-${ROOTDIR}/bin/binge  -daemonPath /entwine -daemonPort 8009 -maxConnections 16 -runType stateless-daemon -exporter stdout -config ${ROOTDIR}/usecase/entwine/config/binge-b.json
+${ROOTDIR}/bin/binge  -daemonPath /entwine -daemonPort 8009 -maxConnections 16 -runType stateless-daemon -exporter stdout -config ${ROOTDIR}/usecase/entwine/config/binge-b.json &
+BINGE2_PID=$!
 
+sleep 2
+
+kill -9 ${TICKER_PID} ${BINGE1_PID} ${BINGE2_PID}
