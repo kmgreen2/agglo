@@ -1,0 +1,74 @@
+{
+  "partitionUuid": "9eb9f91d-b8e6-461d-896d-5e553ade52f7",
+  "pipelines": [
+    {
+      "name": "BingeB",
+      "processes": [
+        {
+          "name": "AnnotateBinge",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
+          "name": "EntwineB",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        }
+      ],
+      "enableTracing": false,
+      "enableMetrics": false
+    }
+  ],
+  "externalSystems": [
+    {
+      "name": "KVStore",
+      "connectionString": "dynamo:endpoint=localhost:8000,region=us-west-2,tableName=kvStoreB,prefixLength=4",
+      "externalType": "ExternalKVStore"
+    },
+    {
+      "name": "ObjectStore",
+      "connectionString": "s3:endpoint=localhost:9000,bucketName=localtestB",
+      "externalType": "ExternalObjectStore"
+    }
+  ],
+  "processDefinitions": [
+    {
+      "annotator": {
+        "name": "AnnotateBinge",
+        "annotations": [
+          {
+            "fieldKey": "bingeProcess",
+            "value": "B",
+            "condition": {}
+          }
+        ]
+      }
+    },
+    {
+      "entwine": {
+        "name": "EntwineB",
+        "streamStateStore": "KVStore",
+        "objectStore": "ObjectStore",
+        "pemPath": "/tmp/b.pem",
+        "subStreamID": "B",
+        "tickerEndpoint": "localhost:8001",
+        "tickerInterval": 10,
+        "condition": {}
+      }
+    }
+  ]
+}

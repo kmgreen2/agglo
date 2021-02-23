@@ -46,7 +46,7 @@ func parseArgs() (*TickerServer, error) {
 	exporterPtr := flag.String("exporter", "stdout", "OpenTelemetry exporter type")
 	kvConnectionStringPtr := flag.String("kvConnectionString", "mem:local",
 		"KVStore connection string (default:  mem:local)")
-	authenticatorPathPtr := flag.String("authenticatorPathPtr", "/etc/entwine/authenticators",
+	authenticatorPathPtr := flag.String("authenticatorPath", "/etc/entwine/authenticators",
 		"path to directory containing public keys for authenticators")
 	privateKeyPathPtr := flag.String("privateKeyPath", "/etc/entwine/tickerKey.pem",
 		"path to PEM filer for ticker")
@@ -82,7 +82,7 @@ func parseArgs() (*TickerServer, error) {
 	server.authenticators = make(map[string]crypto.Authenticator)
 
 	for _, file := range files {
-		fileBytes, err := ioutil.ReadFile(file.Name())
+		fileBytes, err := ioutil.ReadFile(fmt.Sprintf("%s/%s", *authenticatorPathPtr, file.Name()))
 		if err != nil {
 			return nil, err
 		}
@@ -128,8 +128,18 @@ func main() {
 		panic(err)
 	}
 
-	// Register gRPC server endpoint
+	grpcServerStarted := make(chan error, 1)
+
 	// Note: Make sure the gRPC server is running properly and accessible
+	go func () {
+		grpcServerStarted <- startGrpcServer(server)
+	}()
+
+	err = <- grpcServerStarted
+	if err != nil {
+		panic(err)
+	}
+	// Register gRPC server endpoint
 	mux := runtime.NewServeMux()
 	opts := []grpc.DialOption{grpc.WithInsecure()}
 	err = api.RegisterTickerHandlerFromEndpoint(ctx, mux, fmt.Sprintf(":%d", server.grpcPort), opts)

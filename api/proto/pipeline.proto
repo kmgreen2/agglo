@@ -29,6 +29,7 @@ enum ProcessType {
     TeeProcess = 6;
     TransformerProcess = 7;
     ContinuationProcess = 8;
+    EntwineProcess = 9;
 }
 
 enum ExternalType {
@@ -161,7 +162,19 @@ message ProcessDefinition {
         Tee tee = 6;
         Transformer transformer = 7;
         Continuation continuation = 8;
+        Entwine entwine = 9;
     }
+}
+
+message Entwine {
+    string name = 1;
+    string streamStateStore = 2;
+    string objectStore = 3;
+    string pemPath = 4;
+    string subStreamID = 5;
+    string tickerEndpoint = 6;
+    int32 tickerInterval = 7;
+    Condition condition = 8;
 }
 
 message Annotator {

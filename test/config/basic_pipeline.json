@@ -199,7 +199,7 @@
     {
       "externalType": "ExternalKVStore",
       "name": "memKVStore",
-      "connectionString": "local"
+      "connectionString": "mem:local"
     }
   ]
 }
