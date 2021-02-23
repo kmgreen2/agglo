@@ -28,7 +28,7 @@ type ROKVStore interface {
 	ConnectionString() string
 }
 
-func NewKVStoreFromConnectionString(connectionString string) (KVStore, error) {
+func NewKVStoreFromConnectionString(connectionString string, opts ...KVStoreOption) (KVStore, error) {
 	connectionStringAry := strings.Split(connectionString, ":")
 	if len(connectionStringAry) < 2 {
 		return nil, util.NewInvalidError(fmt.Sprintf("invalid connection string, expected <type>:<connStr> got: %s",
@@ -36,7 +36,7 @@ func NewKVStoreFromConnectionString(connectionString string) (KVStore, error) {
 	}
 	switch connectionStringAry[0] {
 	case "mem":
-		return NewMemKVStore(), nil
+		return NewMemKVStore(opts...), nil
 	case "dynamo":
 		return NewDynamoKVStoreFromConnectionString(strings.Join(connectionStringAry[1:], ":"))
 	}

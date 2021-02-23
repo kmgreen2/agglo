@@ -7,6 +7,8 @@ import (
 	"github.com/golang/protobuf/jsonpb"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/internal/common"
+	"github.com/kmgreen2/agglo/pkg/client"
+	"github.com/kmgreen2/agglo/pkg/entwine"
 	"github.com/kmgreen2/agglo/pkg/state"
 	"github.com/kmgreen2/agglo/pkg/storage"
 	"github.com/kmgreen2/agglo/pkg/util"
@@ -16,6 +18,8 @@ import (
 	"github.com/kmgreen2/agglo/pkg/observability"
 	"github.com/kmgreen2/agglo/pkg/streaming"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"time"
@@ -315,7 +319,11 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 	for _, externalSystem := range pipelinesPb.ExternalSystems {
 		switch externalSystem.ExternalType {
 		case api.ExternalType_ExternalKVStore:
-			externalKVStores[externalSystem.Name] = kvs.NewMemKVStore(kvs.WithTracing())
+			externalKVStores[externalSystem.Name], err = kvs.NewKVStoreFromConnectionString(
+				externalSystem.ConnectionString, kvs.WithTracing())
+			if err != nil {
+				return nil, err
+			}
 			shutdownFns = append(shutdownFns, externalKVStores[externalSystem.Name].Close)
 		case api.ExternalType_ExternalPubSub:
 			externalPublisher[externalSystem.Name], err = streaming.NewMemPublisher(streaming.NewMemPubSub(),
@@ -477,6 +485,40 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 				return nil, err
 			}
 			processes[procDef.Continuation.Name] = NewContinuation(procDef.Continuation.Name, condition)
+		case *api.ProcessDefinition_Entwine:
+			var ok bool
+			var objectStore storage.ObjectStore
+			var kvStore kvs.KVStore
+			if _, ok := processes[procDef.Entwine.Name]; ok {
+				msg := fmt.Sprintf("name conflict in process definitions: %s", procDef.Entwine.Name)
+				return nil, util.NewInvalidError(msg)
+			}
+			condition, err := buildCondition(procDef.Entwine.Condition)
+			if err != nil {
+				return nil, err
+			}
+			if objectStore, ok = externalObjectStore[procDef.Entwine.ObjectStore]; !ok {
+				msg := fmt.Sprintf("object store is not defined: %s", procDef.Entwine.ObjectStore)
+				return nil, util.NewInvalidError(msg)
+			}
+			if kvStore, ok = externalKVStores[procDef.Entwine.StreamStateStore]; !ok {
+				msg := fmt.Sprintf("KV store is not defined: %s", procDef.Entwine.StreamStateStore)
+				return nil, util.NewInvalidError(msg)
+			}
+			tickerClient, err := client.NewTickerClient(procDef.Entwine.TickerEndpoint, grpc.WithInsecure())
+			if err != nil {
+				return nil, err
+			}
+			pem, err := ioutil.ReadFile(procDef.Entwine.PemPath)
+			if err != nil {
+				return nil, err
+			}
+			processes[procDef.Entwine.Name], err = NewEntwine(procDef.Entwine.Name,
+				entwine.SubStreamID(procDef.Entwine.SubStreamID), string(pem),
+				kvStore, objectStore, tickerClient, int(procDef.Entwine.TickerInterval), condition)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

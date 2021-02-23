@@ -2,8 +2,8 @@ package crypto
 
 import (
 	"crypto"
-	"crypto/rsa"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"github.com/kmgreen2/agglo/pkg/util"
@@ -203,10 +203,7 @@ func ParseRSAPrivateKeyFromPEM(privateKeyPEM string) (*rsa.PrivateKey, error) {
 }
 
 func ExportRSAPublicKeyAsPEM(publicKey *rsa.PublicKey) (string, error) {
-	publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
-	if err != nil {
-		return "", err
-	}
+	publicKeyBytes := x509.MarshalPKCS1PublicKey(publicKey)
 	publicKeyPEM := pem.EncodeToMemory(
 		&pem.Block{
 			Type:  "RSA PUBLIC KEY",
@@ -223,14 +220,11 @@ func ParseRSAPublicKeyFromPEM(publicKeyPEM string) (*rsa.PublicKey, error) {
 		return nil, util.NewInvalidError("failed to parse PEM block containing the key")
 	}
 
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	pub, err := x509.ParsePKCS1PublicKey(block.Bytes)
 	if err != nil {
 		return nil, err
 	}
 
-	switch pub := pub.(type) {
-	case *rsa.PublicKey:
-		return pub, nil
-	}
-	return nil, util.NewInvalidError("Key type is not RSA")
+	return pub, nil
 }
+
