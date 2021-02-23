@@ -42,7 +42,7 @@ func parseArgs() (*TickerServer, error) {
 	var err error
 	server := &TickerServer{}
 	grpcPortPtr := flag.Int("grpcPort", 9081, "grpc listening port (default 9081)")
-	httpPortPtr := flag.Int("httpPort", 9080, "grpc listening port (default 9080)")
+	httpPortPtr := flag.Int("httpPort", 9080, "http listening port (default 9080)")
 	exporterPtr := flag.String("exporter", "stdout", "OpenTelemetry exporter type")
 	kvConnectionStringPtr := flag.String("kvConnectionString", "mem:local",
 		"KVStore connection string (default:  mem:local)")
@@ -115,7 +115,10 @@ func startGrpcServer(server *TickerServer) error {
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
 	api.RegisterTickerServer(grpcServer, server)
-	return grpcServer.Serve(lis)
+	go func() {
+		_ = grpcServer.Serve(lis)
+	}()
+	return nil
 }
 
 func main() {
@@ -128,14 +131,7 @@ func main() {
 		panic(err)
 	}
 
-	grpcServerStarted := make(chan error, 1)
-
-	// Note: Make sure the gRPC server is running properly and accessible
-	go func () {
-		grpcServerStarted <- startGrpcServer(server)
-	}()
-
-	err = <- grpcServerStarted
+	err = startGrpcServer(server)
 	if err != nil {
 		panic(err)
 	}
@@ -198,6 +194,18 @@ func (server *TickerServer) GetProofStartUuid(ctx context.Context,
 	}
 	return &api.GetProofStartUuidResponse{
 		Uuid: uuid.String(),
+	}, nil
+}
+
+func (server *TickerServer) CreateGenesisProof(ctx context.Context,
+	request *api.CreateGenesisProofRequest) (*api.CreateGenesisProofResponse, error) {
+
+	proof, err := server.ticker.CreateGenesisProof(entwine.SubStreamID(request.SubStreamID))
+	if err != nil {
+		return nil, err
+	}
+	return &api.CreateGenesisProofResponse{
+		Uuid: proof.TickerUuid().String(),
 	}, nil
 }
 

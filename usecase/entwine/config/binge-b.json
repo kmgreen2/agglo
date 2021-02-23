@@ -36,12 +36,12 @@
   "externalSystems": [
     {
       "name": "KVStore",
-      "connectionString": "dynamo:endpoint=localhost:8000,region=us-west-2,tableName=kvStoreB,prefixLength=4",
+      "connectionString": "dynamo:endpoint=http://localhost:8000,region=us-west-2,tableName=kvStoreB,prefixLength=4",
       "externalType": "ExternalKVStore"
     },
     {
       "name": "ObjectStore",
-      "connectionString": "s3:endpoint=localhost:9000,bucketName=localtestB",
+      "connectionString": "s3:endpoint=localhost:9000,bucketName=localtestb",
       "externalType": "ExternalObjectStore"
     }
   ],
@@ -64,7 +64,7 @@
         "streamStateStore": "KVStore",
         "objectStore": "ObjectStore",
         "pemPath": "/tmp/b.pem",
-        "subStreamID": "B",
+        "subStreamID": "ed94a517-f030-4aa6-b390-6283ad24cab3",
         "tickerEndpoint": "localhost:8001",
         "tickerInterval": 10,
         "condition": {}

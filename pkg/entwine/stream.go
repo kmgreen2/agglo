@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
-	"github.com/kmgreen2/agglo/pkg/state"
-	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/kvs"
+	"github.com/kmgreen2/agglo/pkg/state"
+	"github.com/kmgreen2/agglo/pkg/util"
 	"strings"
 	"sync"
 	"time"
@@ -409,7 +409,7 @@ func (streamStore *KVStreamStore) append(message *StreamImmutableMessage) error 
 		if err != nil {
 			return err
 		}
-		err = streamStore.kvStore.Put(context.Background(), TagEntry(tagPrefix, newUuid), []byte(nil))
+		err = streamStore.kvStore.Put(context.Background(), TagEntry(tagPrefix, newUuid), []byte(""))
 		if err != nil {
 			return err
 		}
@@ -420,7 +420,7 @@ func (streamStore *KVStreamStore) append(message *StreamImmutableMessage) error 
 	if err != nil {
 		return err
 	}
-	err = streamStore.kvStore.Put(context.Background(), NameEntry(namePrefix, newUuid), []byte(nil))
+	err = streamStore.kvStore.Put(context.Background(), NameEntry(namePrefix, newUuid), []byte(""))
 	if err != nil {
 		return err
 	}

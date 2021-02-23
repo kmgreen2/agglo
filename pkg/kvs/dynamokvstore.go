@@ -244,6 +244,9 @@ func (kvStore *DynamoKVStore) Get(ctx context.Context, key string) ([]byte, erro
 	}
 	result, err := kvStore.client.GetItem(input)
 	if err != nil {
+		if notFound, ok := err.(*dynamodb.ResourceNotFoundException); ok {
+			return nil, util.NewNotFoundError(notFound.Message())
+		}
 		return nil, err
 	}
 
@@ -280,6 +283,9 @@ func (kvStore *DynamoKVStore)  Head(ctx context.Context, key string) error {
 	}
 	result, err := kvStore.client.GetItem(input)
 	if err != nil {
+		if notFound, ok := err.(*dynamodb.ResourceNotFoundException); ok {
+			return util.NewNotFoundError(notFound.Message())
+		}
 		return err
 	}
 
@@ -310,6 +316,9 @@ func (kvStore *DynamoKVStore)  Delete(ctx context.Context, key string) error {
 	}
 	result, err := kvStore.client.DeleteItem(input)
 	if err != nil {
+		if notFound, ok := err.(*dynamodb.ResourceNotFoundException); ok {
+			return util.NewNotFoundError(notFound.Message())
+		}
 		return err
 	}
 
@@ -347,6 +356,9 @@ func (kvStore *DynamoKVStore) List(ctx context.Context, prefix string) ([]string
 		}
 		result, err := kvStore.client.Query(input)
 		if err != nil {
+			if notFound, ok := err.(*dynamodb.ResourceNotFoundException); ok {
+				return nil, util.NewNotFoundError(notFound.Message())
+			}
 			return nil, err
 		}
 
@@ -355,7 +367,7 @@ func (kvStore *DynamoKVStore) List(ctx context.Context, prefix string) ([]string
 		}
 		for _, item := range result.Items {
 			if key, ok := item["ValueKey"]; ok {
-				retItems = append(retItems, key.GoString())
+				retItems = append(retItems, *key.S)
 			}
 		}
 		if len(result.LastEvaluatedKey) == 0 {

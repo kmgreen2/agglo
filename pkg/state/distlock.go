@@ -96,7 +96,7 @@ func (l KVDistributedLock) getWaiters(ctx context.Context) ([]string, error) {
 
 	// Get a listing of the current waiters
 	entries, err := l.kvStore.List(ctx, lockKey)
-	if err != nil {
+	if err != nil && !errors.Is(err, &util.NotFoundError{}) {
 		return nil, err
 	}
 
@@ -131,7 +131,7 @@ func (l KVDistributedLock) Lock(ctx context.Context, timeout time.Duration) (con
 
 	// Get the largest index for the lock, and use 0 if there are no entries
 	entries, err := l.getWaiters(ctx)
-	if err != nil {
+	if err != nil && !errors.Is(err, &util.NotFoundError{}){
 		return ctx, err
 	}
 
