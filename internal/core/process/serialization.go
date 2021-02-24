@@ -17,6 +17,7 @@ import (
 	"github.com/kmgreen2/agglo/generated/proto"
 	"github.com/kmgreen2/agglo/pkg/observability"
 	"github.com/kmgreen2/agglo/pkg/streaming"
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"io/ioutil"
@@ -72,7 +73,7 @@ func buildExpression(expression *api.Expression) (core.Expression, error) {
 		case *api.Operand_Expression:
 			lhs, err = buildExpression(lhsOperand.Expression)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "buildExpression error")
 			}
 		}
 		switch rhsOperand := e.Comparator.Rhs.Operand.(type) {
@@ -85,7 +86,7 @@ func buildExpression(expression *api.Expression) (core.Expression, error) {
 		case *api.Operand_Expression:
 			rhs, err = buildExpression(rhsOperand.Expression)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "buildExpression error")
 			}
 		}
 		switch e.Comparator.Op {
@@ -112,7 +113,7 @@ func buildExpression(expression *api.Expression) (core.Expression, error) {
 		case *api.Operand_Expression:
 			lhs, err = buildExpression(lhsOperand.Expression)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "buildExpression error")
 			}
 		default:
 			msg := fmt.Sprintf("logical expression operands *must* be expressions, not literal, " +
@@ -123,7 +124,7 @@ func buildExpression(expression *api.Expression) (core.Expression, error) {
 		case *api.Operand_Expression:
 			rhs, err = buildExpression(rhsOperand.Expression)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "buildExpression error")
 			}
 		default:
 			msg := fmt.Sprintf("logical expression operands *must* be expressions, not literal, " +
@@ -218,7 +219,7 @@ func buildCondition(condition *api.Condition) (*core.Condition, error) {
 	case *api.Condition_Expression:
 		expression, err := buildExpression(c.Expression)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "buildCondition error")
 		}
 		return core.NewCondition(expression)
 	case *api.Condition_Exists:
@@ -229,7 +230,7 @@ func buildCondition(condition *api.Condition) (*core.Condition, error) {
 		return core.NewCondition(builder.Get())
 	default:
 		msg := fmt.Sprintf("invalid condition type: %v", reflect.TypeOf(c))
-		return nil, util.NewInvalidError(msg)
+		return nil, errors.Wrap(util.NewInvalidError(msg), "buildCondition error")
 	}
 }
 
@@ -240,7 +241,7 @@ func buildTransformer(transformerSpec *api.Transformer) (*Transformer, error) {
 	for _, spec := range transformerSpecs {
 		condition, err := buildCondition(spec.Transformation.Condition)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "buildTransformer error")
 		}
 		builder := core.NewTransformationBuilder()
 		builder.AddCondition(condition)
@@ -293,7 +294,7 @@ func PipelinesFromJson(pipelineJson []byte) (*Pipelines, error) {
 	byteBuffer := bytes.NewBuffer(pipelineJson)
 	err := jsonpb.Unmarshal(byteBuffer, &pipelinesPb)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "PipelinesFromJson error")
 	}
 	return PipelinesFromPb(&pipelinesPb)
 }
@@ -312,7 +313,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 	// Get Uuid
 	partitionUuid, err := gUuid.Parse(pipelinesPb.PartitionUuid)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "PipelinesFromJson error")
 	}
 
 	// Get external systems
@@ -322,14 +323,14 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			externalKVStores[externalSystem.Name], err = kvs.NewKVStoreFromConnectionString(
 				externalSystem.ConnectionString, kvs.WithTracing())
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "PipelinesFromJson error")
 			}
 			shutdownFns = append(shutdownFns, externalKVStores[externalSystem.Name].Close)
 		case api.ExternalType_ExternalPubSub:
 			externalPublisher[externalSystem.Name], err = streaming.NewMemPublisher(streaming.NewMemPubSub(),
 				externalSystem.ConnectionString)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "PipelinesFromJson error")
 			}
 			shutdownFns = append(shutdownFns, externalPublisher[externalSystem.Name].Close)
 		case api.ExternalType_ExternalHttp:
@@ -339,7 +340,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 		case api.ExternalType_ExternalObjectStore:
 			objectStore, err := storage.NewObjectStoreFromConnectionString(externalSystem.ConnectionString)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "PipelinesFromJson error")
 			}
 			externalObjectStore[externalSystem.Name] = objectStore
 		}
@@ -357,7 +358,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			for _, annotation := range procDef.Annotator.Annotations {
 				condition, err := buildCondition(annotation.Condition)
 				if err != nil {
-					return nil, err
+					return nil, errors.Wrap(err, "PipelinesFromJson error")
 				}
 				annotatorBuilder.Add(core.NewAnnotation(annotation.FieldKey, annotation.Value, condition))
 			}
@@ -373,7 +374,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 					procDef.Aggregator.Aggregation.GroupByKeys))
 				condition, err := buildCondition(procDef.Aggregator.Condition)
 				if err != nil {
-					return nil, err
+					return nil, errors.Wrap(err, "PipelinesFromJson error")
 				}
 				processes[procDef.Aggregator.Name] = NewAggregator(procDef.Aggregator.Name, aggregation, condition,
 					state.NewKvStateStore(kvStore), procDef.Aggregator.AsyncCheckpoint, procDef.Aggregator.ForwardState)
@@ -402,7 +403,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			}
 			filter, err := NewRegexKeyFilter(procDef.Filter.Name, procDef.Filter.Regex, procDef.Filter.KeepMatched)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "PipelinesFromJson error")
 			}
 			processes[procDef.Filter.Name] = filter
 		case *api.ProcessDefinition_Transformer:
@@ -412,7 +413,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			}
 			transformer, err := buildTransformer(procDef.Transformer)
 			if err != nil {
-				 return nil, err
+				 return nil, errors.Wrap(err, "PipelinesFromJson error")
 			}
 			processes[procDef.Transformer.Name] = transformer
 		case *api.ProcessDefinition_Tee:
@@ -437,7 +438,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 
 			condition, err := buildCondition(procDef.Tee.Condition)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "PipelinesFromJson error")
 			}
 
 			if external, ok := externalKVStores[procDef.Tee.OutputConnectorRef]; ok {
@@ -456,7 +457,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			} else if external, ok := externalLocalFile[procDef.Tee.OutputConnectorRef]; ok {
 				if processes[procDef.Tee.Name], err = NewLocalFileTee(procDef.Tee.Name, external, condition,
 					transformer, procDef.Tee.AdditionalBody.AsMap()); err != nil {
-					return nil, err
+					return nil, errors.Wrap(err, "PipelinesFromJson error")
 				}
 			} else {
 				msg := fmt.Sprintf("%v is not a valid external reference", procDef.Tee.TransformerRef)
@@ -471,7 +472,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			job := core.NewCmdJob(procDef.Spawner.Job.Runnable.PathToExec, procDef.Spawner.Job.Runnable.CmdArgs...)
 			condition, err := buildCondition(procDef.Spawner.Condition)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "PipelinesFromJson error")
 			}
 			processes[procDef.Spawner.Name] = NewSpawner(procDef.Spawner.Name, job, condition,
 				time.Duration(procDef.Spawner.DelayInMs) * time.Millisecond, procDef.Spawner.DoSync)
@@ -482,7 +483,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			}
 			condition, err := buildCondition(procDef.Continuation.Condition)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "PipelinesFromJson error")
 			}
 			processes[procDef.Continuation.Name] = NewContinuation(procDef.Continuation.Name, condition)
 		case *api.ProcessDefinition_Entwine:
@@ -495,7 +496,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			}
 			condition, err := buildCondition(procDef.Entwine.Condition)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "PipelinesFromJson error")
 			}
 			if objectStore, ok = externalObjectStore[procDef.Entwine.ObjectStore]; !ok {
 				msg := fmt.Sprintf("object store is not defined: %s", procDef.Entwine.ObjectStore)
@@ -507,17 +508,17 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 			}
 			tickerClient, err := client.NewTickerClient(procDef.Entwine.TickerEndpoint, grpc.WithInsecure())
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "PipelinesFromJson error")
 			}
 			pem, err := ioutil.ReadFile(procDef.Entwine.PemPath)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "PipelinesFromJson error")
 			}
 			processes[procDef.Entwine.Name], err = NewEntwine(procDef.Entwine.Name,
 				entwine.SubStreamID(procDef.Entwine.SubStreamID), string(pem),
 				kvStore, objectStore, tickerClient, int(procDef.Entwine.TickerInterval), condition)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "PipelinesFromJson error")
 			}
 		}
 	}

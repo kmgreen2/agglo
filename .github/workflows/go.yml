@@ -43,10 +43,10 @@ jobs:
       run: nc localhost 9000 -vz
     
     - name: Install minio-client
-      run: wget https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x mc && ./mc alias set localtest http://localhost:9000 localtest localtest
+      run: wget https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x mc && sudo cp ./mc /usr/bin && mc alias set localtest http://localhost:9000 localtest localtest
     
     - name: Create Minio bucket
-      run: ./mc mb localtest/localtest || echo "noop"
+      run: mc mb localtest/localtest || echo "noop"
     
     - name: Create Dynamo table
       run: aws dynamodb create-table --endpoint-url http://localhost:8000 --region us-west-2
@@ -64,8 +64,15 @@ jobs:
     - name: Build
       run: make ci-build
 
-    - name: Test
+    - name: Unit Test
       run: make ci-test
+      env:
+        AWS_ACCESS_KEY_ID: 'localtest'
+        AWS_SECRET_ACCESS_KEY: 'localtest'
+        REGION: 'us-west-2'
+    
+    - name: Entwine Functional Test
+      run: CI_TEST=1 usecase/entwine/scripts/run-dual-binge-entwine.sh 
       env:
         AWS_ACCESS_KEY_ID: 'localtest'
         AWS_SECRET_ACCESS_KEY: 'localtest'

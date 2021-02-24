@@ -23,6 +23,8 @@ type TickerClient interface {
 		subStreamID entwine.SubStreamID) (gUuid.UUID, error)
 	CreateGenesisProof(ctx context.Context,
 		subStreamID entwine.SubStreamID) (gUuid.UUID, error)
+	HappenedBefore(ctx context.Context, lhsSubStreamID string, lhsUuid gUuid.UUID,
+		lhsStreamIdx int64, rhsSubStreamID string, rhsUuid gUuid.UUID, rhsStreamIdx int64) (bool, error)
 }
 
 func NewTickerClient(endpoint string, opts... grpc.DialOption) (TickerClient, error) {
@@ -111,6 +113,25 @@ func (tickerClient *TickerClientImpl) CreateGenesisProof(ctx context.Context,
 	}
 
 	return uuid, nil
+}
+
+func (tickerClient *TickerClientImpl) HappenedBefore(ctx context.Context, lhsSubStreamID string, lhsUuid gUuid.UUID,
+	lhsStreamIdx int64, rhsSubStreamID string, rhsUuid gUuid.UUID, rhsStreamIdx int64) (bool, error) {
+
+	response, err := tickerClient.underlying.HappenedBefore(ctx, &api.HappenedBeforeRequest{
+		LhsSubStreamID: lhsSubStreamID,
+		LhsUuid: lhsUuid.String(),
+		LhsStreamIdx: lhsStreamIdx,
+		RhsSubStreamID: rhsSubStreamID,
+		RhsUuid: rhsUuid.String(),
+		RhsStreamIdx: rhsStreamIdx,
+	})
+
+	if err != nil {
+		return false, err
+	}
+
+	return response.HappenedBefore, nil
 }
 
 

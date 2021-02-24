@@ -22,6 +22,7 @@ type TickerClient interface {
 	Tick(ctx context.Context, in *TickRequest, opts ...grpc.CallOption) (*TickResponse, error)
 	GetProofStartUuid(ctx context.Context, in *GetProofStartUuidRequest, opts ...grpc.CallOption) (*GetProofStartUuidResponse, error)
 	CreateGenesisProof(ctx context.Context, in *CreateGenesisProofRequest, opts ...grpc.CallOption) (*CreateGenesisProofResponse, error)
+	HappenedBefore(ctx context.Context, in *HappenedBeforeRequest, opts ...grpc.CallOption) (*HappenedBeforeResponse, error)
 }
 
 type tickerClient struct {
@@ -68,6 +69,15 @@ func (c *tickerClient) CreateGenesisProof(ctx context.Context, in *CreateGenesis
 	return out, nil
 }
 
+func (c *tickerClient) HappenedBefore(ctx context.Context, in *HappenedBeforeRequest, opts ...grpc.CallOption) (*HappenedBeforeResponse, error) {
+	out := new(HappenedBeforeResponse)
+	err := c.cc.Invoke(ctx, "/ticker.Ticker/HappenedBefore", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TickerServer is the server API for Ticker service.
 // All implementations must embed UnimplementedTickerServer
 // for forward compatibility
@@ -76,6 +86,7 @@ type TickerServer interface {
 	Tick(context.Context, *TickRequest) (*TickResponse, error)
 	GetProofStartUuid(context.Context, *GetProofStartUuidRequest) (*GetProofStartUuidResponse, error)
 	CreateGenesisProof(context.Context, *CreateGenesisProofRequest) (*CreateGenesisProofResponse, error)
+	HappenedBefore(context.Context, *HappenedBeforeRequest) (*HappenedBeforeResponse, error)
 	mustEmbedUnimplementedTickerServer()
 }
 
@@ -94,6 +105,9 @@ func (UnimplementedTickerServer) GetProofStartUuid(context.Context, *GetProofSta
 }
 func (UnimplementedTickerServer) CreateGenesisProof(context.Context, *CreateGenesisProofRequest) (*CreateGenesisProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateGenesisProof not implemented")
+}
+func (UnimplementedTickerServer) HappenedBefore(context.Context, *HappenedBeforeRequest) (*HappenedBeforeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HappenedBefore not implemented")
 }
 func (UnimplementedTickerServer) mustEmbedUnimplementedTickerServer() {}
 
@@ -180,6 +194,24 @@ func _Ticker_CreateGenesisProof_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Ticker_HappenedBefore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HappenedBeforeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TickerServer).HappenedBefore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ticker.Ticker/HappenedBefore",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TickerServer).HappenedBefore(ctx, req.(*HappenedBeforeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Ticker_ServiceDesc is the grpc.ServiceDesc for Ticker service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -202,6 +234,10 @@ var Ticker_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateGenesisProof",
 			Handler:    _Ticker_CreateGenesisProof_Handler,
+		},
+		{
+			MethodName: "HappenedBefore",
+			Handler:    _Ticker_HappenedBefore_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

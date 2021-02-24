@@ -2,6 +2,7 @@ package util
 
 import (
 	"context"
+	"github.com/pkg/errors"
 	"sync"
 	"time"
 )
@@ -207,7 +208,11 @@ func (f *future) Then(runnable PartialRunnable, options ...FutureOption) Future 
 		defer next.Close()
 		defer func() {
 			if r := recover(); r != nil {
-				_ = next.Fail(futureOptions.ctx, err)
+				if recoverErr, ok := r.(error); ok {
+					_ = next.Fail(futureOptions.ctx, recoverErr)
+				} else {
+					_ = next.Fail(futureOptions.ctx, errors.Wrap(err, "unknown panic"))
+				}
 			}
 		}()
 

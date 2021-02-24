@@ -70,6 +70,19 @@ message CreateGenesisProofResponse {
     string uuid = 1;
 }
 
+message HappenedBeforeRequest {
+    string lhsSubStreamID = 1;
+    string lhsUuid = 2;
+    int64 lhsStreamIdx = 3;
+    string rhsUuid = 4;
+    int64 rhsStreamIdx = 5;
+    string rhsSubStreamID = 6;
+}
+
+message HappenedBeforeResponse {
+    bool happenedBefore = 1;
+}
+
 service Ticker {
     rpc Anchor(AnchorRequest) returns (AnchorResponse) {
         option (google.api.http) = {
@@ -85,17 +98,21 @@ service Ticker {
         };
     }
 
-    rpc GetProofStartUuid(GetProofStartUuidRequest) returns
-    (GetProofStartUuidResponse) {
+    rpc GetProofStartUuid(GetProofStartUuidRequest) returns (GetProofStartUuidResponse) {
         option (google.api.http) = {
             get: "/api/v1/getProofStartUuid/{subStreamID}"
         };
     }
 
-    rpc CreateGenesisProof(CreateGenesisProofRequest) returns
-    (CreateGenesisProofResponse) {
+    rpc CreateGenesisProof(CreateGenesisProofRequest) returns (CreateGenesisProofResponse) {
         option (google.api.http) = {
             get: "/api/v1/createGenesisProof/{subStreamID}"
+        };
+    }
+
+    rpc HappenedBefore(HappenedBeforeRequest) returns (HappenedBeforeResponse) {
+        option (google.api.http) = {
+            get: "/api/v1/happenedBefore/{lhsSubStreamID}/{lhsUuid}/{lhsStreamIdx}/{rhsSubStreamID}/{rhsUuid}/{rhsStreamIdx}"
         };
     }
 }

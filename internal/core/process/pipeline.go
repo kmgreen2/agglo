@@ -345,7 +345,7 @@ error) {
 func onFailLogHelper(logger *zap.Logger, msg string) func(ctx context.Context, err error) {
 	return func(ctx context.Context, err error) {
 		// Do not log warnings
-		// ToDo(KMG): Is there a better way to determine if an error is jsut a warning?
+		// ToDo(KMG): Is there a better way to determine if an error is just a warning?
 		// We currently use errors to halt pipeline progress.  This is mostly needed for
 		// continuations or processes that are fail-able.  In those cases, we do not need
 		// to log errors.

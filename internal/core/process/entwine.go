@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	gocrypto "crypto"
-	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/internal/common"
@@ -15,6 +14,7 @@ import (
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/pkg/storage"
 	"github.com/kmgreen2/agglo/pkg/util"
+	"github.com/pkg/errors"
 	"reflect"
 )
 
@@ -85,8 +85,16 @@ func (e Entwine) Name() string {
 	return e.name
 }
 
-func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
-	var err error
+func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (out map[string]interface{}, err error) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			if rError, ok := r.(error); ok {
+				err = errors.Wrap(rError, "")
+			}
+		}
+	}()
+
 	shouldEntwine, err := e.condition.Evaluate(in)
 	if err != nil {
 		return in, PipelineProcessError(e, err, "evaluating condition")
@@ -101,7 +109,7 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (map[s
 		return nil, PipelineProcessError(e, err, "generating UUID")
 	}
 
-	out := util.CopyableMap(in).DeepCopy()
+	out = util.CopyableMap(in).DeepCopy()
 	if _, ok := out[EntwineMetadataKey]; !ok {
 		out[EntwineMetadataKey] = make([]map[string]interface{}, 0)
 	}
@@ -116,38 +124,6 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (map[s
 		return nil, PipelineProcessError(e, err, "storing map to object store")
 	}
 
-	// Anchor with ticker store if necessary.
-	if e.ticker != nil && (e.numMessages % e.tickerInterval == 0) && e.numMessages != 0 {
-		endNode, err := e.appender.Head()
-		if err != nil {
-			return nil, err
-		}
-
-		endUuid := endNode.Uuid()
-
-		startUuid, err := e.ticker.GetProofStartUuid(ctx, e.subStreamID)
-		if err != nil {
-			return nil, err
-		}
-
-		messages, err := e.appender.GetHistory(startUuid, endUuid)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(messages) > 0 {
-			anchor, err := e.ticker.Anchor(ctx, messages, e.subStreamID)
-			if err != nil {
-				return nil, err
-			}
-			err = e.appender.SetAnchorUuid(anchor.Uuid())
-			if err != nil {
-				return nil, err
-			}
-			e.currTickerUUID = anchor.Uuid()
-		}
-	}
-
 	params := e.objectStore.ObjectStoreBackendParams()
 
 	desc := storage.NewObjectDescriptor(params, objectUuid.String())
@@ -156,7 +132,39 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (map[s
 
 	entwineUuid, err := e.appender.Append(message, e.currTickerUUID)
 	if err != nil {
-		return nil, err
+		return nil, PipelineProcessError(e, err, "appending")
+	}
+
+	// Anchor with ticker store if necessary.
+	if e.ticker != nil && (e.numMessages % e.tickerInterval == 0) && e.numMessages != 0 {
+		endNode, err := e.appender.Head()
+		if err != nil {
+			return nil, PipelineProcessError(e, err, "getting head of subStream")
+		}
+
+		endUuid := endNode.Uuid()
+
+		startUuid, err := e.ticker.GetProofStartUuid(ctx, e.subStreamID)
+		if err != nil {
+			return nil, PipelineProcessError(e, err, "getting proof UUID")
+		}
+
+		messages, err := e.appender.GetHistory(startUuid, endUuid)
+		if err != nil {
+			return nil, PipelineProcessError(e, err, "getting history")
+		}
+
+		if len(messages) > 0 {
+			anchor, err := e.ticker.Anchor(ctx, messages, e.subStreamID)
+			if err != nil {
+				return nil, PipelineProcessError(e, err, "anchoring")
+			}
+			err = e.appender.SetAnchorUuid(anchor.Uuid())
+			if err != nil {
+				return nil, PipelineProcessError(e, err, "storing anchor UUID")
+			}
+			e.currTickerUUID = anchor.Uuid()
+		}
 	}
 
 	switch outVal := out[EntwineMetadataKey].(type) {
@@ -174,7 +182,7 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (map[s
 	default:
 		msg := fmt.Sprintf("detected corrupted %s in map when entwining.  expected []map[string]string, got %v",
 			EntwineMetadataKey, reflect.TypeOf(outVal))
-		return nil, util.NewInternalError(msg)
+		return nil, PipelineProcessError(e, util.NewInternalError(msg), "setting output map")
 	}
 
 	e.numMessages++

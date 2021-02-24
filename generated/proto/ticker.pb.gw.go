@@ -203,6 +203,158 @@ func local_request_Ticker_CreateGenesisProof_0(ctx context.Context, marshaler ru
 
 }
 
+func request_Ticker_HappenedBefore_0(ctx context.Context, marshaler runtime.Marshaler, client TickerClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var protoReq HappenedBeforeRequest
+	var metadata runtime.ServerMetadata
+
+	var (
+		val string
+		ok  bool
+		err error
+		_   = err
+	)
+
+	val, ok = pathParams["lhsSubStreamID"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "lhsSubStreamID")
+	}
+
+	protoReq.LhsSubStreamID, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "lhsSubStreamID", err)
+	}
+
+	val, ok = pathParams["lhsUuid"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "lhsUuid")
+	}
+
+	protoReq.LhsUuid, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "lhsUuid", err)
+	}
+
+	val, ok = pathParams["lhsStreamIdx"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "lhsStreamIdx")
+	}
+
+	protoReq.LhsStreamIdx, err = runtime.Int64(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "lhsStreamIdx", err)
+	}
+
+	val, ok = pathParams["rhsSubStreamID"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "rhsSubStreamID")
+	}
+
+	protoReq.RhsSubStreamID, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "rhsSubStreamID", err)
+	}
+
+	val, ok = pathParams["rhsUuid"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "rhsUuid")
+	}
+
+	protoReq.RhsUuid, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "rhsUuid", err)
+	}
+
+	val, ok = pathParams["rhsStreamIdx"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "rhsStreamIdx")
+	}
+
+	protoReq.RhsStreamIdx, err = runtime.Int64(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "rhsStreamIdx", err)
+	}
+
+	msg, err := client.HappenedBefore(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+
+}
+
+func local_request_Ticker_HappenedBefore_0(ctx context.Context, marshaler runtime.Marshaler, server TickerServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var protoReq HappenedBeforeRequest
+	var metadata runtime.ServerMetadata
+
+	var (
+		val string
+		ok  bool
+		err error
+		_   = err
+	)
+
+	val, ok = pathParams["lhsSubStreamID"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "lhsSubStreamID")
+	}
+
+	protoReq.LhsSubStreamID, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "lhsSubStreamID", err)
+	}
+
+	val, ok = pathParams["lhsUuid"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "lhsUuid")
+	}
+
+	protoReq.LhsUuid, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "lhsUuid", err)
+	}
+
+	val, ok = pathParams["lhsStreamIdx"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "lhsStreamIdx")
+	}
+
+	protoReq.LhsStreamIdx, err = runtime.Int64(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "lhsStreamIdx", err)
+	}
+
+	val, ok = pathParams["rhsSubStreamID"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "rhsSubStreamID")
+	}
+
+	protoReq.RhsSubStreamID, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "rhsSubStreamID", err)
+	}
+
+	val, ok = pathParams["rhsUuid"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "rhsUuid")
+	}
+
+	protoReq.RhsUuid, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "rhsUuid", err)
+	}
+
+	val, ok = pathParams["rhsStreamIdx"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "rhsStreamIdx")
+	}
+
+	protoReq.RhsStreamIdx, err = runtime.Int64(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "rhsStreamIdx", err)
+	}
+
+	msg, err := server.HappenedBefore(ctx, &protoReq)
+	return msg, metadata, err
+
+}
+
 // RegisterTickerHandlerServer registers the http handlers for service Ticker to "mux".
 // UnaryRPC     :call TickerServer directly.
 // StreamingRPC :currently unsupported pending https://github.com/grpc/grpc-go/issues/906.
@@ -298,6 +450,29 @@ func RegisterTickerHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		}
 
 		forward_Ticker_CreateGenesisProof_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
+	})
+
+	mux.Handle("GET", pattern_Ticker_HappenedBefore_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		rctx, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/ticker.Ticker/HappenedBefore")
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Ticker_HappenedBefore_0(rctx, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		ctx = runtime.NewServerMetadataContext(ctx, md)
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+
+		forward_Ticker_HappenedBefore_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 
 	})
 
@@ -422,6 +597,26 @@ func RegisterTickerHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 
 	})
 
+	mux.Handle("GET", pattern_Ticker_HappenedBefore_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		rctx, err := runtime.AnnotateContext(ctx, mux, req, "/ticker.Ticker/HappenedBefore")
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Ticker_HappenedBefore_0(rctx, inboundMarshaler, client, req, pathParams)
+		ctx = runtime.NewServerMetadataContext(ctx, md)
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+
+		forward_Ticker_HappenedBefore_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
+	})
+
 	return nil
 }
 
@@ -433,6 +628,8 @@ var (
 	pattern_Ticker_GetProofStartUuid_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "getProofStartUuid", "subStreamID"}, ""))
 
 	pattern_Ticker_CreateGenesisProof_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "createGenesisProof", "subStreamID"}, ""))
+
+	pattern_Ticker_HappenedBefore_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 1, 0, 4, 1, 5, 4, 1, 0, 4, 1, 5, 5, 1, 0, 4, 1, 5, 6, 1, 0, 4, 1, 5, 7, 1, 0, 4, 1, 5, 8}, []string{"api", "v1", "happenedBefore", "lhsSubStreamID", "lhsUuid", "lhsStreamIdx", "rhsSubStreamID", "rhsUuid", "rhsStreamIdx"}, ""))
 )
 
 var (
@@ -443,4 +640,6 @@ var (
 	forward_Ticker_GetProofStartUuid_0 = runtime.ForwardResponseMessage
 
 	forward_Ticker_CreateGenesisProof_0 = runtime.ForwardResponseMessage
+
+	forward_Ticker_HappenedBefore_0 = runtime.ForwardResponseMessage
 )
