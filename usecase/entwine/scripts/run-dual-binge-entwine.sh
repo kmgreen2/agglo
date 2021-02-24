@@ -123,7 +123,7 @@ while (( ${i} < ${NUM_MESSAGES} )); do
 done 
 
 declare -a MESSAGES
-for outfile in `echo /tmp/a-out/* /tmp/b-out/*`; do
+for outfile in `ls /tmp/a-out/* /tmp/b-out/*`; do
     let idx=$(cat ${outfile} | jq -r '.idx')
     uuid=`cat ${outfile} | jq -r '.["internal:entwine:output"][0].entwineUuid'`
     subStreamID=`cat ${outfile} | jq -r '.["internal:entwine:output"][0].subStreamID'`
