@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	gocrypto "crypto"
-	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/internal/common"
@@ -15,6 +14,7 @@ import (
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/pkg/storage"
 	"github.com/kmgreen2/agglo/pkg/util"
+	"github.com/pkg/errors"
 	"reflect"
 )
 
@@ -85,8 +85,15 @@ func (e Entwine) Name() string {
 	return e.name
 }
 
-func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
-	var err error
+func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (out map[string]interface{}, err error) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			if rError, ok := r.(error); ok {
+				err = errors.Wrap(rError, "")
+			}
+		}
+	}()
 
 	shouldEntwine, err := e.condition.Evaluate(in)
 	if err != nil {
@@ -102,7 +109,7 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (map[s
 		return nil, PipelineProcessError(e, err, "generating UUID")
 	}
 
-	out := util.CopyableMap(in).DeepCopy()
+	out = util.CopyableMap(in).DeepCopy()
 	if _, ok := out[EntwineMetadataKey]; !ok {
 		out[EntwineMetadataKey] = make([]map[string]interface{}, 0)
 	}
@@ -115,6 +122,17 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (map[s
 	err = e.objectStore.Put(ctx, objectUuid.String(), bytes.NewBuffer(mapBytes))
 	if err != nil {
 		return nil, PipelineProcessError(e, err, "storing map to object store")
+	}
+
+	params := e.objectStore.ObjectStoreBackendParams()
+
+	desc := storage.NewObjectDescriptor(params, objectUuid.String())
+
+	message := entwine.NewUncommittedMessage(desc, objectUuid.String(), []string{}, e.signer)
+
+	entwineUuid, err := e.appender.Append(message, e.currTickerUUID)
+	if err != nil {
+		return nil, PipelineProcessError(e, err, "appending")
 	}
 
 	// Anchor with ticker store if necessary.
@@ -147,17 +165,6 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (map[s
 			}
 			e.currTickerUUID = anchor.Uuid()
 		}
-	}
-
-	params := e.objectStore.ObjectStoreBackendParams()
-
-	desc := storage.NewObjectDescriptor(params, objectUuid.String())
-
-	message := entwine.NewUncommittedMessage(desc, objectUuid.String(), []string{}, e.signer)
-
-	entwineUuid, err := e.appender.Append(message, e.currTickerUUID)
-	if err != nil {
-		return nil, PipelineProcessError(e, err, "appending")
 	}
 
 	switch outVal := out[EntwineMetadataKey].(type) {

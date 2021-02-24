@@ -71,7 +71,7 @@ func doHappenedBefore(tickerClient client.TickerClient, args... string) error {
 	result, err := tickerClient.HappenedBefore(context.Background(), lhsSubStreamID, lhsUuid, lhsStreamIdx,
 		rhsSubStreamID, rhsUuid, rhsStreamIdx)
 
-	if err != nil {
+	if err == nil {
 		fmt.Printf("%s happenedBefore %s: %v\n", lhsUuid.String(), rhsUuid.String(), result)
 	}
 	return err
@@ -102,19 +102,6 @@ func parseArgs() (*EntwineCtlArgs, error) {
 
 	args.commandType = CommandType(*commandPtr)
 
-	switch args.commandType {
-	case HappenedBefore:
-		if args.tickerClient == nil {
-			usage(fmt.Sprintf("tickerEndpoint requied for %s", args.commandType), 2)
-		}
-		err = doHappenedBefore(args.tickerClient, flag.Args()...)
-		if err != nil {
-			usage(err.Error(), 2)
-		}
-	default:
-		usage(fmt.Sprintf("unknown command type: %s", args.commandType), 2)
-	}
-
 	return args, nil
 }
 
@@ -132,7 +119,8 @@ func main() {
 		}
 		err = doHappenedBefore(args.tickerClient, flag.Args()...)
 		if err != nil {
-			usage(err.Error(), 2)
+			fmt.Println(err.Error())
+			os.Exit(3)
 		}
 	default:
 		usage(fmt.Sprintf("unknown command type: %s", args.commandType), 2)

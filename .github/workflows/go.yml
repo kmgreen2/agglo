@@ -20,6 +20,7 @@ jobs:
             REGION: 'us-west-2'
         ports:
         - 8000:8000
+        options:  -jar DynamoDBLocal.jar -sharedDb
       minio:
         image: bitnami/minio:latest
         env:
@@ -64,8 +65,15 @@ jobs:
     - name: Build
       run: make ci-build
 
-    - name: Test
+    - name: Unit Test
       run: make ci-test
+      env:
+        AWS_ACCESS_KEY_ID: 'localtest'
+        AWS_SECRET_ACCESS_KEY: 'localtest'
+        REGION: 'us-west-2'
+    
+    - name: Entwine Functional Test
+      run: CI_TEST=1 usecase/entwine/scripts/run-dual-binge-entwine.sh 
       env:
         AWS_ACCESS_KEY_ID: 'localtest'
         AWS_SECRET_ACCESS_KEY: 'localtest'

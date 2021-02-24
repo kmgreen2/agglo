@@ -5,6 +5,7 @@ import (
 	gocrypto "crypto"
 	"flag"
 	"fmt"
+	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	api "github.com/kmgreen2/agglo/generated/proto"
 	"github.com/kmgreen2/agglo/pkg/crypto"
@@ -12,6 +13,8 @@ import (
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/pkg/observability"
 	"github.com/kmgreen2/agglo/pkg/util"
+	"github.com/grpc-ecosystem/go-grpc-middleware"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"io/ioutil"
 	"net"
@@ -90,7 +93,8 @@ func parseArgs() (*TickerServer, error) {
 		if err != nil {
 			return nil, err
 		}
-		server.authenticators[file.Name()] = crypto.NewRSAAuthenticator(publicKey, gocrypto.SHA256)
+		server.authenticators[strings.Replace(file.Name(), ".pem", "", -1)] = crypto.NewRSAAuthenticator(publicKey,
+			gocrypto.SHA256)
 	}
 
 	fileBytes, err := ioutil.ReadFile(*privateKeyPathPtr)
@@ -112,8 +116,13 @@ func startGrpcServer(server *TickerServer) error {
 	if err != nil {
 		return err
 	}
-	var opts []grpc.ServerOption
-	grpcServer := grpc.NewServer(opts...)
+	logger, err := zap.NewProduction()
+	if err != nil {
+		return err
+	}
+	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+		grpc_zap.UnaryServerInterceptor(logger),
+	)))
 	api.RegisterTickerServer(grpcServer, server)
 	go func() {
 		_ = grpcServer.Serve(lis)

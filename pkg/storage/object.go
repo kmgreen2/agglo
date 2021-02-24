@@ -161,6 +161,8 @@ func DeserializeObjectDescriptor(descBytes []byte, desc *ObjectDescriptor) error
 	desc.backendType = backendType
 
 	if backendType == NilBackend {
+		desc.backendType = NilBackend
+		desc.backendParams = &NilObjectStoreBackendParams{}
 		return nil
 	}
 
@@ -205,6 +207,8 @@ func NewObjectStoreParamsFromConnectionString(connectionString string) (ObjectSt
 			return nil, err
 		}
 		return params, nil
+	case "nil":
+		return &NilObjectStoreBackendParams{}, nil
 	}
 	return nil, util.NewInvalidError(fmt.Sprintf("invalid backend type: %s", connectionStringAry[0]))
 }
@@ -231,6 +235,8 @@ func NewObjectStore(params ObjectStoreBackendParams) (ObjectStore, error) {
 		if err != nil {
 			return nil, err
 		}
+	} else if params.GetBackendType() == NilBackend {
+		objectStore = nil
 	} else {
 		return nil, util.NewInvalidError(fmt.Sprintf("NewObjectStore - invalid backendType: %d",
 			params.GetBackendType()))

@@ -83,7 +83,7 @@
         "pemPath": "/tmp/b.pem",
         "subStreamID": "ed94a517-f030-4aa6-b390-6283ad24cab3",
         "tickerEndpoint": "localhost:8001",
-        "tickerInterval": 10,
+        "tickerInterval": 1,
         "condition": {}
       }
     },

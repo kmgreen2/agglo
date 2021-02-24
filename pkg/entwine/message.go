@@ -369,7 +369,11 @@ func NewPbFromStreamImmutableMessage(message *StreamImmutableMessage) *api.Strea
 	pbMessage.Uuid = message.uuid.String()
 	pbMessage.PrevUuid = message.prevUuid.String()
 	pbMessage.SubStreamID = string(message.subStreamID)
-	pbMessage.ObjectStoreConnectionString = message.objectDescriptor.GetParams().ConnectionString()
+	if message.objectDescriptor.GetParams().GetBackendType() != storage.NilBackend {
+		pbMessage.ObjectStoreConnectionString = message.objectDescriptor.GetParams().ConnectionString()
+	} else {
+		pbMessage.ObjectStoreConnectionString = "nil:nil"
+	}
 	pbMessage.Name = message.name
 	pbMessage.Tags = message.tags
 	pbMessage.ObjectDigest = message.objectDigest
