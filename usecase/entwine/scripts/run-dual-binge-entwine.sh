@@ -13,6 +13,9 @@ export AWS_ACCESS_KEY_ID=localtest
 export AWS_SECRET_ACCESS_KEY=localtest
 export AWS_DEFAULT_REGION=us-west-2
 
+rm /tmp/a-out/*
+rm /tmp/b-out/*
+
 docker run -d -p 8000:8000 --name dynamodb amazon/dynamodb-local
 
 sleep 2
@@ -79,22 +82,38 @@ BINGE2_PID=$!
 sleep 2
 
 
-nc localhost -zv 8008
-
-NUM_MESSAGES=10
+let NUM_MESSAGES=30
 
 let i=0
+let A_index=1
+let B_index=1
+declare -a INDEXES
 while (( ${i} < ${NUM_MESSAGES} )); do
     choose=$(($RANDOM % 2))
     payload='{"idx":'${i}'}'
     if (( ${choose} == 0 )); then
-        echo ${payload} | curl -H "Content-Type: application/json" -X POST --data-binary @- http://localhost:8008/entwine
+        echo ${payload} | curl --silent -H "Content-Type: application/json" -X POST --data-binary @- http://localhost:8008/entwine -o /dev/null
+        INDEXES[${i}]=${A_index}
+        let A_index=${A_index}+1
     else
-        echo ${payload} | curl -H "Content-Type: application/json" -X POST --data-binary @- http://localhost:8009/entwine
+        echo ${payload} | curl --silent -H "Content-Type: application/json" -X POST --data-binary @- http://localhost:8009/entwine -o /dev/null
+        INDEXES[${i}]=${B_index}
+        let B_index=${B_index}+1
     fi
     let i=${i}+1
+done 
+
+declare -a MESSAGES
+for outfile in `echo /tmp/a-out/* /tmp/b-out/*`; do
+    let idx=$(cat ${outfile} | jq -r '.idx')
+    uuid=`cat ${outfile} | jq -r '.["internal:entwine:output"][0].entwineUuid'`
+    subStreamID=`cat ${outfile} | jq -r '.["internal:entwine:output"][0].subStreamID'`
+    MESSAGES[${idx}]="${subStreamID}:${uuid}:"${INDEXES[${idx}]}
 done
 
-sleep 2
+while (( ${i} > 20 )); do
+    echo ${ROOTDIR}/bin/entwinectl  -tickerEndpoint localhost:8001 -command HappenedBefore ${MESSAGES[$((i))]} ${MESSAGES[$((i-1))]}
+    let i=${i}-1
+done
 
 kill -9 ${TICKER_PID} ${BINGE1_PID} ${BINGE2_PID}

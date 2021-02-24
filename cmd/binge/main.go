@@ -166,7 +166,7 @@ func main() {
 
 	pipelines, err := process.PipelinesFromJson(configBytes)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("%+v", err))
 	}
 
 	err = args.exporter.Start()

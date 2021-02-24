@@ -87,6 +87,7 @@ func (e Entwine) Name() string {
 
 func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
 	var err error
+
 	shouldEntwine, err := e.condition.Evaluate(in)
 	if err != nil {
 		return in, PipelineProcessError(e, err, "evaluating condition")
@@ -120,29 +121,29 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (map[s
 	if e.ticker != nil && (e.numMessages % e.tickerInterval == 0) && e.numMessages != 0 {
 		endNode, err := e.appender.Head()
 		if err != nil {
-			return nil, err
+			return nil, PipelineProcessError(e, err, "getting head of subStream")
 		}
 
 		endUuid := endNode.Uuid()
 
 		startUuid, err := e.ticker.GetProofStartUuid(ctx, e.subStreamID)
 		if err != nil {
-			return nil, err
+			return nil, PipelineProcessError(e, err, "getting proof UUID")
 		}
 
 		messages, err := e.appender.GetHistory(startUuid, endUuid)
 		if err != nil {
-			return nil, err
+			return nil, PipelineProcessError(e, err, "getting history")
 		}
 
 		if len(messages) > 0 {
 			anchor, err := e.ticker.Anchor(ctx, messages, e.subStreamID)
 			if err != nil {
-				return nil, err
+				return nil, PipelineProcessError(e, err, "anchoring")
 			}
 			err = e.appender.SetAnchorUuid(anchor.Uuid())
 			if err != nil {
-				return nil, err
+				return nil, PipelineProcessError(e, err, "storing anchor UUID")
 			}
 			e.currTickerUUID = anchor.Uuid()
 		}
@@ -156,7 +157,7 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (map[s
 
 	entwineUuid, err := e.appender.Append(message, e.currTickerUUID)
 	if err != nil {
-		return nil, err
+		return nil, PipelineProcessError(e, err, "appending")
 	}
 
 	switch outVal := out[EntwineMetadataKey].(type) {
@@ -174,7 +175,7 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (map[s
 	default:
 		msg := fmt.Sprintf("detected corrupted %s in map when entwining.  expected []map[string]string, got %v",
 			EntwineMetadataKey, reflect.TypeOf(outVal))
-		return nil, util.NewInternalError(msg)
+		return nil, PipelineProcessError(e, util.NewInternalError(msg), "setting output map")
 	}
 
 	e.numMessages++

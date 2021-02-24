@@ -209,3 +209,55 @@ func (server *TickerServer) CreateGenesisProof(ctx context.Context,
 	}, nil
 }
 
+func (server *TickerServer) HappenedBefore(ctx context.Context, request *api.HappenedBeforeRequest) (*api.
+	HappenedBeforeResponse, error) {
+
+	lhsProof, err := server.ticker.GetProofForStreamIndex(entwine.SubStreamID(request.LhsSubStreamID),
+		request.LhsStreamIdx)
+	if err != nil {
+		return nil, err
+	}
+
+	rhsProof, err := server.ticker.GetProofForStreamIndex(entwine.SubStreamID(request.RhsSubStreamID),
+		request.RhsStreamIdx)
+	if err != nil {
+		return nil, err
+	}
+
+	lhsFingerprintIdx := request.LhsStreamIdx - lhsProof.StartIdx()
+	if int(lhsFingerprintIdx) > len(lhsProof.Fingerprints()) {
+		return nil, util.NewInvalidError(fmt.Sprintf("lhs index is out-of-bounds"))
+	}
+
+	lhsFingerprint := lhsProof.Fingerprints()[lhsFingerprintIdx]
+
+	if strings.Compare(lhsFingerprint.Uuid.String(), request.LhsUuid) != 0 {
+		return nil, util.NewInvalidError(fmt.Sprintf("lhs UUID does not match index location in proof"))
+	}
+
+	lhsAnchorMessage, err :=  server.ticker.GetMessageByUUID(lhsFingerprint.AnchorUuid)
+	if err != nil {
+		return nil, err
+	}
+
+	rhsFingerprintIdx := request.RhsStreamIdx - rhsProof.StartIdx()
+	if int(rhsFingerprintIdx) > len(rhsProof.Fingerprints()) {
+		return nil, util.NewInvalidError(fmt.Sprintf("rhs index is out-of-bounds"))
+	}
+
+	rhsFingerprint := rhsProof.Fingerprints()[rhsFingerprintIdx]
+
+	if strings.Compare(rhsFingerprint.Uuid.String(), request.RhsUuid) != 0 {
+		return nil, util.NewInvalidError(fmt.Sprintf("rhs UUID does not match index location in proof"))
+	}
+
+	rhsAnchorMessage, err :=  server.ticker.GetMessageByUUID(rhsFingerprint.AnchorUuid)
+	if err != nil {
+		return nil, err
+	}
+
+	return &api.HappenedBeforeResponse{
+		HappenedBefore: lhsAnchorMessage.Index() < rhsAnchorMessage.Index(),
+	}, nil
+}
+
