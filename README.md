@@ -26,6 +26,43 @@ back the durable queue, a persistent daemon may also be treated as if it was
 stateless.  In this way, we like to think of binge as
 nginx-for-stream-processing.
 
+## Rationale and Approach
+
+We already have plenty of stable, reliable stream processing frameworks, so
+why do we need this one?  There are two big reasons:
+
+1. Most stream processing is done explicitly using a framework, such as Spark,
+Flink, Kafka Streams, etc. or via a custom microservice architecture that
+leverages a reliable queue or event bus.
+
+2. Many stream processing tasks are simple transformations, filters,
+aggregations, annotations, etc. that can be done at the point of ingestion.
+This becomes more and more important with IoT use cases, where ingestion points
+(the edge) is far away from your operations VPC(s).
+
+3. Building bespoke micropservices for integration-based event processing is
+overkill.
+
+4. Stateful operations need not occur in a central location
+
+Our approach is to provide a single multi-use binary that can handle most
+stream processing tasks, where any stateful interactions are handled by
+exrternal key-value stores, object stores or file systems, and more complex
+stream processing tasks can be forwarded to the appropriate stream processing
+system.  For example, binge is a perfect fit for complimenting existing stream
+processing workloads, since it can preprocess and route events at the edge.
+
+Main insight: No need to do all stream processing in traditional SPE.  Can
+tradeoff cost, latency, throughput, consistency by using binge with other
+systems.  Hypothesis, can use binge as basis of any event-driven architecture,
+where the binge processes are distributed to different edges (IoT gateways, LB,
+Kubernetes, Lambda) and utilize managed systems for persistence and more
+involved processing.
+
+Draw a picture of this ^^^: Events coming into many binge instances, which are
+relying on managed systems.
+
+
 ## Getting Started
 
 To make life easier, it is best to make sure the tests pass before doing antyhing else.  This requires that the
@@ -59,22 +96,39 @@ This will be enhanced as I find time or others to help.  This was my first React
 There are 5 main components to Agglo:
 
 1. Process: A stage in the pipeline that will consume an input map, perform an operation (annotation, aggregation, completion, filter, spawner, transformation, tee, continuation, entwine) and output a map.
-2. Pipeline: An ordered collection of processes, 
+2. Pipeline: An ordered collection of processes applied to an event.
 3. External systems: A connector to an external system that can used by a process.  Today, we support S3-like Object Stores, POSIX filesystems, Key-value stores, messaging/pubsub systems and REST endpoints.
 4. Binge: A event processing binary and can run as a stateless daemon, persistent daemon or as a standalone command.
 5. Pipeline configuration: A binge instance is instantiated uwing the pipeline configuration that contains one or more pipelines and their dependent processes and external systems.
 
 ### Processes
 
-- annotation
-- aggregation
-- completion
-- filter
-- spawner
-- transformation
-- tee
-- continuation
-- entwine
+All processes must implement the following interface:
+
+```
+type PipelineProcess interface {
+	Process(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error)
+}
+```
+
+In general, a process will perform one or more actions based on the input map
+`in`.  While the input map can technically be anything serialized to/from
+`map[string]interface{}`, we currently support JSON.  Each process will also
+output a map, which is the input to the next process in the pipeline, or gets
+dropped on the floor if it is the last process in a pipeline.  The input to the
+first process is the raw event posted to or read by binge.
+
+There are currently 9 process types:
+
+- Annotation: Conditionally add one or more annotations to the map
+- Aggregation: Aggregate one or more fields (e.g. sum, max, histogram, etc.)
+- Completion: Emit a completion event when the value of two or more specified fields is equal
+- Filter: Filter (or inverse filter) fields based on string or regex match of key
+- Spawner: Conditionally spawn a process
+- Transformation: Transform one or more fields
+- Tee: Send the input map to an external key-value store, object store, file system or REST endpoint
+- Continuation: Conditionally continue or stop processing for this event
+- Entwine: Anchor the input map to an immutable, shared timeline
 
 ### Pipelines
 
