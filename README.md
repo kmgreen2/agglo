@@ -46,7 +46,7 @@ agglo and binge work.
 
 ## Configuration Generator
 
-The raw JSON pipeline configs can become very unwieldy.  Please use the [Agglo Config Generator](https://github.com/kmgreen2/agglo-config-builder)
+The raw JSON pipeline configs can become very unwieldy.  Please use the [Agglo Config Generator](./web/config-builder)
 to generate all of you configs.  A few caveats:
 
 1. The maintainer (@kmgreen2) is not a front-end developer.  I tried to do things the "React-way", but am sure things can be way better.
