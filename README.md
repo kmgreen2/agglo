@@ -5,9 +5,8 @@
 ## Overview
 
 Agglo is an experimental event stream processing framework that enables
-lightweight, reliable and scalable stream processing without the use of or
-alongside persistent object storage, key-value storage or stream processing
-platforms.
+lightweight, reliable and scalable stream processing alongside persistent
+object storage, key-value storage or stream processing platforms.
 
 Binge (BINary-at-the-edGE) is the main artifact of the framework.  As the name
 implies, it is a single, compiled binary and can run as a stateless daemon,
@@ -67,9 +66,63 @@ There are 5 main components to Agglo:
 
 ### Processes
 
+- annotation
+- aggregation
+- completion
+- filter
+- spawner
+- transformation
+- tee
+- continuation
+- entwine
+
 ### Pipelines
 
 ### External Systems
+
+Adding a new external system is as "simple" as implementing the proper interface.
+
+- KVStores: in-memory, Dynamo
+```
+type KVStore interface {
+	AtomicPut(ctx context.Context, key string, prev, value []byte) error
+	AtomicDelete(ctx context.Context, key string, prev []byte) error
+	Put(ctx context.Context, key string, value []byte) error
+	Get(ctx context.Context, key string) ([]byte, error)
+	Head(ctx context.Context, key string) error
+	Delete(ctx context.Context, key string) error
+	List(ctx context.Context, prefix string) ([]string, error)
+	ConnectionString() string
+	Close() error
+}
+```
+
+- Object Stores: in-memory, S3-like
+
+```
+type ObjectStore interface {
+	Put(ctx context.Context, key string, reader io.Reader)	error
+	Get(ctx context.Context, key string) (io.Reader, error)
+	Head(ctx context.Context, key string) error
+	Delete(ctx context.Context, key string) error
+	List(ctx context.Context, prefix string) ([]string, error)
+	ConnectionString() string
+	ObjectStoreBackendParams() ObjectStoreBackendParams
+}
+```
+
+- Pubsub: in-memory
+
+```
+type Publisher interface {
+	Publish(ctx context.Context, b []byte) error
+	Flush(ctx context.Context, timeout time.Duration) error
+	Close() error
+	ConnectionString() string
+}
+```
+
+- REST endpoints: webhooks, microservices, etc.
 
 ### Binge
 
