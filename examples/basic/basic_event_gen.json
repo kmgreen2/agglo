@@ -1,0 +1,61 @@
+{
+  "schemas": [
+    {
+      "name": "foo",
+      "root": {
+        "kvs": {
+          "someNum": {
+            "randomNumeric": {
+              "min": 100,
+              "max": 1000,
+              "maxRef": 1
+            }
+          },
+          "someDict": {
+            "dict": {
+              "kvs": {
+                "someFixed": {
+                  "fixedString": {
+                    "value": "foobar"
+                  }
+                }
+              }
+            }
+          },
+          "someString": {
+            "randomString": {
+              "minLen": 10,
+              "maxLen": 20,
+              "maxRef": 10,
+              "alphabet": "abcdef1234567890"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "bar",
+      "root": {
+        "kvs": {
+          "someVocab": {
+            "vocabString": {
+              "vocab": ["fizz", "buzz", "foo", "bar"],
+              "prefixName": "fizz",
+              "maxRef": 2
+            }
+          },
+          "someReference": {
+            "reference": {
+              "schemaName": "foo",
+              "path": "someNum"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "schemaDistribution": [0.5, 0.5],
+  "stringPrefixes": {
+    "fizz": "buzz/"
+  }
+}
