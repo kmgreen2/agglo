@@ -1,0 +1,13 @@
+replicaCount: 1
+image:
+  repository: agglo
+  pullPolicy: IfNotPresent
+httpPort: 8000
+grpcPort: 9001
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
