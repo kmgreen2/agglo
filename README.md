@@ -26,6 +26,41 @@ back the durable queue, a persistent daemon may also be treated as if it was
 stateless.  In this way, we like to think of binge as
 nginx-for-stream-processing.
 
+## Rationale and Approach
+
+We already have plenty of stable, reliable stream processing frameworks, so
+why do we need this one?  There are two big reasons:
+
+1. Most stream processing is done explicitly using a framework, such as Spark,
+Flink, Kafka Streams, etc. or via a custom microservice architecture that
+leverages a reliable queue or event bus.
+
+2. Many stream processing tasks are simple transformations, filters,
+aggregations, annotations, etc. that can be done at the point of ingestion.
+This becomes more and more important with IoT use cases, where ingestion points
+(the edge) is far away from your operations VPC(s).
+
+3. Building bespoke micropservices for integration-based event processing is
+overkill.
+
+Our approach is to provide a single multi-use binary that can handle most
+stream processing tasks, where any stateful interactions are handled by
+exrternal key-value stores, object stores or file systems, and more complex
+stream processing tasks can be forwarded to the appropriate stream processing
+system.  For example, binge is a perfect fit for complimenting existing stream
+processing workloads, since it can preprocess and route events at the edge.
+
+Main insight: No need to do all stream processing in traditional SPE.  Can
+tradeoff cost, latency, throughput, consistency by using binge with other
+systems.  Hypothesis, can use binge as basis of any event-driven architecture,
+where the binge processes are distributed to different edges (IoT gateways, LB,
+Kubernetes, Lambda) and utilize managed systems for persistence and more
+involved processing.
+
+Draw a picture of this ^^^: Events coming into many binge instances, which are
+relying on managed systems.
+
+
 ## Getting Started
 
 To make life easier, it is best to make sure the tests pass before doing antyhing else.  This requires that the
@@ -66,15 +101,15 @@ There are 5 main components to Agglo:
 
 ### Processes
 
-- annotation
-- aggregation
-- completion
-- filter
-- spawner
-- transformation
-- tee
-- continuation
-- entwine
+- Annotation
+- Aggregation
+- Completion
+- Filter
+- Spawner
+- Transformation
+- Tee
+- Continuation
+- Entwine
 
 ### Pipelines
 
