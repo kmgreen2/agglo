@@ -4,7 +4,7 @@ PROTOC=protoc  -I=api/proto
 
 PKG_SOURCES = $(filter-out %_test.go,$(wildcard pkg/**/*.go))
 INTERNAL_SOURCES = $(filter-out %_test.go,$(wildcard internal/**/*.go))
-export GOOS ?= darwin
+export GOOS ?= $(scripts/myos.sh)
 
 define _mockgen
 mockgen -package=test -source=$(1) -destination test/mocks/$(subst /,_,$(1))

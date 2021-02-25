@@ -75,7 +75,7 @@ func parseArgs() *CommandArgs {
 	maxConnectionsPtr := flag.Int("maxConnections", 64, "maximum number of connections")
 	numThreadsPtr := flag.Int("numThreads", 16, "number of worker threads")
 	stateDbPathPtr := flag.String("stateDbPath", "/tmp/bingeDb", "location of the state db file")
-	exporterPtr := flag.String("exporter", "stdout", "OpenTelemetry exporter type")
+	exporterPtr := flag.String("exporter", "none", "OpenTelemetry exporter type")
 	forcePtr := flag.Bool("force", false, "force overwrite state entries")
 	cpuProfilePtr := flag.String("cpuprofile", "", "write the CPU profile to a file")
 
@@ -122,6 +122,8 @@ func parseArgs() *CommandArgs {
 		}
 	} else if strings.Compare(*exporterPtr, "zipkin") == 0 {
 		args.exporter = observability.NewZipkinExporter("http://localhost:9411/api/v2/spans", "binge")
+	} else if strings.Compare(*exporterPtr, "none") == 0 {
+		args.exporter = nil
 	} else {
 		usage(fmt.Sprintf("invalid exporter: %s", *exporterPtr), 1)
 	}
@@ -169,12 +171,13 @@ func main() {
 		panic(fmt.Sprintf("%+v", err))
 	}
 
-	err = args.exporter.Start()
-	if err != nil {
-		panic(err)
+	if args.exporter != nil {
+		err = args.exporter.Start()
+		if err != nil {
+			panic(err)
+		}
+		defer func(commandArgs *CommandArgs) { _ = args.exporter.Stop() }(args)
 	}
-
-	defer func(commandArgs *CommandArgs) { _ = args.exporter.Stop() }(args)
 
 	// RunStandalone will invoke each pipeline synchronously
 	if args.runType == RunStandalone {
