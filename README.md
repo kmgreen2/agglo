@@ -42,7 +42,7 @@ First, make sure eveything builds and the unit-tests pass:
 $ make test
 ```
 
-Once the tests pass, you can try out some of the examples to get an idea of how
+Once the tests pass, you can try out some of the [Examples](./examples) to get an idea of how
 agglo and binge work.
 
 ## Design and Architecture
