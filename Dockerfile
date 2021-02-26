@@ -28,7 +28,6 @@ COPY go.mod .
 RUN GOSUMDB=off go mod tidy
 RUN make build
 
-
 FROM public.ecr.aws/lambda/provided:al2 as lambda-local
 COPY --from=lambda-builder /go/src/github.com/kmgreen2/agglo/bin/binge /binge
 ARG CONFIGFILE

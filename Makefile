@@ -87,3 +87,10 @@ proto: api/proto/pipeline.proto api/proto/genevents.proto
         --go_out=generated/proto \
         --grpc-gateway_out=logtostderr=true:generated/proto
 
+.PHONY: lambda-local
+lambda-local:
+	docker build --build-arg CONFIGFILE=test/config/basic_pipeline.json --rm --target lambda-local . -t binge-lambda-local:latest
+
+.PHONY: lambda-production
+lambda-production:
+	docker build --build-arg CONFIGFILE=test/config/basic_pipeline.json --rm --target lambda-production . -t binge-lambda-production:latest
