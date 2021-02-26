@@ -20,23 +20,23 @@ all: build
 
 .PHONY: build
 build: 
-	CGO_ENABLED=1 go build -o bin/regexmap cmd/regexmap/main.go
-	CGO_ENABLED=1 go build -o bin/printvals cmd/printvals/main.go
-	CGO_ENABLED=1 go build -o bin/binge cmd/binge/main.go
-	CGO_ENABLED=1 go build -o bin/genevents cmd/genevents/main.go
-	CGO_ENABLED=1 go build -o bin/activitytracker cmd/activitytracker/main.go cmd/activitytracker/activitytracker.go
-	CGO_ENABLED=1 go build -o bin/ticker cmd/ticker/main.go
-	CGO_ENABLED=1 go build -o bin/entwinectl cmd/entwinectl/main.go
+	CGO_ENABLED=0 go build -o bin/regexmap cmd/regexmap/main.go
+	CGO_ENABLED=0 go build -o bin/printvals cmd/printvals/main.go
+	CGO_ENABLED=0 go build -o bin/binge cmd/binge/main.go
+	CGO_ENABLED=0 go build -o bin/genevents cmd/genevents/main.go
+	CGO_ENABLED=0 go build -o bin/activitytracker cmd/activitytracker/main.go cmd/activitytracker/activitytracker.go
+	CGO_ENABLED=0 go build -o bin/ticker cmd/ticker/main.go
+	CGO_ENABLED=0 go build -o bin/entwinectl cmd/entwinectl/main.go
 
 .PHONY: ci-build
 ci-build: 
-	GOOS=linux CGO_ENABLED=1 go build -o bin/regexmap cmd/regexmap/main.go
-	GOOS=linux CGO_ENABLED=1 go build -o bin/printvals cmd/printvals/main.go
-	GOOS=linux CGO_ENABLED=1 go build -o bin/binge cmd/binge/main.go
-	GOOS=linux CGO_ENABLED=1 go build -o bin/genevents cmd/genevents/main.go
-	GOOS=linux CGO_ENABLED=1 go build -o bin/activitytracker cmd/activitytracker/main.go cmd/activitytracker/activitytracker.go
-	GOOS=linux CGO_ENABLED=1 go build -o bin/ticker cmd/ticker/main.go
-	GOOS=linux CGO_ENABLED=1 go build -o bin/entwinectl cmd/entwinectl/main.go
+	GOOS=linux CGO_ENABLED=0 go build -o bin/regexmap cmd/regexmap/main.go
+	GOOS=linux CGO_ENABLED=0 go build -o bin/printvals cmd/printvals/main.go
+	GOOS=linux CGO_ENABLED=0 go build -o bin/binge cmd/binge/main.go
+	GOOS=linux CGO_ENABLED=0 go build -o bin/genevents cmd/genevents/main.go
+	GOOS=linux CGO_ENABLED=0 go build -o bin/activitytracker cmd/activitytracker/main.go cmd/activitytracker/activitytracker.go
+	GOOS=linux CGO_ENABLED=0 go build -o bin/ticker cmd/ticker/main.go
+	GOOS=linux CGO_ENABLED=0 go build -o bin/entwinectl cmd/entwinectl/main.go
 
 .PHONY: genmocks
 genmocks:

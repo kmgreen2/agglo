@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 	"io"
 	"io/ioutil"
+	"github.com/aws/aws-lambda-go/lambda"
 	"os"
 	"os/signal"
 	"runtime/pprof"
@@ -23,6 +24,7 @@ const (
 	RunStandalone RunType = iota
 	RunStatelessDaemon
 	RunPersistentDaemon
+	RunLambda
 )
 
 type CommandArgs struct {
@@ -67,7 +69,7 @@ func parseArgs() *CommandArgs {
 	configPtr := flag.String("config", "", "path to config file for binge")
 	outfilePtr := flag.String("outfile", "/dev/stdout", "path to file to store output")
 	runTypePtr := flag.String("runType", "standalone",
-		"run type for the process: standalone (default), stateless-daemon, persistent-daemon")
+		"run type for the process: standalone (default), lambda, stateless-daemon, persistent-daemon")
 	daemonPortPtr := flag.Int("daemonPort", 8080, "daemon listening port (default 8080)")
 	daemonPathPtr := flag.String("daemonPath", "/binge", "daemon processing path (default /binge)")
 	maintenancePortPtr := flag.Int("maintenancePort", 8081, "daemon listening port (default 8080)")
@@ -106,6 +108,8 @@ func parseArgs() *CommandArgs {
 		args.runType = RunPersistentDaemon
 	} else if strings.Compare(*runTypePtr, "stateless-daemon") == 0 {
 		args.runType = RunStatelessDaemon
+	} else if strings.Compare(*runTypePtr, "lambda") == 0 {
+		args.runType = RunLambda
 	} else {
 		panic(fmt.Sprintf("invalid runType '%s'", *runTypePtr))
 	}
@@ -205,6 +209,8 @@ func main() {
 			}
 		}
 		_ = pipelines.Shutdown()
+	} else if args.runType == RunLambda {
+		lambda.Start(server.LambdaHandler(configBytes))
 	} else if args.runType == RunPersistentDaemon {
 		recoverFunc := func(inBytes []byte) error {
 			logger, err := zap.NewProduction()
