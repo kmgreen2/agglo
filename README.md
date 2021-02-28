@@ -66,6 +66,12 @@ architecture, where the binge processes are distributed to different edges (IoT
 gateways, LB, Kubernetes, Lambda) and utilize managed systems for persistence
 and more involved processing.
 
+While we belive that Agglo/binge is best used in conjunction with existing
+stream processing systems, we also believe that it can be the main building
+block for IoT event processing, building complex iPaaS
+(integration-platform-as-a-service) architecrures and any future use case that
+requires highly distributed event processing from varied sources.
+
 ToDo: Add some pictures with a few examples.
 
 ## Getting Started
@@ -126,6 +132,34 @@ first process is the raw event posted to or read by binge.
 There are currently 9 process types:
 
 - Annotation: Conditionally add one or more annotations to the map
+
+Example: Add `{"foo": "bar"}` to any input map that contains key `bizz` with value `buzz`.
+
+Input:
+```json
+{
+    "bizz": "buzz",
+    "name": "frank",
+    "someMap": {
+        "hi": "hello",
+        "someNum": 1
+    }
+}
+```
+
+Output:
+```json
+{
+    "foo": "bar",
+    "bizz": "buzz",
+    "name": "frank",
+    "someMap": {
+        "hi": "hello",
+        "someNum": 1
+    }
+}
+```
+
 - Aggregation: Aggregate one or more fields (e.g. sum, max, histogram, etc.)
 - Completion: Emit a completion event when the value of two or more specified fields is equal
 - Filter: Filter (or inverse filter) fields based on string or regex match of key
