@@ -1,10 +1,11 @@
 module github.com/kmgreen2/agglo
 
-go 1.13
+go 1.15
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/Knetic/govaluate v2.3.0+incompatible
+	github.com/aws/aws-lambda-go v1.22.0
 	github.com/aws/aws-sdk-go v1.37.12
 	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.4.3

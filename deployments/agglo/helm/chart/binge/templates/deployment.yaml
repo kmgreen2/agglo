@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: binge-deployment
+  labels:
+    app: binge
+spec:
+    replicas: {{ .Values.numReplicas }}
+    selector:
+        matchLabels:
+            app: binge
+    template:
+        metadata:
+            labels:
+                app: binge
+        spec:
+            containers:
+                - name: binge
+                  image: {{ .Values.image }}
+                  ports:
+                  - containerPort: {{ .Values.httpPort }}
+                    containerPort: {{ .Values.grpcPort }}
+                  resources: 
+                    {{ .Values.resources }}

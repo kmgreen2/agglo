@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: binge
+spec:
+  selector:
+    app: binge
+  ports:
+    - protocol: TCP
+      port: {{ .Values.httpPort }}
+      targetPort: {{ .Values.httpPort }}
+    - protocol: TCP
+      port: {{ .Values.grpcPort }}
+      targetPort: {{ .Values.grpcPort }}
