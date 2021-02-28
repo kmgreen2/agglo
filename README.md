@@ -10,7 +10,7 @@ object storage, key-value storage or stream processing platforms.
 
 Binge (BINary-at-the-edGE) is the main artifact of the framework.  As the name
 implies, it is a single, compiled binary and can run as a stateless daemon,
-persistent daemon or as a standalone command.  This allows the same binary to
+persistent daemon or as a stand-alone command.  This allows the same binary to
 be deployed in edge gateways, as Kubernetes deployments, in load balancers,
 cloud (lambda) functions, or anywhere else you need to perform stream
 processing.  The deployed artifact is simply a binary and a single JSON config
@@ -29,50 +29,55 @@ nginx-for-stream-processing.
 ## Rationale and Approach
 
 We already have plenty of stable, reliable stream processing frameworks, so
-why do we need this one?  There are two big reasons:
+why do we need this one?
 
-1. Most stream processing is done explicitly using a framework, such as Spark,
+Most stream processing is done explicitly using a framework, such as Spark,
 Flink, Kafka Streams, etc. or via a custom microservice architecture that
-leverages a reliable queue or event bus.
-
-2. Many stream processing tasks are simple transformations, filters,
-aggregations, annotations, etc. that can be done at the point of ingestion.
-This becomes more and more important with IoT use cases, where ingestion points
-(the edge) is far away from your operations VPC(s).
-
-3. Building bespoke micropservices for integration-based event processing is
-overkill.
-
-4. Stateful operations need not occur in a central location
+leverages a reliable queue or event bus.  Many stream processing tasks are
+simple transformations, filters, aggregations, annotations, etc. that can be
+done at the point of ingestion.  This becomes more and more important with IoT
+use cases, where ingestion points (the edge) is far away from your operations
+VPC(s).  In short, we believe that many stream processing tasks can be
+accomplished without the use of stream processing systems and/or custom
+microservice architectures.
 
 Our approach is to provide a single multi-use binary that can handle most
 stream processing tasks, where any stateful interactions are handled by
-exrternal key-value stores, object stores or file systems, and more complex
+external key-value stores, object stores or file systems, and more complex
 stream processing tasks can be forwarded to the appropriate stream processing
-system.  For example, binge is a perfect fit for complimenting existing stream
-processing workloads, since it can preprocess and route events at the edge.
+system.  This provides the flexibility to deploy the binary to the most
+appropriate "edge" (e.g., load balancer, IoT gateway, Lambda function, etc.)
+depending on the use case.  In addition, it provides the flexibility to rely on
+external systems for stateful interactions, which can also exist at the edge
+(e.g., Agglo provides in-memory key-value stores), existing on-prem deployment
+or cloud-managed deployment.
 
-Main insight: No need to do all stream processing in traditional SPE.  Can
-tradeoff cost, latency, throughput, consistency by using binge with other
-systems.  Hypothesis, can use binge as basis of any event-driven architecture,
-where the binge processes are distributed to different edges (IoT gateways, LB,
-Kubernetes, Lambda) and utilize managed systems for persistence and more
-involved processing.
+Agglo/binge is not intended to replace existing stream processing systems.
+While there are many cases where it could be the main technology used for
+stream processing, it is also a perfect fit for complimenting existing stream
+processing workloads, since it can preprocess and route events from the edge
+to a centrally managed stream processing system or event bus.
 
-Draw a picture of this ^^^: Events coming into many binge instances, which are
-relying on managed systems.
+The main insight here is that there is no need to do all stream processing in
+traditional SPE.  The value here is to provide the ability to tradeoff cost,
+latency, throughput, consistency by using binge with other systems.  Our
+hypothesis is that binge can be used as the basis of any event-driven
+architecture, where the binge processes are distributed to different edges (IoT
+gateways, LB, Kubernetes, Lambda) and utilize managed systems for persistence
+and more involved processing.
 
+ToDo: Add some pictures with a few examples.
 
 ## Getting Started
 
-To make life easier, it is best to make sure the tests pass before doing antyhing else.  This requires that the
+To make life easier, it is best to make sure the tests pass before doing anything else.  This requires that the
 following is installed:
 
 - [aws-cli](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html): Local AWS services are used for testing
 - [go-mock](https://github.com/golang/mock): Mocks are generated at test time (I'll probably just check the mocks in eventually)
 - [minio-client](https://docs.min.io/docs/minio-client-quickstart-guide.html): Used for testing local object stores
 
-First, make sure eveything builds and the unit-tests pass:
+First, make sure everything builds and the unit-tests pass:
 
 ```
 $ make test
@@ -98,8 +103,8 @@ There are 5 main components to Agglo:
 1. Process: A stage in the pipeline that will consume an input map, perform an operation (annotation, aggregation, completion, filter, spawner, transformation, tee, continuation, entwine) and output a map.
 2. Pipeline: An ordered collection of processes applied to an event.
 3. External systems: A connector to an external system that can used by a process.  Today, we support S3-like Object Stores, POSIX filesystems, Key-value stores, messaging/pubsub systems and REST endpoints.
-4. Binge: A event processing binary and can run as a stateless daemon, persistent daemon or as a standalone command.
-5. Pipeline configuration: A binge instance is instantiated uwing the pipeline configuration that contains one or more pipelines and their dependent processes and external systems.
+4. Binge: A event processing binary and can run as a stateless daemon, persistent daemon or as a stand-alone command.
+5. Pipeline configuration: A binge instance is instantiated using the pipeline configuration that contains one or more pipelines and their dependent processes and external systems.
 
 ### Processes
 
