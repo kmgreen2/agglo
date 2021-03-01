@@ -1,37 +1,5 @@
-## Welcome to GitHub Pages
+## Agglo: A Framework for Lightweight, Flexible Event Stream Processing
 
-You can use the [editor on GitHub](https://github.com/kmgreen2/agglo/edit/gh-pages/index.md) to maintain and preview the content for your website in Markdown files.
+Agglo is an experimental event stream processing framework that enables lightweight, reliable and scalable stream processing alongside persistent object storage, key-value storage or stream processing platforms.
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
-
-### Markdown
-
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
-
-```markdown
-Syntax highlighted code block
-
-# Header 1
-## Header 2
-### Header 3
-
-- Bulleted
-- List
-
-1. Numbered
-2. List
-
-**Bold** and _Italic_ and `Code` text
-
-[Link](url) and ![Image](src)
-```
-
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
-
-### Jekyll Themes
-
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/kmgreen2/agglo/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
-
-### Support or Contact
-
-Having trouble with Pages? Check out our [documentation](https://docs.github.com/categories/github-pages-basics/) or [contact support](https://support.github.com/contact) and we’ll help you sort it out.
+Binge (BINary-at-the-edGE) is the main artifact of the framework. As the name implies, it is a single, compiled binary and can run as a stateless daemon, persistent daemon or as a stand-alone command. This allows the same binary to be deployed in edge gateways, as Kubernetes deployments, in load balancers, cloud (lambda) functions, or anywhere else you need to perform stream processing. The deployed artifact is simply a binary and a single JSON config that defines the event processing pipelines and configuration for connecting to external object stores, key-value stores, HTTP/RPC endpoints and stream processing systems.
