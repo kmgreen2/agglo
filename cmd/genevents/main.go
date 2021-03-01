@@ -630,6 +630,7 @@ type CommandState struct {
 	sender Sender
 	numEvents int32
 	numThreads int
+	silent bool
 	stats *Stats
 }
 
@@ -716,6 +717,7 @@ func parseArgs() *CommandState {
 	schemaPtr := flag.String("schema", "", "path to config file schemas")
 	numEventsPtr := flag.Int("numEvents", 100, "number of events to generate")
 	numThreadsPtr := flag.Int("numThreads", 1, "number of threads used to generate events")
+	silentPtr := flag.Bool("silent", false, "if specified, will not print statistics")
 	outputUsage := `destination to send the events:
 - File: a '/' delimited path ("" will go to stdout)
 - Endpoint: a http://host:port/path endpoint
@@ -741,6 +743,8 @@ func parseArgs() *CommandState {
 	args.numThreads = *numThreadsPtr
 
 	args.stats = NewStats(args.numThreads)
+
+	args.silent = *silentPtr
 
 	if isUrl(*outputPtr) {
 		args.sender, err = NewHttpSender(*outputPtr)
@@ -801,5 +805,8 @@ func main() {
 		}(i)
 	}
 	wg.Wait()
-	fmt.Println(args.stats.Finish())
+
+	if !args.silent {
+		fmt.Println(args.stats.Finish())
+	}
 }

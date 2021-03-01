@@ -2,8 +2,8 @@
 
 PROTOC=protoc  -I=api/proto
 
-PKG_SOURCES = $(filter-out %_test.go,$(wildcard pkg/**/*.go))
-INTERNAL_SOURCES = $(filter-out %_test.go,$(wildcard internal/**/*.go))
+PKG_SOURCES=$(filter-out %_test.go,$(wildcard pkg/**/*.go))
+INTERNAL_SOURCES=$(filter-out %_test.go,$(wildcard internal/**/*.go))
 export GOOS ?= $(scripts/myos.sh)
 
 define _mockgen
@@ -89,8 +89,8 @@ proto: api/proto/pipeline.proto api/proto/genevents.proto
 
 .PHONY: lambda-local
 lambda-local:
-	docker build --build-arg CONFIGFILE=test/config/basic_pipeline.json --rm --target lambda-local . -t binge-lambda-local:latest
+	docker build --build-arg CONFIGFILE=$(CONFIGFILE) --rm --target lambda-local . -t binge-lambda-$(LAMBDANAME)-local:latest
 
 .PHONY: lambda-production
 lambda-production:
-	docker build --build-arg CONFIGFILE=test/config/basic_pipeline.json --rm --target lambda-production . -t binge-lambda-production:latest
+	docker build --build-arg CONFIGFILE=$(CONFIGFILE) --rm --target lambda-production . -t binge-lambda-$(LAMBDANAME)-production:latest

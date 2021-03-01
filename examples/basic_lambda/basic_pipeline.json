@@ -1,0 +1,169 @@
+{
+  "partitionUuid": "c5024ca8-d601-499f-bb24-daae74357b5e",
+  "pipelines": [
+    {
+      "name": "BasicPipeline",
+      "processes": [
+        {
+          "name": "BeforeTee",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
+          "name": "AnnotateFooBar",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
+          "name": "SumSomeNum",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
+          "name": "RemovePrefix",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
+          "name": "AfterTee",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        }
+      ],
+      "enableTracing": false,
+      "enableMetrics": false
+    }
+  ],
+  "externalSystems": [
+    {
+      "name": "BeforeEvents",
+      "connectionString": "/tmp/before-events",
+      "externalType": "ExternalLocalFile"
+    },
+    {
+      "name": "AfterEvents",
+      "connectionString": "/tmp/after-events",
+      "externalType": "ExternalLocalFile"
+    },
+    {
+      "name": "AggregatorStateKVStore",
+      "connectionString": "mem:aggregatorState",
+      "externalType": "ExternalKVStore"
+    }
+  ],
+  "processDefinitions": [
+    {
+      "annotator": {
+        "name": "AnnotateFooBar",
+        "annotations": [
+          {
+            "fieldKey": "foobar",
+            "value": "found",
+            "condition": {
+              "expression": {
+                "comparator": {
+                  "lhs": {
+                    "variable": {
+                      "name": "someDict.someFixed"
+                    }
+                  },
+                  "rhs": {
+                    "literal": "foobar"
+                  },
+                  "op": "Equal"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "aggregator": {
+        "name": "SumSomeNum",
+        "condition": {},
+        "stateStore": "AggregatorStateKVStore",
+        "asyncCheckpoint": false,
+        "forwardState": true,
+        "aggregation": {
+          "key": "someNum",
+          "aggregationType": "AggSum",
+          "groupByKeys": []
+        }
+      }
+    },
+    {
+      "transformer": {
+        "name": "RemovePrefix",
+        "specs": [
+          {
+            "sourceField": "someVocab",
+            "targetField": "someVocabSansPrefix",
+            "transformation": {
+              "transformationType": "TransformMapRegex",
+              "condition": {},
+              "mapRegexArgs": {
+                "regex": "buzz/(.*)",
+                "replace": "$1"
+              }
+            }
+          }
+        ],
+        "forwardInputFields": true
+      }
+    },
+    {
+      "tee": {
+        "name": "BeforeTee",
+        "condition": {},
+        "outputConnectorRef": "BeforeEvents",
+        "transformerRef": "",
+        "additionalBody": {}
+      }
+    },
+    {
+      "tee": {
+        "name": "AfterTee",
+        "condition": {},
+        "outputConnectorRef": "AfterEvents",
+        "transformerRef": "",
+        "additionalBody": {}
+      }
+    }
+  ]
+}
