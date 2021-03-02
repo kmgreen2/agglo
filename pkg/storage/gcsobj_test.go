@@ -10,9 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/option"
 	"io"
+	"net"
 	"net/http"
-	"net/url"
+	"os"
 	"testing"
+	"time"
 )
 
 func SetupGCSLocal() (*fakestorage.Server, error){
@@ -25,29 +27,35 @@ func SetupGCSLocal() (*fakestorage.Server, error){
 			},
 		},
 		Scheme: "http",
-		Host: "127.0.0.1",
+		Host: "localhost",
 		Port: 8081,
+		Writer: os.Stdout,
+		PublicHost: "localtest.localhost",
 	})
+}
+
+// This is due to a "bug" in the fake GCS server that expects <bucketname>.<host> URL scheme.  We need to hijack
+// DNS resolution to resolve localtest.localhost -> localhost
+func GetFakeTransport() *http.Transport {
+	transport := &http.Transport{
+	}
+	dialer := &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if addr == "localtest.localhost:8081" {
+			addr = "localhost:8081"
+		}
+		return dialer.DialContext(ctx, network, addr)
+	}
+
+	return transport
 }
 
 func LocalGCSObjectStoreParams() (*storage.GCSObjectStoreBackendParams, error) {
 	return storage.NewGCSObjectStoreBackendParams(storage.GCSObjectStoreBackend,
 		"localtest")
-}
-
-// Using the golang SDK with a GCS emulator is a PITA.
-// Workaround: https://github.com/googleapis/google-cloud-go/issues/2476
-type roundTripper url.URL
-func (rt roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Host = rt.Host
-	req.URL.Host = rt.Host
-	req.URL.Scheme = rt.Scheme
-	return http.DefaultTransport.RoundTrip(req)
-}
-
-func GetTestHttpClient(endpoint string) *http.Client {
-	u, _ := url.Parse(endpoint)
-	return &http.Client{Transport: roundTripper(*u)}
 }
 
 func TestGCSHappyPath(t *testing.T) {
@@ -61,8 +69,10 @@ func TestGCSHappyPath(t *testing.T) {
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
+	os.Setenv("STORAGE_EMULATOR_HOST", "localhost:8081")
 	objStore, err := storage.NewGCSObjectStore(params, option.WithoutAuthentication(),
-		option.WithHTTPClient(GetTestHttpClient("http://127.0.0.1:8081")))
+		option.WithHTTPClient(&http.Client{Transport: GetFakeTransport()}),
+		option.WithEndpoint("http://localtest.localhost:8081/storage/v1"))
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -76,7 +86,9 @@ func TestGCSHappyPath(t *testing.T) {
 	objHash := randomReader.Hash()
 
 	err = objStore.Head(context.Background(), key)
-	assert.Nil(t, err)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
 
 	reader, err := objStore.Get(context.Background(), key)
 	if err != nil {
