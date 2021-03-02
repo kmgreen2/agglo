@@ -33,6 +33,8 @@ const (
 	MemObjectStoreBackend
 	// S3ObjectStoreBackend
 	S3ObjectStoreBackend
+	// GCSObjectStoreBackend
+	GCSObjectStoreBackend
 )
 
 // ObjectStoreBackendParams is an interface whose implementation converts backend parameters into a map of strings
