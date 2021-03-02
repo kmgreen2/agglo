@@ -1,4 +1,4 @@
-## Agglo: A Framework for Lightweight, Flexible Event Stream Processing
+## Agglo: A Process-Anywhere Framework for Event Stream Processing
 
 Agglo is an experimental event stream processing framework that enables lightweight, reliable and scalable stream processing alongside persistent object storage, key-value storage or stream processing platforms.
 
