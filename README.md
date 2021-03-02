@@ -1,4 +1,4 @@
-# Agglo: A Framework for Lightweight, Flexible Event Stream Processing
+# Agglo: A Process-Anywhere Framework for Event Stream Processing
 
 ![Workflow Status](https://github.com/kmgreen2/agglo/workflows/Go/badge.svg?branch=main)
 
