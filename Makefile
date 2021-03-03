@@ -61,15 +61,15 @@ lint:
 
 .PHONY: test
 test: build genmocks ## run tests quickly
-	deployments/minio/run-minio.sh  && deployments/dynamodb/run-dynamodb.sh && \
+	deployments/local/minio/run-minio.sh  && deployments/local/dynamodb/run-dynamodb.sh && \
 	go test ./... ; \
-	deployments/minio/stop-minio.sh ; deployments/dynamodb/stop-dynamodb.sh  
+	deployments/local/minio/stop-minio.sh ; deployments/local/dynamodb/stop-dynamodb.sh  
 
 coverage: setup genmocks ## check code coverage
-	deployments/minio/run-minio.sh  && deployments/dynamodb/run-dynamodb.sh  && \
+	deployments/local/minio/run-minio.sh  && deployments/local/dynamodb/run-dynamodb.sh  && \
 	go test ./... -cover -coverprofile=coverage.txt && \
 	go tool cover -html=coverage.txt -o coverage.html && \
-	deployments/minio/stop-minio.sh ; deployments/dynamodb/stop-dynamodb.sh  
+	deployments/local/minio/stop-minio.sh ; deployments/local/dynamodb/stop-dynamodb.sh  
 
 .PHONY: ci-test
 ci-test: genmocks ## run tests quickly

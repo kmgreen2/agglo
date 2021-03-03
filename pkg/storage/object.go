@@ -33,6 +33,8 @@ const (
 	MemObjectStoreBackend
 	// S3ObjectStoreBackend
 	S3ObjectStoreBackend
+	// GCSObjectStoreBackend
+	GCSObjectStoreBackend
 )
 
 // ObjectStoreBackendParams is an interface whose implementation converts backend parameters into a map of strings
@@ -134,6 +136,15 @@ func SerializeObjectDescriptor(desc *ObjectDescriptor) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+	} else if params, ok := desc.backendParams.(*GCSObjectStoreBackendParams); ok {
+		paramsBytes, err := SerializeGCSObjectStoreParams(params)
+		if err != nil {
+			return nil, err
+		}
+		err = gEncoder.Encode(paramsBytes)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		return nil, util.NewInvalidError(fmt.Sprintf("Deserialize - invalid backend params type: %T",
 			desc.backendParams))
@@ -177,6 +188,11 @@ func DeserializeObjectDescriptor(descBytes []byte, desc *ObjectDescriptor) error
 		}
 	} else if backendType == S3ObjectStoreBackend {
 		desc.backendParams, err = NewS3ObjectStoreBackendParamsFromBytes(paramsBytes)
+		if err != nil {
+			return err
+		}
+	} else if backendType == GCSObjectStoreBackend {
+		desc.backendParams, err = NewGCSObjectStoreBackendParamsFromBytes(paramsBytes)
 		if err != nil {
 			return err
 		}
