@@ -34,4 +34,4 @@ require (
 	gorm.io/gorm v1.20.12
 )
 
-replace github.com/fsouza/fake-gcs-server => github.com/kmgreen2/fake-gcs-server v1.22.6-0.20210302174812-4d574d29511e
+replace github.com/fsouza/fake-gcs-server => github.com/kmgreen2/fake-gcs-server v1.22.6-0.20210303005955-0c51fa1090e3

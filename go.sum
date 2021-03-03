@@ -277,8 +277,8 @@ github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+o
 github.com/klauspost/cpuid v1.2.3/go.mod h1:Pj4uuM528wm8OyEC2QMXAi2YiTZ96dNQPGgoMS4s3ek=
 github.com/klauspost/cpuid v1.3.1 h1:5JNjFYYQrZeKRJ0734q51WCEEn2huer72Dc7K+R/b6s=
 github.com/klauspost/cpuid v1.3.1/go.mod h1:bYW4mA6ZgKPob1/Dlai2LviZJO7KGI3uoWLd42rAQw4=
-github.com/kmgreen2/fake-gcs-server v1.22.6-0.20210302174812-4d574d29511e h1:bQ7wvZYfOt+H+mbokvqrQHIVDr3MKK9NHkip5InDyNg=
-github.com/kmgreen2/fake-gcs-server v1.22.6-0.20210302174812-4d574d29511e/go.mod h1:j4TheshxTrJe4HOIK3fphej5biFC8paNoV7sDUdIuuM=
+github.com/kmgreen2/fake-gcs-server v1.22.6-0.20210303005955-0c51fa1090e3 h1:3gn7CXKKpmZ2MSsSEOQfuyUsDmdXko6TVBPQll4OaJI=
+github.com/kmgreen2/fake-gcs-server v1.22.6-0.20210303005955-0c51fa1090e3/go.mod h1:PKywH0LLTauval/oOepd2mP+uJy3uJLeQh6UuTXnCuY=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/konsorten/go-windows-terminal-sequences v1.0.2/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515/go.mod h1:+0opPa2QZZtGFBFZlji/RkVcI2GknAs/DXo4wKdlNEc=

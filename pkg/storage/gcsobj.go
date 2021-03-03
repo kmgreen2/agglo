@@ -219,9 +219,15 @@ func (objStore *GCSObjectStore) Delete(ctx context.Context, key string) error {
 
 func (objStore *GCSObjectStore) List(ctx context.Context, prefix string) ([]string, error) {
 	var objectKeys []string
-	objects := objStore.client.Bucket(objStore.bucketName).Objects(ctx, &storage.Query{
-		Prefix: prefix,
-	})
+	var objects *storage.ObjectIterator
+
+	if len(prefix) > 0 {
+		objects = objStore.client.Bucket(objStore.bucketName).Objects(ctx, &storage.Query{
+			Prefix: prefix,
+		})
+	} else {
+		objects = objStore.client.Bucket(objStore.bucketName).Objects(ctx, &storage.Query{})
+	}
 
 	for {
 		object, err := objects.Next()

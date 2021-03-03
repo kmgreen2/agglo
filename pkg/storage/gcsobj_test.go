@@ -58,13 +58,11 @@ func LocalGCSObjectStoreParams() (*storage.GCSObjectStoreBackendParams, error) {
 		"localtest")
 }
 
-func TestGCSHappyPath(t *testing.T) {
-	fileSize := 1024
+func setupGCSTest(t *testing.T) (*fakestorage.Server, storage.ObjectStore) {
 	fakeGCS, err := SetupGCSLocal()
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
-	defer fakeGCS.Stop()
 	params, err := LocalGCSObjectStoreParams()
 	if err != nil {
 		assert.FailNow(t, err.Error())
@@ -76,11 +74,19 @@ func TestGCSHappyPath(t *testing.T) {
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
+	return fakeGCS, objStore
+}
+
+func TestGCSHappyPath(t *testing.T) {
+	fileSize := 1024
 	randomReader := NewRandomReader(fileSize)
 
 	key := gUuid.New().String()
 
-	err = objStore.Put(context.Background(), key, randomReader)
+	fakeGCS, objStore := setupGCSTest(t)
+	defer fakeGCS.Stop()
+
+	err := objStore.Put(context.Background(), key, randomReader)
 	assert.Nil(t, err)
 
 	objHash := randomReader.Hash()
@@ -117,4 +123,144 @@ func TestGCSHappyPath(t *testing.T) {
 
 	err = objStore.Delete(context.Background(), key)
 	assert.Nil(t, err)
+}
+
+func TestGCSPutOverwrite(t *testing.T) {
+	fakeGCS, objStore := setupGCSTest(t)
+	defer fakeGCS.Stop()
+
+	randomReader := NewRandomReader(1024)
+
+	key := gUuid.New().String()
+
+	err := objStore.Put(context.Background(), key, randomReader)
+	assert.Nil(t, err)
+
+	randomReader = NewRandomReader(1024)
+
+	err = objStore.Put(context.Background(), key, randomReader)
+	assert.Nil(t, err)
+}
+
+func TestGCSPutReadError(t *testing.T) {
+	fakeGCS, objStore := setupGCSTest(t)
+	defer fakeGCS.Stop()
+	badReader := &BadReader{}
+
+	err := objStore.Put(context.Background(), "foo", badReader)
+	assert.Error(t, err)
+}
+
+func TestGCSGetNotFound(t *testing.T) {
+	fakeGCS, objStore := setupGCSTest(t)
+	defer fakeGCS.Stop()
+	_, err := objStore.Get(context.Background(), "baz")
+	assert.Error(t, err)
+}
+
+func TestGCSHeadNotFound(t *testing.T) {
+	fakeGCS, objStore := setupGCSTest(t)
+	defer fakeGCS.Stop()
+	err := objStore.Head(context.Background(), "baz")
+	assert.Error(t, err)
+}
+
+func TestGCSListNone(t *testing.T) {
+	fakeGCS, objStore := setupGCSTest(t)
+	defer fakeGCS.Stop()
+	key := gUuid.New().String()
+
+	err := putObjects(objStore, key, 10, 0)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	results, err := objStore.List(context.Background(), "notprefix")
+	assert.Equal(t, len(results), 0)
+}
+
+func TestGCSListAll(t *testing.T) {
+	fakeGCS, objStore := setupGCSTest(t)
+	defer fakeGCS.Stop()
+
+	key := gUuid.New().String()
+
+	err := putObjects(objStore, key, 10, 10)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	results, err := objStore.List(context.Background(), "")
+	// Gotta do >= because the bucket may have a bunch of objects
+	assert.True(t, len(results) >= 20)
+}
+
+func TestGCSListSome(t *testing.T) {
+	fakeGCS, objStore := setupGCSTest(t)
+	defer fakeGCS.Stop()
+	key := gUuid.New().String()
+
+	err := putObjects(objStore, key, 10, 10)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	results, err := objStore.List(context.Background(), key)
+	assert.Equal(t, len(results), 10)
+}
+
+func TestSerDeGCS(t *testing.T) {
+	var objDescDeser storage.ObjectDescriptor
+	params, err := LocalGCSObjectStoreParams()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	objDesc := storage.NewObjectDescriptor(params, "foo")
+
+	objDescBytes, err := storage.SerializeObjectDescriptor(objDesc)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	err = storage.DeserializeObjectDescriptor(objDescBytes, &objDescDeser)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	assert.Equal(t, objDesc.GetParams(), objDescDeser.GetParams())
+	assert.Equal(t, objDesc.GetKey(), objDescDeser.GetKey())
+}
+
+func TestSerDeGCSDifferent(t *testing.T) {
+	var objDescDeser storage.ObjectDescriptor
+	params, err := LocalGCSObjectStoreParams()
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	objDesc := storage.NewObjectDescriptor(params, "foo")
+
+	objDescBytes, err := storage.SerializeObjectDescriptor(objDesc)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	err = storage.DeserializeObjectDescriptor(objDescBytes, &objDescDeser)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	objDesc = storage.NewObjectDescriptor(params, "bar")
+
+	assert.Equal(t, objDesc.GetParams(), objDescDeser.GetParams())
+	assert.NotEqual(t, objDesc.GetKey(), objDescDeser.GetKey())
+}
+
+func TestSerDeGCSFail(t *testing.T) {
+	var objDescDeser storage.ObjectDescriptor
+
+	err := storage.DeserializeObjectDescriptor([]byte("bad"), &objDescDeser)
+	assert.Error(t, err)
+
 }
