@@ -1,4 +1,4 @@
-ROOTDIR=$( dirname $0 )/../../..
+ROOTDIR=$( dirname $0 )/../../../..
 
 function cleanup {
     if [[ -z ${CI_TEST} ]]; then
@@ -91,11 +91,11 @@ curl --silent -X POST http://localhost:8002/api/v1/tick > /dev/null 2>&1
 if [[ -n ${DEBUG_BINGE} ]]; then
     read -p "Start debugger for binge, then press any key to continue: " NOTHING
 else
-    ${ROOTDIR}/bin/binge  -daemonPath /entwine -daemonPort 8008 -maxConnections 16 -runType stateless-daemon -exporter stdout -config ${ROOTDIR}/usecase/entwine/config/binge-a.json > /tmp/binge-a.out 2>&1 &
+    ${ROOTDIR}/bin/binge  -daemonPath /entwine -daemonPort 8008 -maxConnections 16 -runType stateless-daemon -exporter stdout -config ${ROOTDIR}/test/functional/entwine/config/binge-a.json > /tmp/binge-a.out 2>&1 &
     BINGE1_PID=$!
 fi
 
-${ROOTDIR}/bin/binge  -daemonPath /entwine -daemonPort 8009 -maxConnections 16 -runType stateless-daemon -exporter stdout -config ${ROOTDIR}/usecase/entwine/config/binge-b.json > /tmp/binge-b.out 2>&1 &
+${ROOTDIR}/bin/binge  -daemonPath /entwine -daemonPort 8009 -maxConnections 16 -runType stateless-daemon -exporter stdout -config ${ROOTDIR}/test/functional/entwine/config/binge-b.json > /tmp/binge-b.out 2>&1 &
 BINGE2_PID=$!
 sleep 2
 

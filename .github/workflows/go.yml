@@ -72,7 +72,7 @@ jobs:
         REGION: 'us-west-2'
     
     - name: Entwine Functional Test
-      run: CI_TEST=1 usecase/entwine/scripts/run-dual-binge-entwine.sh 
+      run: CI_TEST=1 test/functional/entwine/scripts/run-dual-binge-entwine.sh 
       env:
         AWS_ACCESS_KEY_ID: 'localtest'
         AWS_SECRET_ACCESS_KEY: 'localtest'

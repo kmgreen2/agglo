@@ -1,0 +1,100 @@
+{
+  "partitionUuid": "9eb9f91d-b8e6-461d-896d-5e553ade52f7",
+  "pipelines": [
+    {
+      "name": "BingeA",
+      "processes": [
+        {
+          "name": "AnnotateBinge",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
+          "name": "EntwineA",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
+          "name": "TeeOutputA",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        }
+      ],
+      "enableTracing": false,
+      "enableMetrics": false
+    }
+  ],
+  "externalSystems": [
+    {
+      "name": "KVStore",
+      "connectionString": "dynamo:endpoint=http://localhost:8000,region=us-west-2,tableName=kvStoreA,prefixLength=4",
+      "externalType": "ExternalKVStore"
+    },
+    {
+      "name": "ObjectStore",
+      "connectionString": "s3:endpoint=localhost:9000,bucketName=localtesta",
+      "externalType": "ExternalObjectStore"
+    },
+    {
+      "name": "LocalFileForA",
+      "connectionString": "/tmp/a-out",
+      "externalType": "ExternalLocalFile"
+    }
+  ],
+  "processDefinitions": [
+    {
+      "annotator": {
+        "name": "AnnotateBinge",
+        "annotations": [
+          {
+            "fieldKey": "bingeProcess",
+            "value": "A",
+            "condition": {}
+          }
+        ]
+      }
+    },
+    {
+      "entwine": {
+        "name": "EntwineA",
+        "streamStateStore": "KVStore",
+        "objectStore": "ObjectStore",
+        "pemPath": "/tmp/a.pem",
+        "subStreamID": "e546e731-2b86-43cd-b847-764f437a7835",
+        "tickerEndpoint": "localhost:8001",
+        "tickerInterval": 1,
+        "condition": {}
+      }
+    },
+    {
+      "tee": {
+        "name": "TeeOutputA",
+        "condition": {},
+        "outputConnectorRef": "LocalFileForA",
+        "transformerRef": "",
+        "additionalBody": {}
+      }
+    }
+  ]
+}
