@@ -79,7 +79,7 @@ anchor after every event, we know that the first event (idx:1, aIdx:1) should de
 
 Get the first event:
 ```
-$ echo /tmp/a-out/* | xargs cat | jq 'select(.idx==1)'
+$ echo /tmp/a-out/* | xargs cat | jq 'select(.idx==7)'
 {
   "aIdx": 3,
   "bingeProcess": "A",
@@ -104,7 +104,7 @@ $ echo /tmp/a-out/* | xargs cat | jq 'select(.idx==1)'
 Get the second event:
 
 ```
-$ echo /tmp/b-out/* | xargs cat | jq 'select(.idx==2)'
+$ echo /tmp/b-out/* | xargs cat | jq 'select(.idx==8)'
 {
   "bIdx": 8,
   "bingeProcess": "B",
