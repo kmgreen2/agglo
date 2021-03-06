@@ -1,0 +1,100 @@
+{
+  "partitionUuid": "e3f9e001-4920-45da-b053-18588e45804b",
+  "pipelines": [
+    {
+      "name": "TrafficMirror",
+      "processes": [
+        {
+          "name": "Forward to Test",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
+          "name": "Forward to Service Production",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        }
+      ],
+      "enableTracing": false,
+      "enableMetrics": false
+    }
+  ],
+  "externalSystems": [
+    {
+      "name": "ServiceA",
+      "connectionString": "http://localhost:1337/webhook",
+      "externalType": "ExternalHttp"
+    },
+    {
+      "name": "ServiceB",
+      "connectionString": "http://localhost:1338/webhook",
+      "externalType": "ExternalHttp"
+    }
+  ],
+  "processDefinitions": [
+    {
+      "tee": {
+        "name": "Forward to Service Production",
+        "condition": {},
+        "outputConnectorRef": "ServiceA",
+        "transformerRef": "",
+        "additionalBody": {}
+      }
+    },
+    {
+      "transformer": {
+        "name": "APIChange",
+        "specs": [
+          {
+            "sourceField": "someNum",
+            "targetField": "newNum",
+            "transformation": {
+              "transformationType": "TransformCopy",
+              "condition": {}
+            }
+          }
+        ],
+        "forwardInputFields": true
+      }
+    },
+    {
+      "tee": {
+        "name": "Forward to Test",
+        "condition": {
+          "expression": {
+            "comparator": {
+              "lhs": {
+                "variable": {
+                  "name": "doTest"
+                }
+              },
+              "rhs": {
+                "literal": "true"
+              },
+              "op": "Equal"
+            }
+          }
+        },
+        "outputConnectorRef": "ServiceB",
+        "transformerRef": "APIChange",
+        "additionalBody": {
+          "routedTest": true
+        }
+      }
+    }
+  ]
+}
