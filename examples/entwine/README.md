@@ -79,11 +79,11 @@ anchor after every event, we know that the first event (idx:1, aIdx:1) should de
 
 Get the first event:
 ```
-$ echo /tmp/a-out/* | xargs cat | jq 'select(.idx==7)'
+$ echo /tmp/a-out/* | xargs cat | jq 'select(.idx==5)'
 {
   "aIdx": 3,
   "bingeProcess": "A",
-  "idx": 7,
+  "idx": 5,
   "internal:entwine:output": [
     {
       "entwineUuid": "39384886-650a-4e11-9359-d673d2be5edb",
