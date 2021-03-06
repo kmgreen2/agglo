@@ -81,9 +81,9 @@ Get the first event:
 ```
 $ echo /tmp/a-out/* | xargs cat | jq 'select(.idx==1)'
 {
-  "aIdx": 1,
+  "aIdx": 3,
   "bingeProcess": "A",
-  "idx": 1,
+  "idx": 7,
   "internal:entwine:output": [
     {
       "entwineUuid": "39384886-650a-4e11-9359-d673d2be5edb",
@@ -106,9 +106,9 @@ Get the second event:
 ```
 $ echo /tmp/b-out/* | xargs cat | jq 'select(.idx==2)'
 {
-  "bIdx": 1,
+  "bIdx": 8,
   "bingeProcess": "B",
-  "idx": 2,
+  "idx": 4,
   "internal:entwine:output": [
     {
       "entwineUuid": "1a50e0e0-1a58-418d-80a4-89e036efe1eb",
@@ -131,8 +131,8 @@ Use `entwinectl` to validate that `39384886-650a-4e11-9359-d673d2be5edb` happene
 ```
 # The format for happenedBefore is <subStreamUuid>:<UUID>:<subStreamIdx>
  ../../bin/entwinectl  -tickerEndpoint localhost:8001 -command HappenedBefore \
-    e546e731-2b86-43cd-b847-764f437a7835:39384886-650a-4e11-9359-d673d2be5edb:1 \
-    ed94a517-f030-4aa6-b390-6283ad24cab3:37443ed1-5349-4cd3-a511-ac5fb70bd0ae:2
+    e546e731-2b86-43cd-b847-764f437a7835:39384886-650a-4e11-9359-d673d2be5edb:3 \
+    ed94a517-f030-4aa6-b390-6283ad24cab3:37443ed1-5349-4cd3-a511-ac5fb70bd0ae:4
 
 39384886-650a-4e11-9359-d673d2be5edb happenedBefore 37443ed1-5349-4cd3-a511-ac5fb70bd0ae: true
 ```
