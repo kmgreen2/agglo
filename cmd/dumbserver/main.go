@@ -1,14 +1,34 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 )
 
+type DumbServerArgs struct {
+	port int
+}
+
+func parseArgs() *DumbServerArgs {
+	args := &DumbServerArgs{}
+
+	portPtr := flag.Int("port", 8080, "listening port")
+	flag.Parse()
+
+	args.port = *portPtr
+
+	return args
+}
+
 func main() {
+	args := parseArgs()
 	http.HandleFunc("/webhook", PrintBody)
-	http.ListenAndServe(":8080", nil)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", args.port), nil)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func PrintBody(w http.ResponseWriter, r *http.Request) {

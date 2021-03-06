@@ -27,6 +27,7 @@ build:
 	CGO_ENABLED=0 go build -o bin/activitytracker cmd/activitytracker/main.go cmd/activitytracker/activitytracker.go
 	CGO_ENABLED=0 go build -o bin/ticker cmd/ticker/main.go
 	CGO_ENABLED=0 go build -o bin/entwinectl cmd/entwinectl/main.go
+	CGO_ENABLED=0 go build -o bin/dumbserver cmd/dumbserver/main.go
 
 .PHONY: ci-build
 ci-build: 
@@ -37,6 +38,7 @@ ci-build:
 	GOOS=linux CGO_ENABLED=0 go build -o bin/activitytracker cmd/activitytracker/main.go cmd/activitytracker/activitytracker.go
 	GOOS=linux CGO_ENABLED=0 go build -o bin/ticker cmd/ticker/main.go
 	GOOS=linux CGO_ENABLED=0 go build -o bin/entwinectl cmd/entwinectl/main.go
+	GOOD=linux CGO_ENABLED=0 go build -o bin/dumbserver cmd/dumbserver/main.go
 
 .PHONY: genmocks
 genmocks:

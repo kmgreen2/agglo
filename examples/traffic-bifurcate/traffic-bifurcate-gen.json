@@ -1,0 +1,43 @@
+{
+  "schemas": [
+    {
+      "name": "foo",
+      "root": {
+        "kvs": {
+          "someNum": {
+            "randomNumeric": {
+              "min": 100,
+              "max": 1000,
+              "maxRef": 1
+            }
+          },
+          "someDict": {
+            "dict": {
+              "kvs": {
+                "someFixed": {
+                  "fixedString": {
+                    "value": "foobar"
+                  }
+                }
+              }
+            }
+          },
+          "doTest": {
+            "vocabString": {
+              "vocab": ["true", "false"]
+            }
+          },
+          "someString": {
+            "randomString": {
+              "minLen": 10,
+              "maxLen": 20,
+              "maxRef": 10,
+              "alphabet": "abcdef1234567890"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "schemaDistribution": [1.0]
+}
