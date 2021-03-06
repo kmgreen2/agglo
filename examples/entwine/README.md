@@ -106,9 +106,9 @@ Get the second event:
 ```
 $ echo /tmp/b-out/* | xargs cat | jq 'select(.idx==8)'
 {
-  "bIdx": 8,
+  "bIdx": 4,
   "bingeProcess": "B",
-  "idx": 4,
+  "idx": 8,
   "internal:entwine:output": [
     {
       "entwineUuid": "1a50e0e0-1a58-418d-80a4-89e036efe1eb",
