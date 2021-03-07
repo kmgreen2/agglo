@@ -1,0 +1,34 @@
+{
+  "schemas": [
+    {
+      "name": "foo",
+      "root": {
+        "kvs": {
+          "someNum": {
+            "randomNumeric": {
+              "min": 100,
+              "max": 1000,
+              "maxRef": 1
+            }
+          },
+          "text": {
+            "vocabString": {
+              "vocab": [
+                "foo", "bar", "bizz"
+              ]
+            }
+          },
+          "someString": {
+            "randomString": {
+              "minLen": 10,
+              "maxLen": 20,
+              "maxRef": 10,
+              "alphabet": "abcdef1234567890"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "schemaDistribution": [1.0]
+}
