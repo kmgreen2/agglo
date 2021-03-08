@@ -2,6 +2,7 @@ package process_test
 
 import (
 	"context"
+	"github.com/kmgreen2/agglo/internal/common"
 	"github.com/kmgreen2/agglo/internal/core"
 	"github.com/kmgreen2/agglo/internal/core/process"
 	"github.com/kmgreen2/agglo/test"
@@ -20,6 +21,7 @@ func TestSpawnerHappyPathAsync(t *testing.T) {
 	out, err := spawner.Process(context.Background(), in)
 
 	assert.Nil(t, err)
+	delete(out, string(common.SpawnMetadataKey))
 	assert.Equal(t, in, out)
 }
 
@@ -37,6 +39,7 @@ func TestSpawnerHappyPathFalseCondition(t *testing.T) {
 	assert.True(t, end.Sub(start) < 1*time.Second)
 
 	assert.Nil(t, err)
+	delete(out, string(common.SpawnMetadataKey))
 	assert.Equal(t, in, out)
 }
 
@@ -54,6 +57,7 @@ func TestSpawnerHappyPathSync(t *testing.T) {
 
 	assert.True(t, end.Sub(start) > 1 * time.Second)
 	assert.Nil(t, err)
+	delete(out, string(common.SpawnMetadataKey))
 	assert.Equal(t, in, out)
 }
 
@@ -84,5 +88,6 @@ func TestSpawnerHappyPathDelaySync(t *testing.T) {
 
 	assert.True(t, end.Sub(start) > 2 * time.Second)
 	assert.Nil(t, err)
+	delete(out, string(common.SpawnMetadataKey))
 	assert.Equal(t, in, out)
 }

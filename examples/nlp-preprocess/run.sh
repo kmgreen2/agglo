@@ -24,10 +24,13 @@ mc alias set localtest http://localhost:9000 localtest localtest
 # Create buckets to use in the test
 mc mb localtest/localtest || exit 1
 
-../../bin/binge  -daemonPath /binge -daemonPort 80 -maxConnections 4 -runType stateless-daemon -exporter none -config ./nlp-pipeline.json >/tmp/binge.out 2>&1 &
-PID2=$!
-
-sleep 5
+if [[ ${DEBUG_BINGE} == "1" ]]; then
+    read  -p "Start binge in a debugger and hit enter to continue: " val
+else
+    ../../bin/binge  -daemonPath /binge -daemonPort 80 -maxConnections 4 -runType stateless-daemon -exporter none -config ./nlp-pipeline.json >/tmp/binge.out 2>&1 &
+    PID2=$!
+    sleep 5
+fi
 
 ../../bin/genevents  -numEvents 20 -numThreads 1 -schema ./nlp-pipeline-gen.json -output http://localhost:80/binge
 

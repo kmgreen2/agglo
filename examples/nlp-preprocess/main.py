@@ -32,7 +32,6 @@ def parse_args() -> Args:
 
 def main():
     args = parse_args()
-
     in_map = json.load(sys.stdin)
 
     in_text = in_map.get(args.payload_field)
@@ -47,10 +46,9 @@ def main():
     if tokenizer:
         tokens = list(tokenizer.tokenize(in_text))
 
-    print({
+    print(json.dumps({
         "tokens": tokens
-    })
-
+    }), end='')
 
 if __name__ == '__main__':
     main()

@@ -2,10 +2,15 @@ package process
 
 import (
 	"context"
+	"fmt"
+	"github.com/kmgreen2/agglo/internal/common"
 	"github.com/kmgreen2/agglo/internal/core"
 	"github.com/kmgreen2/agglo/pkg/util"
+	"reflect"
 	"time"
 )
+
+var SpawnMetadataKey string = string(common.SpawnMetadataKey)
 
 type Spawner struct {
 	name string
@@ -41,6 +46,21 @@ func (s Spawner) Process(ctx context.Context, in map[string]interface{}) (map[st
 			result := f.Get()
 			if result.Error() != nil {
 				return in, PipelineProcessError(s, result.Error(), "running job")
+			}
+			if _, ok := out[SpawnMetadataKey]; !ok {
+				out[SpawnMetadataKey] = make([]map[string]interface{}, 0)
+			}
+
+			switch outVal := out[SpawnMetadataKey].(type) {
+			case []map[string]interface{}:
+				spawnResult := map[string]interface{} {
+					s.name: result.Value(),
+				}
+				out[SpawnMetadataKey] = append(outVal, spawnResult)
+			default:
+				msg := fmt.Sprintf("detected corrupted %s in map when spawning.  expected []map[string]string, got %v",
+					SpawnMetadataKey, reflect.TypeOf(outVal))
+				return nil, util.NewInternalError(msg)
 			}
 		}
 	}
