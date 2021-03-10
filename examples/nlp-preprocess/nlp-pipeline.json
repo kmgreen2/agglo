@@ -1,0 +1,111 @@
+{
+  "partitionUuid": "9926252d-d92a-48e4-89d3-74b1b47892dc",
+  "pipelines": [
+    {
+      "name": "Tokenizer",
+      "processes": [
+        {
+          "name": "Store Original in S3",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
+          "name": "Tokenize",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
+          "name": "Send Tokens to Token Endpoint",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        }
+      ],
+      "enableTracing": false,
+      "enableMetrics": false
+    }
+  ],
+  "externalSystems": [
+    {
+      "name": "TokenEndpoint",
+      "connectionString": "http://localhost:1337/webhook",
+      "externalType": "ExternalHttp"
+    },
+    {
+      "name": "S3ObjectStore",
+      "connectionString": "s3:endpoint=localhost:9000,bucketName=localtest",
+      "externalType": "ExternalObjectStore"
+    }
+  ],
+  "processDefinitions": [
+    {
+      "spawner": {
+        "name": "Tokenize",
+        "condition": {
+          "exists": {
+            "ops": [
+              {
+                "key": "text",
+                "op": "Exists"
+              }
+            ]
+          }
+        },
+        "delayInMs": 0,
+        "doSync": true,
+        "job": {
+          "runnable": {
+            "pathToExec": "/usr/local/bin/docker",
+            "cmdArgs": [
+              "run",
+              "-i",
+              "tokenizer",
+              "python3",
+              "main.py",
+              "--tokenize_type",
+              "regular"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "tee": {
+        "name": "Store Original in S3",
+        "condition": {},
+        "outputConnectorRef": "S3ObjectStore",
+        "transformerRef": "",
+        "additionalBody": {}
+      }
+    },
+    {
+      "tee": {
+        "name": "Send Tokens to Token Endpoint",
+        "condition": {},
+        "outputConnectorRef": "TokenEndpoint",
+        "transformerRef": "",
+        "additionalBody": {}
+      }
+    }
+  ]
+}
