@@ -1,6 +1,21 @@
 ROOTDIR=$( dirname $0 )/../..
 THISDIR=$( dirname $0 )
 
+SETUP_MINIO=
+function cleanup {
+    if [[ -n ${SETUP_MINIO} ]]; then
+        docker kill minio
+        docker rm minio
+    fi
+    if [[ -n ${PID1} ]]; then
+        kill -9 ${PID1}
+    fi
+    if [[ -n ${PID2} ]]; then
+        kill -9 ${PID2}
+    fi
+}
+
+trap cleanup EXIT INT TERM
 MINIO_PORT=9000
 
 export AWS_ACCESS_KEY_ID=localtest
@@ -18,7 +33,8 @@ docker run -d -p ${MINIO_PORT}:${MINIO_PORT} \
     --name minio \
     minio/minio server /data || exit 1
 
-sleep 2
+SETUP_MINIO=1
+sleep 2 
 mc alias set localtest http://localhost:9000 localtest localtest
 
 # Create buckets to use in the test
@@ -34,6 +50,12 @@ fi
 
 ../../bin/genevents  -numEvents 20 -numThreads 1 -schema ./nlp-pipeline-gen.json -output http://localhost:80/binge
 
+S3_OBJECT=`mc ls localtest/localtest | awk '{print $5;}' | head -n 1`
+EXAMPLE_MESSAGE=`mc cat localtest/localtest/${S3_OBJECT} | jq '."internal:messageID"'`
+echo "Example Message ID: ${EXAMPLE_MESSAGE}"
+echo "Example S3 object:"
+mc cat localtest/localtest/${S3_OBJECT} | head -n 1 | jq
+echo "Payload from Dumbserver:"
+cat /tmp/dumbserver.1337  | grep ${EXAMPLE_MESSAGE} | jq
+
 kill -9 ${PID1} ${PID2}
-docker kill minio
-docker rm minio
