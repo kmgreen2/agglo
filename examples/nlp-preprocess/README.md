@@ -129,15 +129,15 @@ The entire example is contained in `./run.sh`:
 If everything goes well, you should eventually see an example event's S3 object and dumbserver payload:
 
 ```
-Example Message ID: "5f0c58a0-c348-426b-947f-7780f3c9bafd"
+Example Message ID: "08195e48-59a3-4d78-b793-4a590ab5102d"
 Example S3 object:
 {
-  "internal:messageID": "5f0c58a0-c348-426b-947f-7780f3c9bafd",
+  "internal:messageID": "08195e48-59a3-4d78-b793-4a590ab5102d",
   "internal:name": "Tokenizer",
   "internal:partitionID": "9926252d-d92a-48e4-89d3-74b1b47892dc",
-  "someNum": 946.4581792405112,
-  "someString": "b39ea4e21e6436",
-  "text": "I'm heading back to Colorado tomorrow after being down in Santa Barbara over the weekend for the festival there. I will be making October plans once there and will try to arrange so I'm back here for the birthday if possible. I'll let you know as soon as I know the doctor's appointment schedule and my flight plans."
+  "someNum": 217.3724615564126,
+  "someString": "ed8be22a024786c72",
+  "text": "She patiently waited for his number to be called. She had no desire to be there, but her mom had insisted that she go. She's resisted at first, but over time she realized it was simply easier to appease her and go. Mom tended to be that way. She would keep insisting until you wore down and did what she wanted. So, here she sat, patiently waiting for her number to be called."
 }
 Payload from Dumbserver:
 {
