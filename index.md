@@ -6,6 +6,10 @@ Binge (BINary-at-the-edGE) is the main artifact of the framework. As the name im
 
 See the [examples](https://github.com/kmgreen2/agglo/tree/main/examples) to get an idea of how you can use Agglo.
 
+### Processes
+
+See the [processes page](https://github.com/kmgreen2/agglo/tree/main/internal/core/process) for examples of the stream processors currently supported.
+
 ### Entwine: Immutable, Partial Ordering of Events
 
 Agglo contains a special processor, called [Entwine](https://github.com/kmgreen2/agglo/tree/main/pkg/entwine) that allows you to scalably entwine two or more event histories.
