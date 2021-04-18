@@ -395,3 +395,45 @@ func (e *PipelineError) IsWarning() bool {
 	return true
 }
 
+// FlushDidNotCompleteError
+type FlushDidNotCompleteError struct {
+	name string
+	errors []error
+}
+
+// NewFlushDidNotCompleteError is the constructor for FlushDidNotCompleteError
+func NewFlushDidNotCompleteError(name string) *FlushDidNotCompleteError {
+	return &FlushDidNotCompleteError{
+		name: name,
+	}
+}
+
+func (e *FlushDidNotCompleteError) AddError(other error) {
+	e.errors = append(e.errors, other)
+}
+
+// Error returns the string representation of the FlushDidNotCompleteError
+func (e *FlushDidNotCompleteError) Error() string {
+	msg := fmt.Sprintf("Errors running the pipeline (%s):\n", e.name)
+	for _, err := range e.errors {
+		msg += err.Error() + "\n"
+	}
+	return msg
+}
+
+// Is
+func (e *FlushDidNotCompleteError) Is(other error) bool {
+	_, ok := other.(*FlushDidNotCompleteError)
+	return ok
+}
+
+// IsWarning()
+func (e *FlushDidNotCompleteError) IsWarning() bool {
+	for _, err := range e.errors {
+		if !IsWarning(err) {
+			return false
+		}
+	}
+	return true
+}
+

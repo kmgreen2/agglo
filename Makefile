@@ -22,7 +22,7 @@ all: build
 build: 
 	CGO_ENABLED=0 go build -o bin/regexmap cmd/regexmap/main.go
 	CGO_ENABLED=0 go build -o bin/printvals cmd/printvals/main.go
-	CGO_ENABLED=0 go build -o bin/binge cmd/binge/main.go
+	go build -o bin/binge cmd/binge/main.go
 	CGO_ENABLED=0 go build -o bin/genevents cmd/genevents/main.go
 	CGO_ENABLED=0 go build -o bin/activitytracker cmd/activitytracker/main.go cmd/activitytracker/activitytracker.go
 	CGO_ENABLED=0 go build -o bin/ticker cmd/ticker/main.go
@@ -33,7 +33,7 @@ build:
 ci-build: 
 	GOOS=linux CGO_ENABLED=0 go build -o bin/regexmap cmd/regexmap/main.go
 	GOOS=linux CGO_ENABLED=0 go build -o bin/printvals cmd/printvals/main.go
-	GOOS=linux CGO_ENABLED=0 go build -o bin/binge cmd/binge/main.go
+	GOOS=linux go build -o bin/binge cmd/binge/main.go
 	GOOS=linux CGO_ENABLED=0 go build -o bin/genevents cmd/genevents/main.go
 	GOOS=linux CGO_ENABLED=0 go build -o bin/activitytracker cmd/activitytracker/main.go cmd/activitytracker/activitytracker.go
 	GOOS=linux CGO_ENABLED=0 go build -o bin/ticker cmd/ticker/main.go
@@ -64,14 +64,16 @@ lint:
 .PHONY: test
 test: build genmocks ## run tests quickly
 	deployments/local/minio/run-minio.sh  && deployments/local/dynamodb/run-dynamodb.sh && \
+	deployments/local/kafka/run-kafka.sh && \
 	go test ./... ; \
-	deployments/local/minio/stop-minio.sh ; deployments/local/dynamodb/stop-dynamodb.sh  
+	deployments/local/minio/stop-minio.sh ; deployments/local/dynamodb/stop-dynamodb.sh ; deployments/local/kafka/stop-kafka.sh
 
 coverage: setup genmocks ## check code coverage
 	deployments/local/minio/run-minio.sh  && deployments/local/dynamodb/run-dynamodb.sh  && \
+	deployments/local/kafka/run-kafka.sh && \
 	go test ./... -cover -coverprofile=coverage.txt && \
 	go tool cover -html=coverage.txt -o coverage.html && \
-	deployments/local/minio/stop-minio.sh ; deployments/local/dynamodb/stop-dynamodb.sh  
+	deployments/local/minio/stop-minio.sh ; deployments/local/dynamodb/stop-dynamodb.sh ; deployments/local/kafka/stop-kafka.sh
 
 .PHONY: ci-test
 ci-test: genmocks ## run tests quickly
@@ -82,12 +84,12 @@ proto: api/proto/pipeline.proto api/proto/genevents.proto
 	$(PROTOC) --go_out=generated/proto api/proto/pipeline.proto 
 	$(PROTOC) --go_out=generated/proto api/proto/genevents.proto
 	$(PROTOC) -I$(GOPATH)/src \
-        -I$(GOPATH)/src/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis api/proto/ticker.proto \
-        --go_out=generated/proto --go-grpc_out=generated/proto
+		-I$(GOPATH)/src/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis api/proto/ticker.proto \
+		--go_out=generated/proto --go-grpc_out=generated/proto
 	$(PROTOC) -I$(GOPATH)/src \
-        -I$(GOPATH)/src/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis api/proto/ticker.proto \
-        --go_out=generated/proto \
-        --grpc-gateway_out=logtostderr=true:generated/proto
+		-I$(GOPATH)/src/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis api/proto/ticker.proto \
+		--go_out=generated/proto \
+		--grpc-gateway_out=logtostderr=true:generated/proto
 
 .PHONY: lambda-local
 lambda-local:
