@@ -19,6 +19,7 @@ const (
 	SpawnMetadataKey InternalKey = "internal:spawn:output"
 	EntwineMetadataKey InternalKey = "internal:entwine:output"
 	MessageIDKey InternalKey = "internal:messageID"
+	NTPTimeKey InternalKey = "internal:ntp:time"
 )
 
 func (k InternalKey) String()string {
