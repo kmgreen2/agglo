@@ -8,6 +8,7 @@ require (
 	github.com/Knetic/govaluate v2.3.0+incompatible
 	github.com/aws/aws-lambda-go v1.22.0
 	github.com/aws/aws-sdk-go v1.37.12
+	github.com/beevik/ntp v0.3.0
 	github.com/confluentinc/confluent-kafka-go v1.6.1
 	github.com/fsouza/fake-gcs-server v1.22.5
 	github.com/golang/mock v1.4.4
