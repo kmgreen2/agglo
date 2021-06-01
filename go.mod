@@ -9,7 +9,9 @@ require (
 	github.com/aws/aws-lambda-go v1.22.0
 	github.com/aws/aws-sdk-go v1.37.12
 	github.com/beevik/ntp v0.3.0
+	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/confluentinc/confluent-kafka-go v1.6.1
+	github.com/elastic/go-elasticsearch/v8 v8.0.0-20210715114708-200bc9d1b64b
 	github.com/fsouza/fake-gcs-server v1.22.5
 	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.4.3

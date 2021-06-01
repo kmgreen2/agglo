@@ -10,7 +10,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    
+
     services:
       dynamodb:
         image: amazon/dynamodb-local:latest
@@ -59,6 +59,21 @@ jobs:
           CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
           CONFLUENT_METRICS_ENABLE: 'true'
           CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
+          services:
+      es01:
+        image: docker.elastic.co/elasticsearch/elasticsearch:7.13.0
+        env:
+          node.name: es01
+          cluster.name: es-docker-cluster
+          cluster.initial_master_nodes: es01
+          bootstrap.memory_lock: true
+          ES_JAVA_OPTS: '-Xms512m -Xmx512m'
+        options: --ulimit memlock=-1:-1 --name es01  --health-cmd="curl --silent --fail http://localhost:9200/_cluster/health?wait_for_status=green&timeout=1s || exit 1" --health-interval 10s --health-timeout 5s --health-retries 5
+        volumes:
+          - data01:/usr/share/elasticsearch/data
+        ports:
+          - 9200:9200
+
     steps:
     - uses: actions/checkout@v2
 
@@ -66,16 +81,22 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: 1.15
-    
+
     - name: Install mockgen
       run: go get github.com/golang/mock/mockgen@v1.4.4
-    
+
     - name: Test minio is up
       run: nc localhost 9000 -vz
-    
+
+    - name: Test elasticsearch is up
+      run: nc localhost 9200 -vz
+
+    - name: Create elasticsearch index
+      run: sleep 10 && deployments/local/elastic/create-index.sh
+
     - name: Install minio-client
       run: wget https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x mc && sudo cp ./mc /usr/bin && mc alias set localtest http://localhost:9000 localtest localtest
-    
+
     - name: Create Minio bucket
       run: mc mb localtest/localtest || echo "noop"
     
@@ -108,3 +129,8 @@ jobs:
         AWS_ACCESS_KEY_ID: 'localtest'
         AWS_SECRET_ACCESS_KEY: 'localtest'
         REGION: 'us-west-2'
+    
+    - name: Setup tmate session
+      if: ${{ failure() }}
+      uses: mxschmitt/action-tmate@v3
+
