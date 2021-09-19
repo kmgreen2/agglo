@@ -1,0 +1,74 @@
+{
+  "settings": {
+    "number_of_shards": 1
+  },
+  "mappings": {
+    "properties": {
+      "type": {
+        "type": "keyword"
+      },
+      "id": {
+        "type": "keyword"
+      },
+      "fulltext": {
+        "type": "text"
+      },
+      "blob": {
+        "type": "object",
+        "enabled": false
+      },
+      "created": {
+        "type": "date",
+        "format": "yyyy-MM-dd HH:mm:ss",
+        "locale": "UTC"
+      },
+      "keywords": {
+        "type": "nested",
+        "properties": {
+          "id": {
+            "type": "keyword"
+          },
+          "value": {
+            "type": "keyword"
+          }
+        }
+      },
+      "numeric": {
+        "type": "nested",
+        "properties": {
+          "id": {
+            "type": "keyword"
+          },
+          "value": {
+            "type": "long"
+          }
+        }
+      },
+      "text": {
+        "type": "nested",
+        "properties": {
+          "id": {
+            "type": "keyword"
+          },
+          "value": {
+            "type": "text",
+            "copy_to": "fulltext"
+          }
+        }
+      },
+      "date": {
+        "type": "nested",
+        "properties": {
+          "id": {
+            "type": "keyword"
+          },
+          "value": {
+            "type": "date",
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "locale": "UTC"
+          }
+        }
+      }
+    }
+  }
+}

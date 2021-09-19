@@ -437,3 +437,24 @@ func (e *FlushDidNotCompleteError) IsWarning() bool {
 	return true
 }
 
+// IndexError represents a condition when a queue is empty
+type IndexError struct {
+	msg string
+}
+
+// NewIndexError is the constructor for IndexError
+func NewIndexError(msg string) *IndexError {
+	return &IndexError{msg}
+}
+
+// Error returns the string representation of the IndexError
+func (e *IndexError) Error() string {
+	return e.msg
+}
+
+// Is
+func (err *IndexError) Is(other error) bool {
+	_, ok := other.(*IndexError)
+	return ok
+}
+
