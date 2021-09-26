@@ -39,6 +39,7 @@ enum ExternalType {
     ExternalPubSub = 3;
     ExternalHttp = 4;
     ExternalLocalFile = 5;
+    ExternalSearchIndex = 6;
 }
 
 enum AggregationType {

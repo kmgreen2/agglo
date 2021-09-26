@@ -29,6 +29,18 @@
           }
         },
         {
+          "name": "SearchIndex",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
           "name": "TeeOutputA",
           "retryStrategy": {
             "numRetries": 0,
@@ -55,6 +67,11 @@
       "name": "ObjectStore",
       "connectionString": "s3:endpoint=localhost:9000,bucketName=localtesta",
       "externalType": "ExternalObjectStore"
+    },
+    {
+      "name": "SearchIndex",
+      "connectionString": "elastic:index=test-index,nodes=http://localhost:9200,authString=basic;;",
+      "externalType": "ExternalSearchIndex"
     },
     {
       "name": "LocalFileForA",
@@ -85,6 +102,15 @@
         "tickerEndpoint": "localhost:8001",
         "tickerInterval": 1,
         "condition": {}
+      }
+    },
+    {
+      "tee": {
+        "name": "SearchIndex",
+        "condition": {},
+        "outputConnectorRef": "SearchIndex",
+        "transformerRef": "",
+        "additionalBody": {}
       }
     },
     {

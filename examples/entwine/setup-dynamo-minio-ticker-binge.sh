@@ -9,6 +9,7 @@ MINIO_PORT=9000
 
 SETUP_DYNAMO=
 SETUP_MINIO=
+SETUP_ELASTIC=
 SETUP_DONE=
 
 function cleanup {
@@ -20,6 +21,9 @@ function cleanup {
         if [[ -n ${SETUP_MINIO} ]]; then
             docker kill minio
             docker rm minio
+        fi
+        if [[ -n ${SETUP_ELASTIC} ]]; then
+            ${ROOTDIR}/deployments/local/elastic/stop-elastic.sh
         fi
     fi
 }
@@ -77,6 +81,10 @@ sleep 2
 mc alias set localtest http://localhost:9000 localtest localtest
 
 SETUP_MINIO=1
+
+${ROOTDIR}/deployments/local/elastic/start-elastic.sh
+
+SETUP_ELASTIC=1
 
 # Create buckets to use in the test
 mc mb localtest/localtesta || exit 1

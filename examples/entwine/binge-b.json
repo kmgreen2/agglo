@@ -29,7 +29,19 @@
           }
         },
         {
-          "name": "LocalOutputB",
+          "name": "SearchIndex",
+          "retryStrategy": {
+            "numRetries": 0,
+            "initialBackOffMs": 0
+          },
+          "instrumentation": {
+            "enableTracing": false,
+            "latency": false,
+            "counter": false
+          }
+        },
+        {
+          "name": "TeeOutputB",
           "retryStrategy": {
             "numRetries": 0,
             "initialBackOffMs": 0
@@ -57,7 +69,12 @@
       "externalType": "ExternalObjectStore"
     },
     {
-      "name": "LocalFileB",
+      "name": "SearchIndex",
+      "connectionString": "elastic:index=test-index,nodes=http://localhost:9200,authString=basic;;",
+      "externalType": "ExternalSearchIndex"
+    },
+    {
+      "name": "LocalFileForB",
       "connectionString": "/tmp/b-out",
       "externalType": "ExternalLocalFile"
     }
@@ -89,9 +106,18 @@
     },
     {
       "tee": {
-        "name": "LocalOutputB",
+        "name": "SearchIndex",
         "condition": {},
-        "outputConnectorRef": "LocalFileB",
+        "outputConnectorRef": "SearchIndex",
+        "transformerRef": "",
+        "additionalBody": {}
+      }
+    },
+    {
+      "tee": {
+        "name": "TeeOutputB",
+        "condition": {},
+        "outputConnectorRef": "LocalFileForB",
         "transformerRef": "",
         "additionalBody": {}
       }

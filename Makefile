@@ -71,7 +71,7 @@ test: build genmocks ## run tests quickly
 	deployments/local/minio/stop-minio.sh ; deployments/local/dynamodb/stop-dynamodb.sh ; \
 	deployments/local/kafka/stop-kafka.sh ; deployments/local/elastic/stop-elastic.sh
 
-coverage: setup genmocks ## check code coverage
+coverage: build genmocks ## check code coverage
 	deployments/local/minio/run-minio.sh  && deployments/local/dynamodb/run-dynamodb.sh  && \
 	deployments/local/kafka/run-kafka.sh && deployments/local/elastic/start-elastic.sh \
 	go test ./... -cover -coverprofile=coverage.txt && \

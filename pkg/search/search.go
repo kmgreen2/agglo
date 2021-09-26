@@ -38,6 +38,7 @@ type Index interface {
 	Delete(ctx context.Context, documentID string) error
 	Query(ctx context.Context, query QuerySpec) (map[string]interface{}, error)
 	Close(ctx context.Context) error
+	ConnectionString() string
 }
 
 func NewIndexFromConnectionString(connectionString string) (Index, error) {

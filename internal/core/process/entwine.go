@@ -26,6 +26,7 @@ type Entwine struct {
 	objectStore storage.ObjectStore
 	signer crypto.Signer
 	subStreamID entwine.SubStreamID
+	streamStore entwine.StreamStore
 	condition *core.Condition
 	ticker client.TickerClient
 	tickerInterval int
@@ -50,8 +51,8 @@ func NewEntwine(name string, subStreamID entwine.SubStreamID, pem string, kvStor
 
 	entwiner.signer = crypto.NewRSASigner(privateKey, gocrypto.SHA256)
 
-	streamStore := entwine.NewKVStreamStore(kvStore, util.SHA256)
-	entwiner.appender = entwine.NewSubStreamAppender(streamStore, subStreamID)
+	entwiner.streamStore = entwine.NewKVStreamStore(kvStore, util.SHA256)
+	entwiner.appender = entwine.NewSubStreamAppender(entwiner.streamStore, subStreamID)
 
 	if tickerClient != nil {
 		entwiner.ticker = tickerClient
@@ -68,9 +69,9 @@ func NewEntwine(name string, subStreamID entwine.SubStreamID, pem string, kvStor
 		entwiner.currTickerUUID = tickerUuid
 	}
 
-	_, err = streamStore.Head(entwiner.subStreamID)
+	_, err = entwiner.streamStore.Head(entwiner.subStreamID)
 	if err != nil && errors.Is(&util.NotFoundError{}, err) {
-		err = streamStore.Create(entwiner.subStreamID, util.SHA256, entwiner.signer, entwiner.currTickerUUID)
+		err = entwiner.streamStore.Create(entwiner.subStreamID, util.SHA256, entwiner.signer, entwiner.currTickerUUID)
 		if err != nil {
 			return nil, err
 		}
@@ -167,9 +168,14 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (out m
 		}
 	}
 
+	committedMessage, err := e.streamStore.GetMessageByUUID(entwineUuid)
+	if err != nil {
+		return nil, PipelineProcessError(e, err, "error getting committed message")
+	}
+
 	switch outVal := out[EntwineMetadataKey].(type) {
 	case []map[string]interface{}:
-		teeOutputMap := map[string]interface{}{
+		outputMap := map[string]interface{}{
 			"objectDescriptor": map[string]string {
 				"objectKey": objectUuid.String(),
 				"objectStoreConnectionString": e.objectStore.ConnectionString(),
@@ -177,8 +183,9 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (out m
 			"entwineUuid": entwineUuid.String(),
 			"tickerUuid": e.currTickerUUID.String(),
 			"subStreamID": e.subStreamID,
+			"subStreamIndex": committedMessage.Index(),
 		}
-		out[EntwineMetadataKey] = append(outVal, teeOutputMap)
+		out[EntwineMetadataKey] = append(outVal, outputMap)
 	default:
 		msg := fmt.Sprintf("detected corrupted %s in map when entwining.  expected []map[string]string, got %v",
 			EntwineMetadataKey, reflect.TypeOf(outVal))

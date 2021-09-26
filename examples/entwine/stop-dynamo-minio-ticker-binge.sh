@@ -1,9 +1,13 @@
 #!/bin/bash
 
+ROOTDIR=$( dirname $0 )/../..
+
 docker kill dynamodb
 docker rm dynamodb
 docker kill minio
 docker rm minio
+
+${ROOTDIR}/deployments/local/elastic/stop-elastic.sh
 
 rm /tmp/a-out/*
 rm /tmp/b-out/*

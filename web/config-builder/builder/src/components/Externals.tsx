@@ -12,6 +12,7 @@ export enum ExternalType {
     PubSub = "PubSub",
     Http = "Http",
     LocalFile = "LocalFile",
+    SearchIndex = "SearchIndex"
 }
 
 export function StrToExternalType(strExternalType: string): ExternalType {
