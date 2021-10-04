@@ -18,6 +18,8 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strings"
+	"time"
 )
 
 var TeeMetadataKey string = string(common.TeeMetadataKey)
@@ -256,7 +258,16 @@ func NewSearchIndexTee(name string, searchIndex search.Index, condition *core.Co
 		for k, v := range payload {
 			switch _v := v.(type) {
 			case string:
-				builder = builder.AddKeyword(k, _v)
+				// Detect if the string is a timestamp and, if so add as date
+				if t, err := time.Parse(time.RFC3339, _v); err == nil {
+					if strings.Compare(k, search.ElasticCreated) == 0 {
+						builder = builder.SetCreated(t.UTC().Unix())
+					} else {
+						builder = builder.AddDate(k, t.UTC().Unix())
+					}
+				} else {
+					builder = builder.AddKeyword(k, _v)
+				}
 			case float64:
 				builder = builder.AddNumeric(k, _v)
 			case int:

@@ -85,6 +85,11 @@
         "name": "AnnotateBinge",
         "annotations": [
           {
+            "fieldKey": "created",
+            "value": "derived:currentTime",
+            "condition": {}
+          },
+          {
             "fieldKey": "bingeProcess",
             "value": "B",
             "condition": {}

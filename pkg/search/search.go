@@ -17,6 +17,7 @@ const (
 	IndexItemFreeText = 0x04
 	IndexItemDate = 0x08
 	IndexItemBlob = 0x10
+	IndexItemCreated = 0x20
 )
 
 type IndexItem struct {

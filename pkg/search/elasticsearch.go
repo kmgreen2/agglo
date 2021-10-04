@@ -135,6 +135,7 @@ const (
 	ElasticKeyword = "keywords"
 	ElasticFreeText = "text"
 	ElasticDate = "date"
+	ElasticCreated = "created"
 	ElasticBlob = "blob"
 )
 
@@ -168,6 +169,12 @@ func toPayload(value IndexValue) ([]byte, error) {
 				"id": k,
 				"value": v.item,
 			})
+		case IndexItemCreated:
+			if len(m[ElasticCreated]) == 0 {
+				m[ElasticCreated] = append(m[ElasticCreated], v.item)
+			} else {
+				m[ElasticCreated][0] = v.item
+			}
 		case IndexItemBlob:
 			if len(m[ElasticBlob]) == 0 {
 				m[ElasticBlob] = append(m[ElasticBlob], v.item)
