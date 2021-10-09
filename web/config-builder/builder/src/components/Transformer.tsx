@@ -23,7 +23,9 @@ export enum TransformationType {
     Count = "Count",
     LeftFold = "LeftFold",
     RightFold = "RightFold",
-    Map = "Map"
+    Map = "Map",
+    PopHead = "PopHead",
+    PopTail = "PopTail"
 }
 
 export function GetTransformationTypes(): Array<string> {
@@ -38,6 +40,8 @@ const TransformationArgNames = {
     Unknown: [],
     Sum: [],
     Copy: [],
+    PopHead: [],
+    PopTail: [],
     MapRegex: ["Regex", "Replace"],
     MapAdd: ["Const"],
     MapMult: ["Const"],

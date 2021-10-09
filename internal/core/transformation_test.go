@@ -302,3 +302,37 @@ func TestNewExecMapTransformation(t *testing.T) {
 		assert.Equal(t, expectedMap, v)
 	}
 }
+
+func TestPopHeadTransformation(t *testing.T) {
+	testSlice := []map[string]interface{} {
+		{"hello": 5},
+		{"hi": 5},
+		{"hey": 7},
+	}
+
+	builder := core.NewTransformationBuilder()
+	builder.AddFieldTransformation(core.PopHeadTransformation{})
+	transformation := builder.Get()
+
+	result, err := transformation.Transform(core.NewTransformable(testSlice))
+	assert.Nil(t, err)
+
+	assert.Equal(t, map[string]interface{}{"hello": 5}, result.Value())
+}
+
+func TestPopTailTransformation(t *testing.T) {
+	testSlice := []interface{} {
+		"hello",
+		5,
+		7,
+	}
+
+	builder := core.NewTransformationBuilder()
+	builder.AddFieldTransformation(core.PopTailTransformation{})
+	transformation := builder.Get()
+
+	result, err := transformation.Transform(core.NewTransformable(testSlice))
+	assert.Nil(t, err)
+
+	assert.Equal(t, 7, result.Value())
+}

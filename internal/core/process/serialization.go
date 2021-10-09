@@ -284,6 +284,10 @@ func buildTransformer(transformerSpec *api.Transformer) (*Transformer, error) {
 			case *api.Transformation_RightFoldArgs:
 				builder.AddFieldTransformation(core.NewExecMapTransformation(transformArgs.RightFoldArgs.Path))
 			}
+		case api.TransformationType_TransformPopHead:
+			builder.AddFieldTransformation(&core.PopHeadTransformation{})
+		case api.TransformationType_TransformPopTail:
+			builder.AddFieldTransformation(&core.PopTailTransformation{})
 		}
 		transformer.AddSpec(spec.SourceField, spec.TargetField, builder.Get())
 	}

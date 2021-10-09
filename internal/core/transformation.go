@@ -43,6 +43,54 @@ type FieldTransformation interface {
 	Transform(in *Transformable) (*Transformable, error)
 }
 
+type PopHeadTransformation struct {}
+func (t PopHeadTransformation) Transform(in *Transformable) (*Transformable, error) {
+	if in.Kind() == reflect.Slice {
+		switch v := in.Value().(type) {
+		case []interface{}:
+			if len(v) > 0 {
+				return &Transformable{v[0]}, nil
+			} else {
+				return &Transformable{nil}, nil
+			}
+		case []map[string]interface{}:
+			if len(v) > 0 {
+				return &Transformable{v[0]}, nil
+			} else {
+				return &Transformable{nil}, nil
+			}
+		default:
+			return nil, fmt.Errorf("Pop transformation only compatible with arrays, not  %v", in.Kind())
+		}
+	}
+	return nil, fmt.Errorf("Pop transformation only compatible with arrays, not  %v", in.Kind())
+}
+
+type PopTailTransformation struct {}
+func (t PopTailTransformation) Transform(in *Transformable) (*Transformable, error) {
+	if in.Kind() == reflect.Slice {
+		switch v := in.Value().(type) {
+		case []interface{}:
+			if len(v) > 0 {
+				lastElement := len(v) - 1
+				return &Transformable{v[lastElement]}, nil
+			} else {
+				return &Transformable{nil}, nil
+			}
+		case []map[string]interface{}:
+			if len(v) > 0 {
+				lastElement := len(v) - 1
+				return &Transformable{v[lastElement]}, nil
+			} else {
+				return &Transformable{nil}, nil
+			}
+		default:
+			return nil, fmt.Errorf("Pop transformation only compatible with arrays, not  %v", in.Kind())
+		}
+	}
+	return nil, fmt.Errorf("Pop transformation only compatible with arrays, not  %v", in.Kind())
+}
+
 type MapTransformation struct {
 	MapFunc func(interface{}) (interface{}, error)
 }

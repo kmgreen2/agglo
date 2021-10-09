@@ -176,7 +176,7 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (out m
 	switch outVal := out[EntwineMetadataKey].(type) {
 	case []map[string]interface{}:
 		outputMap := map[string]interface{}{
-			"objectDescriptor": map[string]string {
+			"objectDescriptor": map[string]interface{} {
 				"objectKey": objectUuid.String(),
 				"objectStoreConnectionString": e.objectStore.ConnectionString(),
 			},
