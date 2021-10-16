@@ -138,6 +138,8 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (out m
 
 	// Anchor with ticker store if necessary.
 	if e.ticker != nil && (e.numMessages % e.tickerInterval == 0) && e.numMessages != 0 {
+		// Distributed Lock() appender.StartAnchor() ... appender.EndAnchor()
+		// Maybe use entwineUuid instead of getting the head?
 		endNode, err := e.appender.Head()
 		if err != nil {
 			return nil, PipelineProcessError(e, err, "getting head of subStream")

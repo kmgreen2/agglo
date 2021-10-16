@@ -2,13 +2,13 @@ package entwine
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/pkg/state"
 	"github.com/kmgreen2/agglo/pkg/util"
+	"github.com/pkg/errors"
 	"strings"
 	"sync"
 	"time"
@@ -363,7 +363,7 @@ func (streamStore *KVStreamStore) Append(message *UncommittedMessage, subStreamI
 	// Take lock
 	ctx, err := streamStore.writeLocks[string(subStreamID)].Lock(context.Background(), -1)
 	if err != nil {
-		return gUuid.Nil, err
+		return gUuid.Nil, errors.Wrap(err, "failed to acquire write lock")
 	}
 	defer func() {
 		// ToDo(KMG): Log the error
@@ -372,17 +372,17 @@ func (streamStore *KVStreamStore) Append(message *UncommittedMessage, subStreamI
 
 	head, err := streamStore.getHead(subStreamID)
 	if err != nil {
-		return gUuid.Nil, err
+		return gUuid.Nil, errors.Wrap(err, "failed to get head of substream")
 	}
 	immutableMessage, err := NewStreamImmutableMessage(subStreamID, message.objectDescriptor, message.name,
 		message.tags, streamStore.digestType, message.signer, ts, head, anchorTickerUuid)
 	if err != nil {
-		return gUuid.Nil, err
+		return gUuid.Nil, errors.Wrap(err, "failed to create immutable message")
 	}
 
 	err = streamStore.append(immutableMessage)
 	if err != nil {
-		return gUuid.Nil, err
+		return gUuid.Nil, errors.Wrap(err, "failed to append message to stream store")
 	}
 
 	return immutableMessage.uuid, nil

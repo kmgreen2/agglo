@@ -269,27 +269,28 @@ func NewSearchIndexTee(name string, searchIndex search.Index, condition *core.Co
 					// ToDo(KMG): May want to change the behavior here, but we should index as follows:
 					//			  1. If the string is one token and less than 128 chars, then add as a keyword
 					//			  2. If the string is multiple tokens, add as a text field
-					//			  3. Else add as a blob (un-indexed)
 					numTokens := len(strings.Split(_v, " "))
-					if numTokens == 1 && len(_v) <= 128 {
+					if numTokens == 1 && len(_v) <= 32 {
 						builder = builder.AddKeyword(k, _v)
 					} else if numTokens > 1 {
 						builder = builder.AddFreeText(k, _v)
-					} else {
-						blob[k] = _v
 					}
 				}
 			case float64:
 				builder = builder.AddNumeric(k, _v)
 			case int:
+				builder = builder.AddNumeric(k, float64(_v))
 			case int64:
+				builder = builder.AddNumeric(k, float64(_v))
 			case uint:
+				builder = builder.AddNumeric(k, float64(_v))
 			case uint64:
+				builder = builder.AddNumeric(k, float64(_v))
 			case float32:
 				builder = builder.AddNumeric(k, float64(_v))
-			default:
-				blob[k] = _v
 			}
+			// Add all field to the blob
+			blob[k] = v
 		}
 
 		if len(blob) > 0 {
