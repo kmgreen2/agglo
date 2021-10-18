@@ -183,7 +183,15 @@ func GetKVStreamStore(numMessages int, subStreamID entwine.SubStreamID, signer c
 		if newAnchorStride > 0 && i % newAnchorStride == 0 {
 			currAnchorUuid = gUuid.New()
 		}
-		uuid, err := kvStreamStore.Append(message, subStreamID, currAnchorUuid)
+		appendLockCtx, err := kvStreamStore.SubStreamWriteLock(subStreamID)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+
+		uuid, err := kvStreamStore.Append(appendLockCtx, message, subStreamID, currAnchorUuid)
+
+		_ = kvStreamStore.SubStreamWriteUnlock(subStreamID, appendLockCtx)
+
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -277,7 +285,15 @@ func GetProofStream(startNumTicks, tickStride, messageStride, numEntanglements i
 			objKey := fmt.Sprintf("%d", k)
 			desc := storage.NewObjectDescriptor(storageParams, objKey)
 			message := entwine.NewUncommittedMessage(desc, objKey, []string{}, messageSigner)
-			endUuid, err = kvStreamStore.Append(message, subStreamID, anchorUuid)
+			appendLockCtx, err := kvStreamStore.SubStreamWriteLock(subStreamID)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			endUuid, err = kvStreamStore.Append(appendLockCtx, message, subStreamID, anchorUuid)
+
+			_ = kvStreamStore.SubStreamWriteUnlock(subStreamID, appendLockCtx)
+
 			if err != nil {
 				return nil, nil, err
 			}

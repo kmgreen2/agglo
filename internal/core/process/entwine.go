@@ -63,6 +63,11 @@ func NewEntwine(name string, subStreamID entwine.SubStreamID, pem string, kvStor
 			if err != nil {
 				return nil, err
 			}
+			// Be sure to set the genesis anchor
+			err = entwiner.appender.SetAnchorUuid(tickerUuid)
+			if err != nil {
+				return nil, err
+			}
 		} else if err != nil {
 			return nil, err
 		}
@@ -131,30 +136,41 @@ func (e *Entwine) Process(ctx context.Context, in map[string]interface{}) (out m
 
 	message := entwine.NewUncommittedMessage(desc, objectUuid.String(), []string{}, e.signer)
 
-	entwineUuid, err := e.appender.Append(message, e.currTickerUUID)
+	// WriteLock/WriteUnlock will ensure the anchor operation is synchronized with the append operations and
+	// other anchor operations for the same substream
+	appendLockCtx, err := e.appender.WriteLock()
+	if err != nil {
+		return nil, PipelineProcessError(e, err, "write lock for subStream")
+	}
+
+	defer func() {
+		_ = e.appender.WriteUnlock(appendLockCtx)
+	}()
+
+	// There is a race with the curr ticker UUID, where the wrong UUID is used because
+	// an anchor operation could happen concurrently
+	// ToDo(KMG): Need to handle ticker UUID internally => get anchor UUID inside of append (under lock)
+	entwineUuid, err := e.appender.Append(appendLockCtx, message)
 	if err != nil {
 		return nil, PipelineProcessError(e, err, "appending")
 	}
 
 	// Anchor with ticker store if necessary.
 	if e.ticker != nil && (e.numMessages % e.tickerInterval == 0) && e.numMessages != 0 {
-		// Distributed Lock() appender.StartAnchor() ... appender.EndAnchor()
-		// Maybe use entwineUuid instead of getting the head?
-		endNode, err := e.appender.Head()
-		if err != nil {
-			return nil, PipelineProcessError(e, err, "getting head of subStream")
-		}
-
-		endUuid := endNode.Uuid()
-
+		// Anchor from last known message with ticker to *this* latest appended message
 		startUuid, err := e.ticker.GetProofStartUuid(ctx, e.subStreamID)
 		if err != nil {
 			return nil, PipelineProcessError(e, err, "getting proof UUID")
 		}
 
-		messages, err := e.appender.GetHistory(startUuid, endUuid)
+		messages, err := e.appender.GetHistory(startUuid, entwineUuid)
 		if err != nil {
 			return nil, PipelineProcessError(e, err, "getting history")
+		}
+
+		var anchorUuids []string
+		for _, m := range messages {
+			anchorUuids = append(anchorUuids, m.Uuid().String()[:4])
 		}
 
 		if len(messages) > 0 {

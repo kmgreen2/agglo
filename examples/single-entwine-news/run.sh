@@ -83,11 +83,9 @@ mc mb localtest/localtest || exit 1
 rm /tmp/binge.pem*; ssh-keygen -f /tmp/binge.pem -t rsa -m pem -N "" && ssh-keygen -f /tmp/binge.pem.pub -e -m pem > /tmp/authenticators/e546e731-2b86-43cd-b847-764f437a7835.pem || exit 1
 rm /tmp/ticker.pem*; ssh-keygen -f /tmp/ticker.pem -t rsa -m pem -N "" && ssh-keygen -f /tmp/ticker.pem.pub -e -m pem > /tmp/authenticators/ticker.pem || exit 1
 
-#${ROOTDIR}/bin/ticker  --grpcPort 8001 --httpPort ${TICKER_PORT} -kvConnectionString "dynamo:endpoint=http://localhost:${DYNAMO_PORT},region=us-west-2,tableName=tickerKVStore,prefixLength=4" \
-#        -authenticatorPath /tmp/authenticators -privateKeyPath /tmp/ticker.pem > /tmp/ticker.out 2>&1 &
-#TICKER_PID=$!
-
-read -p "Hi\n"
+${ROOTDIR}/bin/ticker  --grpcPort 8001 --httpPort ${TICKER_PORT} -kvConnectionString "dynamo:endpoint=http://localhost:${DYNAMO_PORT},region=us-west-2,tableName=tickerKVStore,prefixLength=4" \
+        -authenticatorPath /tmp/authenticators -privateKeyPath /tmp/ticker.pem > /tmp/ticker.out 2>&1 &
+TICKER_PID=$!
 
 # Wait for the ticker to come up
 sleep 5

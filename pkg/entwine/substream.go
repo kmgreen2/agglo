@@ -1,6 +1,7 @@
 package entwine
 
 import (
+	"context"
 	gUuid "github.com/google/uuid"
 	"strings"
 )
@@ -33,8 +34,13 @@ func (ssa *SubStreamAppender) Head() (*StreamImmutableMessage, error) {
 	return ssa.streamStore.Head(ssa.subStreamID)
 }
 
-func (ssa *SubStreamAppender) Append(message *UncommittedMessage, anchorTickerUuid gUuid.UUID) (gUuid.UUID, error) {
-	return ssa.streamStore.Append(message, ssa.subStreamID, anchorTickerUuid)
+func (ssa *SubStreamAppender) Append(ctx context.Context, message *UncommittedMessage) (gUuid.UUID, error) {
+	anchorUuid, err := ssa.GetAnchorUuid()
+	if err != nil {
+		// ToDo(KMG): Assume the anchor is always set before calling append
+		return gUuid.Nil, err
+	}
+	return ssa.streamStore.Append(ctx, message, ssa.subStreamID, anchorUuid)
 }
 
 func (ssa *SubStreamAppender) GetAnchorUuid() (gUuid.UUID, error) {
@@ -47,5 +53,13 @@ func (ssa *SubStreamAppender) SetAnchorUuid(uuid gUuid.UUID) error {
 
 func (ssa *SubStreamAppender) GetHistory(startUuid, endUuid gUuid.UUID) ([]*StreamImmutableMessage, error) {
 	return ssa.streamStore.GetHistory(startUuid, endUuid)
+}
+
+func (ssa *SubStreamAppender) WriteLock() (context.Context, error) {
+	return ssa.streamStore.SubStreamWriteLock(ssa.subStreamID)
+}
+
+func (ssa *SubStreamAppender) WriteUnlock(ctx context.Context) error {
+	return ssa.streamStore.SubStreamWriteUnlock(ssa.subStreamID, ctx)
 }
 

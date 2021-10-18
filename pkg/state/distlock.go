@@ -25,6 +25,7 @@ func lockPrefix(id string) string {
 type DistributedLock interface {
 	Lock(ctx context.Context, timeout time.Duration) (context.Context, error)
 	Unlock(ctx context.Context) error
+	Locked(ctx context.Context) (bool, error)
 	Close(ctx context.Context) error
 }
 
@@ -199,6 +200,22 @@ func (l KVDistributedLock) Unlock(ctx context.Context) error {
 	}
 
 	return l.kvStore.AtomicDelete(ctx, l.getIndexKey(minIndex), []byte("locked"))
+}
+
+func (l KVDistributedLock) Locked(ctx context.Context) (bool, error) {
+	entries, err := l.getWaiters(ctx)
+	if err != nil {
+		return false, err
+	}
+	minIndex, err := l.getMinIndex(entries)
+	if err != nil {
+		return false, err
+	}
+	idx := util.ExtractDistributedLockIndex(ctx)
+	if idx != minIndex {
+		return false, nil
+	}
+	return true, nil
 }
 
 func (l KVDistributedLock) Close(ctx context.Context) error {
