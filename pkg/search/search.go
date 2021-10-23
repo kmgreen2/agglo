@@ -17,6 +17,7 @@ const (
 	IndexItemFreeText = 0x04
 	IndexItemDate = 0x08
 	IndexItemBlob = 0x10
+	IndexItemCreated = 0x20
 )
 
 type IndexItem struct {
@@ -38,6 +39,7 @@ type Index interface {
 	Delete(ctx context.Context, documentID string) error
 	Query(ctx context.Context, query QuerySpec) (map[string]interface{}, error)
 	Close(ctx context.Context) error
+	ConnectionString() string
 }
 
 func NewIndexFromConnectionString(connectionString string) (Index, error) {

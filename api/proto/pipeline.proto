@@ -39,6 +39,7 @@ enum ExternalType {
     ExternalPubSub = 3;
     ExternalHttp = 4;
     ExternalLocalFile = 5;
+    ExternalSearchIndex = 6;
 }
 
 enum AggregationType {
@@ -62,6 +63,8 @@ enum TransformationType {
     TransformLeftFold = 7;
     TransformRightFold = 8;
     TransformMap = 9;
+    TransformPopHead = 10;
+    TransformPopTail = 11;
 }
 
 enum OperatorType {

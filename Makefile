@@ -29,6 +29,7 @@ build:
 	CGO_ENABLED=0 go build -o bin/entwinectl cmd/entwinectl/main.go
 	CGO_ENABLED=0 go build -o bin/dumbserver cmd/dumbserver/main.go
 	CGO_ENABLED=0 go build -o bin/ntpsync cmd/ntpsync/main.go
+	CGO_ENABLED=0 go build -o bin/csv2json cmd/csv2json/main.go
 
 .PHONY: ci-build
 ci-build:
@@ -41,6 +42,7 @@ ci-build:
 	GOOS=linux CGO_ENABLED=0 go build -o bin/entwinectl cmd/entwinectl/main.go
 	GOOD=linux CGO_ENABLED=0 go build -o bin/dumbserver cmd/dumbserver/main.go
 	GOOS=linux CGO_ENABLED=0 go build -o bin/ntpsync cmd/ntpsync/main.go
+	GOOS=linux CGO_ENABLED=0 go build -o bin/csv2json cmd/csv2json/main.go
 
 .PHONY: genmocks
 genmocks:
@@ -71,7 +73,7 @@ test: build genmocks ## run tests quickly
 	deployments/local/minio/stop-minio.sh ; deployments/local/dynamodb/stop-dynamodb.sh ; \
 	deployments/local/kafka/stop-kafka.sh ; deployments/local/elastic/stop-elastic.sh
 
-coverage: setup genmocks ## check code coverage
+coverage: build genmocks ## check code coverage
 	deployments/local/minio/run-minio.sh  && deployments/local/dynamodb/run-dynamodb.sh  && \
 	deployments/local/kafka/run-kafka.sh && deployments/local/elastic/start-elastic.sh \
 	go test ./... -cover -coverprofile=coverage.txt && \

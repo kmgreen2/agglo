@@ -1,5 +1,7 @@
 package search
 
+import "time"
+
 type ElasticIndexValue struct {
 	values map[string]*IndexItem
 	id string
@@ -55,13 +57,25 @@ func (builder *ElasticIndexValueBuilder) AddFreeText(key string, value string) *
 func (builder *ElasticIndexValueBuilder) AddDate(key string, value int64) *ElasticIndexValueBuilder {
 	builder.value.values[key] = &IndexItem{
 		itemType: IndexItemDate,
-		item: value,
+		// ES mapping formats dates with: yyyy-MM-dd HH:mm:ss
+		// 2006-01-02T15:04:05Z07:00
+		item: time.Unix(value, 0).UTC().Format("2006-01-02 15:04:05"),
+	}
+	return builder
+}
+
+func (builder *ElasticIndexValueBuilder) SetCreated(value int64) *ElasticIndexValueBuilder {
+	builder.value.values[ElasticCreated] = &IndexItem{
+		itemType: IndexItemCreated,
+		// ES mapping formats dates with: yyyy-MM-dd HH:mm:ss
+		// 2006-01-02T15:04:05Z07:00
+		item: time.Unix(value, 0).UTC().Format("2006-01-02 15:04:05"),
 	}
 	return builder
 }
 
 func (builder *ElasticIndexValueBuilder) SetBlob(value []byte) *ElasticIndexValueBuilder {
-	builder.value.values["_blob"] = &IndexItem{
+	builder.value.values[ElasticBlob] = &IndexItem{
 		itemType: IndexItemBlob,
 		item: value,
 	}
@@ -103,6 +117,11 @@ func ResolveElasticResults(rawResults map[string]interface{}) (ElasticSearchResu
 									case ElasticDate:
 										if entryValue, entryValueOk := v.(map[string]interface{}); entryValueOk {
 											builder.AddDate(entryValue["id"].(string), entryValue["value"].(int64))
+										}
+										break
+									case ElasticCreated:
+										if entryValue, entryValueOk := v.(map[string]interface{}); entryValueOk {
+											builder.SetCreated(entryValue["value"].(int64))
 										}
 										break
 									case ElasticBlob:

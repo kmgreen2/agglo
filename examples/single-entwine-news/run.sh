@@ -1,8 +1,7 @@
 ROOTDIR=$( dirname $0 )/../..
 THISDIR=$( dirname $0 )
 
-BINGEA_PORT=8008
-BINGEB_PORT=8009
+BINGE_PORT=8008
 TICKER_PORT=8002
 DYNAMO_PORT=8000
 MINIO_PORT=9000
@@ -35,26 +34,16 @@ export AWS_SECRET_ACCESS_KEY=localtest
 export AWS_DEFAULT_REGION=us-west-2
 
 mkdir -p /tmp/authenticators
-mkdir -p /tmp/a-out
-mkdir -p /tmp/b-out
+mkdir -p /tmp/binge-out
 
-rm /tmp/a-out/*
-rm /tmp/b-out/*
+rm /tmp/binge-out/*
 
 docker run -d -p ${DYNAMO_PORT}:${DYNAMO_PORT} --name dynamodb amazon/dynamodb-local -jar DynamoDBLocal.jar -sharedDb
 sleep 2
 
 # Create tables 
 aws dynamodb create-table --endpoint-url http://localhost:${DYNAMO_PORT} --region us-west-2 \
-     --table-name kvStoreA \
-     --attribute-definitions \
-         AttributeName=KeyPrefix,AttributeType=S \
-         AttributeName=ValueKey,AttributeType=S \
-     --key-schema AttributeName=KeyPrefix,KeyType=HASH AttributeName=ValueKey,KeyType=RANGE \
-     --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 || exit 1
-
-aws dynamodb create-table --endpoint-url http://localhost:${DYNAMO_PORT} --region us-west-2 \
-     --table-name kvStoreB \
+     --table-name kvStore \
      --attribute-definitions \
          AttributeName=KeyPrefix,AttributeType=S \
          AttributeName=ValueKey,AttributeType=S \
@@ -87,13 +76,11 @@ ${ROOTDIR}/deployments/local/elastic/start-elastic.sh
 SETUP_ELASTIC=1
 
 # Create buckets to use in the test
-mc mb localtest/localtesta || exit 1
-mc mb localtest/localtestb || exit 1
+mc mb localtest/localtest || exit 1
 
 # Generate key pairs
 
-rm /tmp/a.pem*; ssh-keygen -f /tmp/a.pem -t rsa -m pem -N "" && ssh-keygen -f /tmp/a.pem.pub -e -m pem > /tmp/authenticators/e546e731-2b86-43cd-b847-764f437a7835.pem || exit 1
-rm /tmp/b.pem*; ssh-keygen -f /tmp/b.pem -t rsa -m pem -N "" && ssh-keygen -f /tmp/b.pem.pub -e -m pem > /tmp/authenticators/ed94a517-f030-4aa6-b390-6283ad24cab3.pem || exit 1
+rm /tmp/binge.pem*; ssh-keygen -f /tmp/binge.pem -t rsa -m pem -N "" && ssh-keygen -f /tmp/binge.pem.pub -e -m pem > /tmp/authenticators/e546e731-2b86-43cd-b847-764f437a7835.pem || exit 1
 rm /tmp/ticker.pem*; ssh-keygen -f /tmp/ticker.pem -t rsa -m pem -N "" && ssh-keygen -f /tmp/ticker.pem.pub -e -m pem > /tmp/authenticators/ticker.pem || exit 1
 
 ${ROOTDIR}/bin/ticker  --grpcPort 8001 --httpPort ${TICKER_PORT} -kvConnectionString "dynamo:endpoint=http://localhost:${DYNAMO_PORT},region=us-west-2,tableName=tickerKVStore,prefixLength=4" \
@@ -105,13 +92,11 @@ sleep 5
 
 curl --silent -X POST http://localhost:${TICKER_PORT}/api/v1/tick > /dev/null 2>&1
 
-${ROOTDIR}/bin/binge  -daemonPath /entwine -daemonPort ${BINGEA_PORT} -maxConnections 16 -runType stateless-daemon -exporter stdout -config ${THISDIR}/binge-a.json > /tmp/binge-a.out 2>&1 &
-BINGE1_PID=$!
-
-${ROOTDIR}/bin/binge  -daemonPath /entwine -daemonPort ${BINGEB_PORT} -maxConnections 16 -runType stateless-daemon -exporter stdout -config ${THISDIR}/binge-b.json > /tmp/binge-b.out 2>&1 &
-BINGE2_PID=$!
+${ROOTDIR}/bin/binge  -daemonPath /entwine -daemonPort ${BINGE_PORT} -maxConnections 16 -runType stateless-daemon -exporter stdout -config ${THISDIR}/binge.json > /tmp/binge.out 2>&1 &
+BINGE_PID=$!
 
 echo "All services are up!"
-echo "Run the following to cleanup: kill -9 ${TICKER_PID} ${BINGE1_PID} ${BINGE2_PID}; ${THISDIR}/stop-dynamo-minio-ticker-binge.sh"
+echo "Run the following to cleanup: kill -9 ${TICKER_PID} ${BINGE_PID}; ${THISDIR}/stop.sh"
 
 SETUP_DONE=1
+

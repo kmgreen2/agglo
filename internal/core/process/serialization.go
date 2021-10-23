@@ -9,6 +9,7 @@ import (
 	"github.com/kmgreen2/agglo/internal/common"
 	"github.com/kmgreen2/agglo/pkg/client"
 	"github.com/kmgreen2/agglo/pkg/entwine"
+	"github.com/kmgreen2/agglo/pkg/search"
 	"github.com/kmgreen2/agglo/pkg/state"
 	"github.com/kmgreen2/agglo/pkg/storage"
 	"github.com/kmgreen2/agglo/pkg/util"
@@ -283,6 +284,10 @@ func buildTransformer(transformerSpec *api.Transformer) (*Transformer, error) {
 			case *api.Transformation_RightFoldArgs:
 				builder.AddFieldTransformation(core.NewExecMapTransformation(transformArgs.RightFoldArgs.Path))
 			}
+		case api.TransformationType_TransformPopHead:
+			builder.AddFieldTransformation(&core.PopHeadTransformation{})
+		case api.TransformationType_TransformPopTail:
+			builder.AddFieldTransformation(&core.PopTailTransformation{})
 		}
 		transformer.AddSpec(spec.SourceField, spec.TargetField, builder.Get())
 	}
@@ -306,6 +311,7 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 	externalKVStores := make(map[string]kvs.KVStore)
 	externalPublisher := make(map[string]streaming.Publisher)
 	externalObjectStore := make(map[string]storage.ObjectStore)
+	externalSearchIndex := make(map[string]search.Index)
 	externalHttp := make(map[string]string)
 	externalLocalFile := make(map[string]string)
 	processes := make(map[string]PipelineProcess)
@@ -343,6 +349,11 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 				return nil, errors.Wrap(err, "PipelinesFromJson error")
 			}
 			externalObjectStore[externalSystem.Name] = objectStore
+		case api.ExternalType_ExternalSearchIndex:
+			externalSearchIndex[externalSystem.Name], err = search.NewIndexFromConnectionString(externalSystem.ConnectionString)
+			if err != nil {
+				return nil, errors.Wrap(err, "PipelinesFromJson error")
+			}
 		}
 	}
 
@@ -459,6 +470,9 @@ func PipelinesFromPb(pipelinesPb *api.Pipelines)  (*Pipelines, error) {
 					transformer, procDef.Tee.AdditionalBody.AsMap()); err != nil {
 					return nil, errors.Wrap(err, "PipelinesFromJson error")
 				}
+			} else if external, ok := externalSearchIndex[procDef.Tee.OutputConnectorRef]; ok {
+				processes[procDef.Tee.Name] = NewSearchIndexTee(procDef.Tee.Name, external, condition, transformer,
+					procDef.Tee.AdditionalBody.AsMap())
 			} else {
 				msg := fmt.Sprintf("%v is not a valid external reference", procDef.Tee.TransformerRef)
 				return nil, util.NewInvalidError(msg)

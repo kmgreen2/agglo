@@ -2,10 +2,10 @@ package state
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/pkg/util"
+	"github.com/pkg/errors"
 	"math"
 	"strconv"
 	"strings"
@@ -25,6 +25,7 @@ func lockPrefix(id string) string {
 type DistributedLock interface {
 	Lock(ctx context.Context, timeout time.Duration) (context.Context, error)
 	Unlock(ctx context.Context) error
+	Locked(ctx context.Context) (bool, error)
 	Close(ctx context.Context) error
 }
 
@@ -130,35 +131,40 @@ func (l KVDistributedLock) Lock(ctx context.Context, timeout time.Duration) (con
 	}
 
 	// Get the largest index for the lock, and use 0 if there are no entries
+	// The index determines the caller's place in line
 	entries, err := l.getWaiters(ctx)
 	if err != nil && !errors.Is(err, &util.NotFoundError{}){
-		return ctx, err
+		return ctx, errors.Wrap(err, "unable to get write lock waiters")
 	}
 
+	// Take a guess at the caller's place in line
 	myIndex := 0
 	if len(entries) > 0 {
 		maxIndex, err := l.getMaxIndex(entries)
 		if err != nil {
-			return ctx, err
+			return ctx, errors.Wrap(err, "unable to get write lock max index")
 		}
 		myIndex = maxIndex + 1
 	}
 
+	// Actually set the callers place in line, moving further back if others have arrived first
 	myKey := l.getIndexKey(myIndex)
 	for {
 		err = l.kvStore.AtomicPut(ctx, myKey, nil, []byte("locked"))
 		if err == nil {
 			break
 		} else if !errors.Is(err, &util.ConflictError{}) {
-			return ctx, err
+			return ctx, errors.Wrap(err, fmt.Sprintf("error setting write lock: %s", err.Error()))
 		}
 		myIndex++
 		myKey = l.getIndexKey(myIndex)
 	}
 
+	// Wait until the caller is min waiter before returning, and time out if the caller
+	// specified a timeout
 	minIndex, err := l.getMinWaiter(ctx)
 	if err != nil {
-		return ctx, err
+		return ctx, errors.Wrap(err, "error getting min write lock waiter")
 	}
 
 	for myIndex != minIndex {
@@ -167,11 +173,11 @@ func (l KVDistributedLock) Lock(ctx context.Context, timeout time.Duration) (con
 		case <- t.C:
 		case <- timeoutChannel:
 			t.Stop()
-			return ctx, util.NewTimedOutError("lock timed out")
+			return ctx, errors.Wrap(util.NewTimedOutError("lock timed out"), "lock operation timed out")
 		}
 		minIndex, err = l.getMinWaiter(ctx)
 		if err != nil {
-			return ctx, err
+			return ctx, errors.Wrap(err, "error getting min write lock when waiting to acquire write lock")
 		}
 	}
 
@@ -194,6 +200,22 @@ func (l KVDistributedLock) Unlock(ctx context.Context) error {
 	}
 
 	return l.kvStore.AtomicDelete(ctx, l.getIndexKey(minIndex), []byte("locked"))
+}
+
+func (l KVDistributedLock) Locked(ctx context.Context) (bool, error) {
+	entries, err := l.getWaiters(ctx)
+	if err != nil {
+		return false, err
+	}
+	minIndex, err := l.getMinIndex(entries)
+	if err != nil {
+		return false, err
+	}
+	idx := util.ExtractDistributedLockIndex(ctx)
+	if idx != minIndex {
+		return false, nil
+	}
+	return true, nil
 }
 
 func (l KVDistributedLock) Close(ctx context.Context) error {

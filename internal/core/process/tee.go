@@ -7,6 +7,7 @@ import (
 	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/internal/common"
+	"github.com/kmgreen2/agglo/pkg/search"
 	"github.com/kmgreen2/agglo/pkg/storage"
 	"github.com/kmgreen2/agglo/pkg/util"
 	"github.com/kmgreen2/agglo/internal/core"
@@ -17,6 +18,8 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strings"
+	"time"
 )
 
 var TeeMetadataKey string = string(common.TeeMetadataKey)
@@ -228,6 +231,96 @@ func NewHttpTee(name string, client common.HTTPClient, url string, condition *co
 		transformer,
 		"web",
 		url,
+		additionalBody,
+	}
+}
+
+func NewSearchIndexTee(name string, searchIndex search.Index, condition *core.Condition, transformer *Transformer,
+	additionalBody map[string]interface{}) *Tee {
+
+	outputFunc := func(ctx context.Context, key string, in map[string]interface{}) (map[string]interface{}, error) {
+		var err error
+		blob := make(map[string]interface{})
+		payload := in
+
+		if len(additionalBody) > 0 {
+			payload, err = util.MergeMaps(in, additionalBody)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		builder := search.NewElasticIndexValueBuilder(key)
+
+		// Only process first level of the dictionary as keyword or numeric values
+		// All non-string/numeric keys beyond the first level will be added to
+		// an un-indexed blob
+		for k, v := range payload {
+			switch _v := v.(type) {
+			case string:
+				// Detect if the string is a timestamp and, if so add as date
+				if t, err := time.Parse(time.RFC3339, _v); err == nil {
+					if strings.Compare(k, search.ElasticCreated) == 0 {
+						builder = builder.SetCreated(t.UTC().Unix())
+					} else {
+						builder = builder.AddDate(k, t.UTC().Unix())
+					}
+				} else {
+					// ToDo(KMG): May want to change the behavior here, but we should index as follows:
+					//			  1. If the string is one token and less than 128 chars, then add as a keyword
+					//			  2. If the string is multiple tokens, add as a text field
+					numTokens := len(strings.Split(_v, " "))
+					if numTokens == 1 && len(_v) <= 32 {
+						builder = builder.AddKeyword(k, _v)
+					} else if numTokens > 1 {
+						builder = builder.AddFreeText(k, _v)
+					}
+				}
+			case float64:
+				builder = builder.AddNumeric(k, _v)
+			case int:
+				builder = builder.AddNumeric(k, float64(_v))
+			case int64:
+				builder = builder.AddNumeric(k, float64(_v))
+			case uint:
+				builder = builder.AddNumeric(k, float64(_v))
+			case uint64:
+				builder = builder.AddNumeric(k, float64(_v))
+			case float32:
+				builder = builder.AddNumeric(k, float64(_v))
+			}
+			// Add all field to the blob
+			blob[k] = v
+		}
+
+		if len(blob) > 0 {
+			blobBytes := bytes.NewBuffer([]byte{})
+			encoder := json.NewEncoder(blobBytes)
+
+			err = encoder.Encode(blob)
+			if err != nil {
+				return nil, err
+			}
+
+			builder.SetBlob(blobBytes.Bytes())
+		}
+
+		return nil, searchIndex.Put(ctx, key, builder.Get())
+	}
+	if transformer == nil {
+		transformation := core.NewTransformation(
+			[]core.FieldTransformation{&core.CopyTransformation{}},
+			core.TrueCondition)
+		transformer = DefaultTransformer()
+		transformer.AddSpec("", "", transformation)
+	}
+	return &Tee{
+		name,
+		outputFunc,
+		condition,
+		transformer,
+		"searchIndex",
+		searchIndex.ConnectionString(),
 		additionalBody,
 	}
 }

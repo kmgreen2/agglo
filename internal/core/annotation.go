@@ -1,12 +1,38 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
+
+type DerivedValue string
+
+const (
+	CurrentTime DerivedValue = "derived:currentTime"
+)
+
+func deriveCurrentTime(inValue string) string {
+	return time.Now().Format(time.RFC3339)
+}
+
+type DerivedValueGenerator func(string) string
+
+var DerivedValues = map[DerivedValue]DerivedValueGenerator {
+	CurrentTime: deriveCurrentTime,
+}
 
 // Annotation is a conditional annotation for a map
 type Annotation struct {
 	fieldKey string
 	value string
 	condition *Condition
+}
+
+func getValue(value string) string {
+	if vFunc, ok := DerivedValues[DerivedValue(value)]; ok {
+		return vFunc(value)
+	}
+	return value
 }
 
 // NewAnnotation will create a new conditional Annotation object based on the provided
@@ -31,6 +57,6 @@ func (a Annotation) Annotate(in map[string]interface{}) error {
 	if _, ok := in[a.fieldKey]; ok {
 		return fmt.Errorf("field exists: cannot annotate with field '%s'", a.fieldKey)
 	}
-	in[a.fieldKey] = a.value
+	in[a.fieldKey] = getValue(a.value)
 	return nil
 }

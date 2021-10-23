@@ -2,13 +2,13 @@ package entwine
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	gUuid "github.com/google/uuid"
 	"github.com/kmgreen2/agglo/pkg/crypto"
 	"github.com/kmgreen2/agglo/pkg/kvs"
 	"github.com/kmgreen2/agglo/pkg/state"
 	"github.com/kmgreen2/agglo/pkg/util"
+	"github.com/pkg/errors"
 	"strings"
 	"sync"
 	"time"
@@ -33,13 +33,14 @@ type StreamStore interface {
 	GetMessageByUUID(uuid gUuid.UUID) (*StreamImmutableMessage, error)
 	GetHistory(start gUuid.UUID, end gUuid.UUID) ([]*StreamImmutableMessage, error)
 	GetHistoryToLastAnchor(uuid gUuid.UUID) ([]*StreamImmutableMessage, error)
-	Append(message *UncommittedMessage, subStreamID SubStreamID, anchorTickerUuid gUuid.UUID) (gUuid.UUID, error)
+	Append(ctx context.Context, message *UncommittedMessage, subStreamID SubStreamID, anchorTickerUuid gUuid.UUID) (gUuid.UUID, error)
 	Head(subStreamID SubStreamID) (*StreamImmutableMessage, error)
 	Create(subStreamID SubStreamID, digestType util.DigestType,
 		signer crypto.Signer, anchorTickerUuid gUuid.UUID) error
 	GetCurrentAnchorUuid(subStreamID SubStreamID) (gUuid.UUID, error)
 	SetCurrentAnchorUuid(subStreamID SubStreamID, uuid gUuid.UUID) error
-
+	SubStreamWriteLock(subStreamID SubStreamID) (context.Context, error)
+	SubStreamWriteUnlock(subStreamID SubStreamID, ctx context.Context) error
 
 	// This function needs to be at a higher level
 	// If the anchor is encoded into every message, then this is a simple fetch and compare from the Ticker: idx1 < idx2
@@ -347,13 +348,7 @@ func (streamStore *KVStreamStore) SetCurrentAnchorUuid(subStreamID SubStreamID, 
 		uuidBytes)
 }
 
-
-// Append will append an uncommitted message to a substream, anchored at the provided anchor UUID; otherwise return
-// an error.
-func (streamStore *KVStreamStore) Append(message *UncommittedMessage, subStreamID SubStreamID,
-	anchorTickerUuid gUuid.UUID) (gUuid.UUID, error) {
-	ts := time.Now().Unix()
-
+func (streamStore *KVStreamStore) SubStreamWriteLock(subStreamID SubStreamID) (context.Context, error) {
 	streamStore.streamLock.Lock()
 	if _, ok := streamStore.writeLocks[string(subStreamID)]; !ok {
 		streamStore.writeLocks[string(subStreamID)] = state.NewKVDistributedLock(string(subStreamID), streamStore.kvStore)
@@ -363,26 +358,51 @@ func (streamStore *KVStreamStore) Append(message *UncommittedMessage, subStreamI
 	// Take lock
 	ctx, err := streamStore.writeLocks[string(subStreamID)].Lock(context.Background(), -1)
 	if err != nil {
+		return ctx, errors.Wrap(err, "failed to acquire write lock")
+	}
+	return ctx, nil
+}
+
+func (streamStore *KVStreamStore) SubStreamWriteUnlock(subStreamID SubStreamID, ctx context.Context) error {
+	return streamStore.writeLocks[string(subStreamID)].Unlock(ctx)
+}
+
+func (streamStore *KVStreamStore) SubStreamIsLocked(subStreamID SubStreamID, ctx context.Context) (bool, error) {
+	return streamStore.writeLocks[string(subStreamID)].Locked(ctx)
+}
+
+
+// Append will append an uncommitted message to a substream, anchored at the provided anchor UUID; otherwise return
+// an error.
+func (streamStore *KVStreamStore) Append(ctx context.Context, message *UncommittedMessage, subStreamID SubStreamID,
+	anchorTickerUuid gUuid.UUID) (gUuid.UUID, error) {
+	ts := time.Now().Unix()
+
+	// Must ensure the caller holds the lock on the substream
+	// This is needed because append calls can race with anchor
+	// calls
+	// See Process in the Entwine
+	ok, err := streamStore.SubStreamIsLocked(subStreamID, ctx)
+	if !ok {
+		return gUuid.Nil, util.NewInvalidError(
+			fmt.Sprintf("cannot append to subStream (%s) without holding subStream lock", subStreamID))
+	} else if err != nil {
 		return gUuid.Nil, err
 	}
-	defer func() {
-		// ToDo(KMG): Log the error
-		_ = streamStore.writeLocks[string(subStreamID)].Unlock(ctx)
-	}()
 
 	head, err := streamStore.getHead(subStreamID)
 	if err != nil {
-		return gUuid.Nil, err
+		return gUuid.Nil, errors.Wrap(err, "failed to get head of substream")
 	}
 	immutableMessage, err := NewStreamImmutableMessage(subStreamID, message.objectDescriptor, message.name,
 		message.tags, streamStore.digestType, message.signer, ts, head, anchorTickerUuid)
 	if err != nil {
-		return gUuid.Nil, err
+		return gUuid.Nil, errors.Wrap(err, "failed to create immutable message")
 	}
 
 	err = streamStore.append(immutableMessage)
 	if err != nil {
-		return gUuid.Nil, err
+		return gUuid.Nil, errors.Wrap(err, "failed to append message to stream store")
 	}
 
 	return immutableMessage.uuid, nil

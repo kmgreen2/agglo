@@ -291,7 +291,16 @@ func (ledger *Ledger) Vote(voterElectionUuid gUuid.UUID, voterElectionUuidSignat
 
 	message := entwine.NewUncommittedMessage(desc, voterElectionUuid.String(), []string{}, ledger.signer)
 
-	streamUuid, err := ledger.streamStore.Append(message, ledger.municipality, ledger.currTickerAnchorUuid)
+	appendLockCtx, err := ledger.streamStore.SubStreamWriteLock(ledger.municipality)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		_ = ledger.streamStore.SubStreamWriteUnlock(ledger.municipality, appendLockCtx)
+	}()
+
+	streamUuid, err := ledger.streamStore.Append(appendLockCtx, message, ledger.municipality, ledger.currTickerAnchorUuid)
 	if err != nil {
 		return nil, err
 	}

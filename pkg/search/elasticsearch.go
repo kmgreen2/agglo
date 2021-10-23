@@ -22,6 +22,7 @@ type ElasticsearchIndex struct {
 	bulkIndexer esutil.BulkIndexer
 	bulkThreads int
 	bulkThresholdBytes int
+	connectionString string
 }
 
 func NewElasticsearchIndexFromConnectionString(connectionString string) (*ElasticsearchIndex, error) {
@@ -47,6 +48,8 @@ func NewElasticsearchIndexFromConnectionString(connectionString string) (*Elasti
 		MaxRetries: 5,
 	}
 
+	// Set connection string
+	esIndex.connectionString = connectionString
 
 	// Set defaults
 	esIndex.bulkThreads = 4
@@ -132,6 +135,7 @@ const (
 	ElasticKeyword = "keywords"
 	ElasticFreeText = "text"
 	ElasticDate = "date"
+	ElasticCreated = "created"
 	ElasticBlob = "blob"
 )
 
@@ -165,6 +169,12 @@ func toPayload(value IndexValue) ([]byte, error) {
 				"id": k,
 				"value": v.item,
 			})
+		case IndexItemCreated:
+			if len(m[ElasticCreated]) == 0 {
+				m[ElasticCreated] = append(m[ElasticCreated], v.item)
+			} else {
+				m[ElasticCreated][0] = v.item
+			}
 		case IndexItemBlob:
 			if len(m[ElasticBlob]) == 0 {
 				m[ElasticBlob] = append(m[ElasticBlob], v.item)
@@ -289,4 +299,8 @@ func (elastic *ElasticsearchIndex) Close(ctx context.Context) error {
 		return elastic.bulkIndexer.Close(ctx)
 	}
 	return nil
+}
+
+func (elastic *ElasticsearchIndex) ConnectionString() string {
+	return elastic.connectionString
 }

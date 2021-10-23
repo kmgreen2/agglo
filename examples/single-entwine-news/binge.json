@@ -2,22 +2,10 @@
   "partitionUuid": "9eb9f91d-b8e6-461d-896d-5e553ade52f7",
   "pipelines": [
     {
-      "name": "BingeB",
+      "name": "Binge",
       "processes": [
         {
-          "name": "AnnotateBinge",
-          "retryStrategy": {
-            "numRetries": 0,
-            "initialBackOffMs": 0
-          },
-          "instrumentation": {
-            "enableTracing": false,
-            "latency": false,
-            "counter": false
-          }
-        },
-        {
-          "name": "EntwineB",
+          "name": "Entwine",
           "retryStrategy": {
             "numRetries": 0,
             "initialBackOffMs": 0
@@ -65,7 +53,7 @@
           }
         },
         {
-          "name": "TeeOutputB",
+          "name": "TeeOutput",
           "retryStrategy": {
             "numRetries": 0,
             "initialBackOffMs": 0
@@ -84,12 +72,12 @@
   "externalSystems": [
     {
       "name": "KVStore",
-      "connectionString": "dynamo:endpoint=http://localhost:8000,region=us-west-2,tableName=kvStoreB,prefixLength=4",
+      "connectionString": "dynamo:endpoint=http://localhost:8000,region=us-west-2,tableName=kvStore,prefixLength=4",
       "externalType": "ExternalKVStore"
     },
     {
       "name": "ObjectStore",
-      "connectionString": "s3:endpoint=localhost:9000,bucketName=localtestb",
+      "connectionString": "s3:endpoint=localhost:9000,bucketName=localtest",
       "externalType": "ExternalObjectStore"
     },
     {
@@ -98,36 +86,19 @@
       "externalType": "ExternalSearchIndex"
     },
     {
-      "name": "LocalFileForB",
-      "connectionString": "/tmp/b-out",
+      "name": "LocalFileFor",
+      "connectionString": "/tmp/binge-out",
       "externalType": "ExternalLocalFile"
     }
   ],
   "processDefinitions": [
     {
-      "annotator": {
-        "name": "AnnotateBinge",
-        "annotations": [
-          {
-            "fieldKey": "created",
-            "value": "derived:currentTime",
-            "condition": {}
-          },
-          {
-            "fieldKey": "bingeProcess",
-            "value": "B",
-            "condition": {}
-          }
-        ]
-      }
-    },
-    {
       "entwine": {
-        "name": "EntwineB",
+        "name": "Entwine",
         "streamStateStore": "KVStore",
         "objectStore": "ObjectStore",
-        "pemPath": "/tmp/b.pem",
-        "subStreamID": "ed94a517-f030-4aa6-b390-6283ad24cab3",
+        "pemPath": "/tmp/binge.pem",
+        "subStreamID": "e546e731-2b86-43cd-b847-764f437a7835",
         "tickerEndpoint": "localhost:8001",
         "tickerInterval": 1,
         "condition": {}
@@ -144,9 +115,9 @@
     },
     {
       "tee": {
-        "name": "TeeOutputB",
+        "name": "TeeOutput",
         "condition": {},
-        "outputConnectorRef": "LocalFileForB",
+        "outputConnectorRef": "LocalFileFor",
         "transformerRef": "",
         "additionalBody": {}
       }

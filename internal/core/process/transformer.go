@@ -83,6 +83,7 @@ func (t Transformer) valueFromPath(key string, in map[string]interface{}) (inter
 func (t Transformer) createPathAndTransform(sourceField, targetField string, transformation *core.Transformation, in,
 	out map[string]interface{}) error {
 
+	// Note(KMG): This path is specifically for copying entire input payloads
 	if len(sourceField) == 0 && len(targetField) == 0 {
 		result, err := transformation.Transform(core.NewTransformable(in))
 		if err != nil {

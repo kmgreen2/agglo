@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
@@ -26,6 +27,17 @@ func keyPrefix(key string, length int) string {
 		prefixLength = len(key)
 	}
 	return key[:prefixLength]
+}
+
+// Will map to a conflict error if the error is a conditional check failure
+func dynamoConflictOrError(err error) error {
+	aerr, ok := err.(awserr.Error)
+	code := aerr.Code()
+	if ok && strings.Compare(code, "TransactionCanceledException") == 0 &&
+		strings.Contains(aerr.Error(), "ConditionalCheckFailed"){
+		return util.NewConflictError(aerr.Error())
+	}
+	return err
 }
 
 // NewDynamoKVStoreFromConnectionString
@@ -143,7 +155,8 @@ func (kvStore *DynamoKVStore) AtomicPut(ctx context.Context, key string, prev, v
 
 	_, err = kvStore.client.TransactWriteItems(input)
 	if err != nil {
-		return err
+		// Map to a conflict error if the conditional check fails
+		return dynamoConflictOrError(err)
 	}
 	return nil
 }
@@ -185,7 +198,8 @@ func (kvStore *DynamoKVStore)  AtomicDelete(ctx context.Context, key string, pre
 
 	_, err = kvStore.client.TransactWriteItems(input)
 	if err != nil {
-		return err
+		// Map to a conflict error if the conditional check fails
+		return dynamoConflictOrError(err)
 	}
 	return nil
 }
