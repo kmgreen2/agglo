@@ -18,6 +18,4 @@ rmdir /tmp/authenticators
 rm /tmp/a.pem*
 rm /tmp/b.pem*
 
-rm /tmp/binge-a.out
-rm /tmp/binge-b.out
 rm /tmp/ticker.out
