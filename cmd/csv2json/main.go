@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"encoding/csv"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,6 +19,7 @@ type CommandArgs struct {
 	outfile *os.File
 	outEndpoint string
 	csvMap map[int64]string
+	fieldMatchers map[int64]*regexp.Regexp
 	debugLogging bool
 	concurrencyChan chan bool
 	outfileMutex sync.Mutex
@@ -33,6 +35,7 @@ func parseArgs() *CommandArgs {
 	var err error
 	args := &CommandArgs{}
 	args.csvMap = make(map[int64]string)
+	args.fieldMatchers = make(map[int64]*regexp.Regexp)
 	csvFilePtr := flag.String("csvFile", "/dev/stdin", "path to fetch CSV input")
 	outfilePtr := flag.String("outfile", "", "path to file to store output")
 	outEndpointPtr := flag.String("outEndpoint", "", "path to endpoint to send output")
@@ -40,6 +43,8 @@ func parseArgs() *CommandArgs {
 		"Comma-delimited mapping of CSV index to output field name: idx1:field1,idx2:field2,...")
 	debugLoggingPtr := flag.Bool("debugLogging", false, "enable debug logging")
 	concurrencyPtr := flag.Int("concurrency", 1, "concurrency")
+	fieldMatchers := flag.String("fieldMatchers", "",
+		"Comma-delimited field to regex matchers: idx1:r1,idx2:r2,...")
 
 	flag.Parse()
 
@@ -83,6 +88,23 @@ func parseArgs() *CommandArgs {
 		args.csvMap[idx] = mAry[1]
 	}
 
+	for _, m := range strings.Split(*fieldMatchers, ",") {
+		mAry := strings.Split(m, ":")
+		if len(mAry) != 2 {
+			panic(fmt.Sprintf("Malformed field matcher entry: %s.  Expected idx:regex", m))
+		}
+		idx, err := strconv.ParseInt(mAry[0], 10, 32)
+		if err != nil {
+			panic(err)
+		}
+		cRegex, err := regexp.Compile(mAry[1])
+		if err != nil {
+			panic(err)
+		}
+		args.fieldMatchers[idx] = cRegex
+	}
+
+
 	return args
 }
 
@@ -125,8 +147,18 @@ func main() {
 
 	for _, record := range records {
 		outMap := make(map[string]string)
+		match := true
 		for idx, field := range args.csvMap {
+			if cRegex, ok := args.fieldMatchers[idx]; ok {
+				if !cRegex.MatchString(record[idx]) {
+					match = false
+					break
+				}
+			}
 			outMap[field] = record[idx]
+		}
+		if !match {
+			continue
 		}
 		jsonBuf := bytes.NewBuffer([]byte{})
 		encoder := json.NewEncoder(jsonBuf)
